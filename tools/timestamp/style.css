@@ -1,0 +1,208 @@
+/* ========== 时间戳工具样式 ========== */
+
+.tool-container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ========== 区块标题 ========== */
+.section-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ========== 当前时间 ========== */
+.now-section,
+.convert-section {
+  padding: var(--space-lg);
+}
+
+.now-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.now-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+  gap: var(--space-md);
+}
+
+.now-row:last-child {
+  border-bottom: none;
+}
+
+.now-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.now-value-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.now-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+  text-align: right;
+}
+
+.now-row--accent .now-value {
+  color: var(--accent);
+  font-size: var(--text-lg);
+}
+
+.btn-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.btn-copy:hover {
+  background: var(--card-hover);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
+.btn-copy--success {
+  color: #22c55e;
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+/* ========== 转换区 ========== */
+.convert-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.convert-input {
+  flex: 1;
+  min-width: 200px;
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.convert-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.convert-select {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.convert-result {
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  min-height: 50px;
+  word-break: break-all;
+  font-family: var(--font-mono);
+}
+
+.convert-result--error {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.result-line {
+  padding: 2px 0;
+}
+
+.result-line code {
+  background: var(--card);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.result-line--sub {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  margin-top: var(--space-xs);
+  font-family: var(--font-mono);
+}
+
+/* ========== 快捷键提示 ========== */
+.shortcut-hint {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 480px) {
+  .convert-row {
+    flex-direction: column;
+  }
+  .convert-input,
+  .convert-select {
+    width: 100%;
+  }
+  .now-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+  .now-value-row {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .now-value {
+    text-align: left;
+  }
+}

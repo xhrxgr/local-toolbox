@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="编码转换工具 —— Base64 / URL / ASCII / Unicode 编解码，全部本地运行" />
+  <title>编码转换 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/encoding/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="base64">Base64</button>
+      <button class="mode-tab" data-mode="url">URL 编码</button>
+      <button class="mode-tab" data-mode="ascii">ASCII</button>
+      <button class="mode-tab" data-mode="unicode">Unicode</button>
+    </nav>
+
+    <!-- ========== Base64 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-base64">
+      <div class="panel-desc">Base64 编解码，支持 UTF-8 中文（自动处理多字节字符，避免乱码）。</div>
+      <div class="codec-row">
+        <label class="codec-label">输入</label>
+        <textarea class="codec-input" id="b64-input" placeholder="输入文本或 Base64 字符串" rows="5"></textarea>
+      </div>
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-b64-encode">编码 →</button>
+        <button class="btn btn-secondary" id="btn-b64-decode">← 解码</button>
+        <button class="btn btn-secondary" id="btn-b64-swap">↑↓ 交换</button>
+        <button class="btn btn-secondary" id="btn-b64-clear">清空</button>
+      </div>
+      <div class="codec-row">
+        <label class="codec-label">输出</label>
+        <textarea class="codec-output" id="b64-output" placeholder="结果" rows="5" readonly></textarea>
+      </div>
+      <div class="codec-meta" id="b64-meta"></div>
+    </section>
+
+    <!-- ========== URL 编码 ========== -->
+    <section class="mode-panel glass" id="panel-url">
+      <div class="panel-desc">URL 编解码，支持 encodeURIComponent（编码所有特殊字符）和 encodeURI（保留 URL 结构）两种模式。</div>
+      <div class="codec-row">
+        <label class="codec-label">输入</label>
+        <textarea class="codec-input" id="url-input" placeholder="输入 URL 或文本" rows="5"></textarea>
+      </div>
+      <div class="codec-actions">
+        <select class="codec-select" id="url-mode">
+          <option value="component">encodeURIComponent（编码所有特殊字符）</option>
+          <option value="uri">encodeURI（保留 :/?#[]@!$&'()*+,;=）</option>
+        </select>
+        <button class="btn btn-primary" id="btn-url-encode">编码 →</button>
+        <button class="btn btn-secondary" id="btn-url-decode">← 解码</button>
+        <button class="btn btn-secondary" id="btn-url-swap">↑↓ 交换</button>
+        <button class="btn btn-secondary" id="btn-url-clear">清空</button>
+      </div>
+      <div class="codec-row">
+        <label class="codec-label">输出</label>
+        <textarea class="codec-output" id="url-output" placeholder="结果" rows="5" readonly></textarea>
+      </div>
+      <div class="codec-meta" id="url-meta"></div>
+    </section>
+
+    <!-- ========== ASCII ========== -->
+    <section class="mode-panel glass" id="panel-ascii">
+      <div class="panel-desc">ASCII / 字符编码转换，支持文本与 ASCII 码（十进制 / 十六进制 / 二进制）双向转换。</div>
+      <div class="codec-row">
+        <label class="codec-label">输入</label>
+        <textarea class="codec-input" id="ascii-input" placeholder="输入文本或 ASCII 码（用空格、逗号或 0x 前缀分隔）" rows="5"></textarea>
+      </div>
+      <div class="codec-actions">
+        <select class="codec-select" id="ascii-mode">
+          <option value="dec">文本 → 十进制</option>
+          <option value="hex">文本 → 十六进制 (0xXX)</option>
+          <option value="bin">文本 → 二进制</option>
+          <option value="char">ASCII 码 → 文本</option>
+        </select>
+        <button class="btn btn-primary" id="btn-ascii-convert">转换 →</button>
+        <button class="btn btn-secondary" id="btn-ascii-swap">↑↓ 交换</button>
+        <button class="btn btn-secondary" id="btn-ascii-clear">清空</button>
+      </div>
+      <div class="codec-row">
+        <label class="codec-label">输出</label>
+        <textarea class="codec-output" id="ascii-output" placeholder="结果" rows="5" readonly></textarea>
+      </div>
+      <div class="codec-meta" id="ascii-meta"></div>
+    </section>
+
+    <!-- ========== Unicode ========== -->
+    <section class="mode-panel glass" id="panel-unicode">
+      <div class="panel-desc">Unicode 转换，支持文本与 \uXXXX / U+XXXX 转义双向转换，并显示每个字符的码点。</div>
+      <div class="codec-row">
+        <label class="codec-label">输入</label>
+        <textarea class="codec-input" id="uni-input" placeholder="输入文本或 Unicode 转义（如 \\u4e2d\\u6587 或 U+4E2D U+6587）" rows="5"></textarea>
+      </div>
+      <div class="codec-actions">
+        <select class="codec-select" id="uni-mode">
+          <option value="escape">文本 → \uXXXX 转义</option>
+          <option value="codepoint">文本 → U+XXXX 码点</option>
+          <option value="unescape">转义 → 文本</option>
+        </select>
+        <button class="btn btn-primary" id="btn-uni-convert">转换 →</button>
+        <button class="btn btn-secondary" id="btn-uni-swap">↑↓ 交换</button>
+        <button class="btn btn-secondary" id="btn-uni-clear">清空</button>
+      </div>
+      <div class="codec-row">
+        <label class="codec-label">输出</label>
+        <textarea class="codec-output" id="uni-output" placeholder="结果" rows="5" readonly></textarea>
+      </div>
+      <div class="codec-meta" id="uni-meta"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/encoding/main.js"></script>
+</body>
+</html>

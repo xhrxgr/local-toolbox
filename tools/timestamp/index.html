@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Unix 时间戳工具 —— 当前时间戳、毫秒/秒互转、日期↔时间戳双向转换" />
+  <title>时间戳 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/timestamp/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 当前时间 -->
+    <section class="now-section glass">
+      <h2 class="section-title">当前时间</h2>
+      <div class="now-display">
+        <div class="now-row">
+          <span class="now-label">Unix 时间戳（秒）</span>
+          <div class="now-value-row">
+            <span class="now-value" id="now-sec">—</span>
+            <button class="btn-copy" data-copy-target="now-sec" title="复制">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="now-row">
+          <span class="now-label">Unix 时间戳（毫秒）</span>
+          <div class="now-value-row">
+            <span class="now-value" id="now-ms">—</span>
+            <button class="btn-copy" data-copy-target="now-ms" title="复制">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="now-row now-row--accent">
+          <span class="now-label">本地时间（北京时间）</span>
+          <span class="now-value" id="now-local">—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 时间戳 → 日期 -->
+    <section class="convert-section glass">
+      <h2 class="section-title">时间戳 → 日期</h2>
+      <div class="convert-row">
+        <input type="text" class="convert-input" id="ts-input" placeholder="输入时间戳（秒或毫秒）" />
+        <select class="convert-select" id="ts-unit">
+          <option value="auto">自动</option>
+          <option value="s">秒</option>
+          <option value="ms">毫秒</option>
+        </select>
+        <button class="btn btn-primary" id="btn-ts-convert">转换</button>
+      </div>
+      <div class="convert-result" id="ts-result">输入时间戳后点击"转换"</div>
+    </section>
+
+    <!-- 日期 → 时间戳 -->
+    <section class="convert-section glass">
+      <h2 class="section-title">日期 → 时间戳</h2>
+      <div class="convert-row">
+        <input type="datetime-local" class="convert-input" id="date-input" step="1" />
+        <button class="btn btn-primary" id="btn-date-convert">转换</button>
+      </div>
+      <div class="convert-result" id="date-result">选择日期时间后点击"转换"</div>
+    </section>
+
+    <!-- 快捷键提示 -->
+    <section class="shortcut-hint">
+      <span class="shortcut">实时刷新，每秒更新</span>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/timestamp/main.js"></script>
+</body>
+</html>

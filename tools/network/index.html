@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="网络工具箱 —— HTTP 延迟测试、连接诊断、网速测试、DNS 查询、网络信息，全部基于浏览器运行" />
+  <title>网络工具 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/network/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="ping">延迟测试</button>
+      <button class="mode-tab" data-mode="diag">连接诊断</button>
+      <button class="mode-tab" data-mode="speed">网速测试</button>
+      <button class="mode-tab" data-mode="dns">DNS 查询</button>
+      <button class="mode-tab" data-mode="info">网络信息</button>
+    </nav>
+
+    <!-- ========== 延迟测试 (HTTP Ping) ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-ping">
+      <div class="panel-desc">基于 HTTP 请求的延迟测试（浏览器无法发送 ICMP，这是最接近 ping 的方案）。对目标 URL 发送多次 HEAD 请求，测量往返时间、丢包率。</div>
+      <div class="form-row">
+        <input type="text" class="form-input" id="ping-url" value="https://www.baidu.com" placeholder="https://example.com" />
+        <button class="btn btn-primary" id="btn-ping-start">开始</button>
+        <button class="btn btn-secondary" id="btn-ping-stop" disabled>停止</button>
+      </div>
+      <div class="form-row form-row--compact">
+        <label class="form-label">次数<input type="number" class="form-input form-input--sm" id="ping-count" value="10" min="1" max="100" /></label>
+        <label class="form-label">间隔(ms)<input type="number" class="form-input form-input--sm" id="ping-interval" value="1000" min="0" max="10000" /></label>
+        <label class="form-label">超时(ms)<input type="number" class="form-input form-input--sm" id="ping-timeout" value="5000" min="500" max="30000" /></label>
+      </div>
+      <div class="target-info" id="ping-target-info" hidden></div>
+      <div class="ping-stats" id="ping-stats">
+        <div class="stat-item"><span class="stat-label">已发送</span><span class="stat-value" id="ping-sent">0</span></div>
+        <div class="stat-item"><span class="stat-label">已接收</span><span class="stat-value" id="ping-recv">0</span></div>
+        <div class="stat-item"><span class="stat-label">丢包率</span><span class="stat-value" id="ping-loss">—</span></div>
+        <div class="stat-item"><span class="stat-label">最小</span><span class="stat-value" id="ping-min">—</span></div>
+        <div class="stat-item"><span class="stat-label">平均</span><span class="stat-value" id="ping-avg">—</span></div>
+        <div class="stat-item"><span class="stat-label">最大</span><span class="stat-value" id="ping-max">—</span></div>
+        <div class="stat-item"><span class="stat-label">抖动</span><span class="stat-value" id="ping-mdev">—</span></div>
+      </div>
+      <div class="ping-log" id="ping-log">
+        <div class="empty-state">点击"开始"进行延迟测试</div>
+      </div>
+    </section>
+
+    <!-- ========== 连接诊断 (TCPing) ========== -->
+    <section class="mode-panel glass" id="panel-diag">
+      <div class="panel-desc">通过 Performance Resource Timing API 拆解一次 HTTP 请求的各阶段耗时（DNS / TCP 连接 / TLS 握手 / TTFB / 内容传输）。这是浏览器中最接近 tcping 的连接诊断方案。</div>
+      <div class="form-row">
+        <input type="text" class="form-input" id="diag-url" value="https://www.baidu.com" placeholder="https://example.com:443/path" />
+        <button class="btn btn-primary" id="btn-diag">诊断</button>
+      </div>
+      <div class="target-info" id="diag-target-info" hidden></div>
+      <div class="diag-note" id="diag-note"></div>
+      <div class="diag-result" id="diag-result">
+        <div class="empty-state">输入 URL 后点击"诊断"</div>
+      </div>
+    </section>
+
+    <!-- ========== 网速测试 ========== -->
+    <section class="mode-panel glass" id="panel-speed">
+      <div class="panel-desc">通过下载/上传实际数据测量网络吞吐量。默认使用 Cloudflare 测速端点（支持 CORS），可自定义目标地址。</div>
+      <div class="speed-section">
+        <div class="speed-header">
+          <h3 class="speed-title">下载测速</h3>
+          <button class="btn btn-primary" id="btn-speed-down">开始下载</button>
+        </div>
+        <div class="speed-config">
+          <label class="form-label">数据量<select class="form-input form-input--sm" id="speed-down-size">
+            <option value="1000000">1 MB</option>
+            <option value="10000000" selected>10 MB</option>
+            <option value="50000000">50 MB</option>
+            <option value="100000000">100 MB</option>
+          </select></label>
+          <label class="form-label">目标地址<input type="text" class="form-input form-input--sm" id="speed-down-url" value="https://speed.cloudflare.com/__down?bytes=" /></label>
+        </div>
+        <div class="speed-progress" id="speed-down-progress" hidden>
+          <div class="speed-progress__bar"><div class="speed-progress__fill" id="speed-down-fill"></div></div>
+          <span class="speed-progress__text" id="speed-down-text">0 MB/s</span>
+        </div>
+        <div class="speed-result" id="speed-down-result"></div>
+      </div>
+      <hr class="speed-divider" />
+      <div class="speed-section">
+        <div class="speed-header">
+          <h3 class="speed-title">上传测速</h3>
+          <button class="btn btn-primary" id="btn-speed-up">开始上传</button>
+        </div>
+        <div class="speed-config">
+          <label class="form-label">数据量<select class="form-input form-input--sm" id="speed-up-size">
+            <option value="1000000" selected>1 MB</option>
+            <option value="10000000">10 MB</option>
+            <option value="50000000">50 MB</option>
+          </select></label>
+          <label class="form-label">目标地址<input type="text" class="form-input form-input--sm" id="speed-up-url" value="https://speed.cloudflare.com/__up" /></label>
+        </div>
+        <div class="speed-progress" id="speed-up-progress" hidden>
+          <div class="speed-progress__bar"><div class="speed-progress__fill" id="speed-up-fill"></div></div>
+          <span class="speed-progress__text" id="speed-up-text">准备中…</span>
+        </div>
+        <div class="speed-result" id="speed-up-result"></div>
+      </div>
+    </section>
+
+    <!-- ========== DNS 查询 ========== -->
+    <section class="mode-panel glass" id="panel-dns">
+      <div class="panel-desc">通过 DNS-over-HTTPS (DoH) 查询域名解析记录，支持 Cloudflare / Google 两个 DoH 提供商。</div>
+      <div class="form-row">
+        <input type="text" class="form-input" id="dns-domain" value="example.com" placeholder="example.com" />
+        <select class="form-input form-input--sm" id="dns-type">
+          <option value="A">A (IPv4)</option>
+          <option value="AAAA">AAAA (IPv6)</option>
+          <option value="MX">MX (邮件)</option>
+          <option value="TXT">TXT (文本)</option>
+          <option value="NS">NS (域名服务器)</option>
+          <option value="CNAME">CNAME (别名)</option>
+          <option value="SOA">SOA (起始授权)</option>
+          <option value="CAA">CAA (证书授权)</option>
+        </select>
+        <select class="form-input form-input--sm" id="dns-provider">
+          <option value="cloudflare">Cloudflare 1.1.1.1</option>
+          <option value="google">Google 8.8.8.8</option>
+        </select>
+        <button class="btn btn-primary" id="btn-dns">查询</button>
+      </div>
+      <div class="dns-result" id="dns-result">
+        <div class="empty-state">输入域名后点击"查询"</div>
+      </div>
+    </section>
+
+    <!-- ========== 网络信息 ========== -->
+    <section class="mode-panel glass" id="panel-info">
+      <div class="panel-desc">显示当前网络的公网 IP、地理位置，并通过多源出口 IP 对比检测 VPN 路由分流（进入面板自动检测）。</div>
+      <div class="info-grid" id="info-grid">
+        <div class="empty-state">加载中…</div>
+      </div>
+      <div class="info-actions">
+        <button class="btn btn-secondary" id="btn-info-refresh">刷新信息</button>
+        <button class="btn btn-primary" id="btn-exit-compare">重新检测出口 IP</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/network/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist.zip
+.trae/
+.superpowers/
+mse-test.png
+*.log
+.DS_Store
+Thumbs.db
+
+# AI 助手内部文档（不公开）
+AGENTS.md
+conversation_summary.md
+.screenshots/
+sw.png
+stopwatch-final.png

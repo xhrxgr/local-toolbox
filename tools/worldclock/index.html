@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="世界时间工具 —— 多时区实时显示，可选毫秒精度，添加/删除时区，本地记忆" />
+  <title>世界时间 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/worldclock/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 全局设置 -->
+    <section class="settings-section glass">
+      <div class="settings-row">
+        <label class="ms-toggle" title="为所有时区开启毫秒显示">
+          <input type="checkbox" id="show-ms">
+          <span>显示毫秒</span>
+        </label>
+        <div class="add-tz">
+          <select class="tz-select" id="tz-select"></select>
+          <button class="btn btn-primary btn-sm" id="btn-add-tz">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            添加时区
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 时区列表 -->
+    <section class="clocks-section">
+      <div class="clocks-list" id="clocks-list">
+        <!-- 时区卡片由 JS 渲染 -->
+      </div>
+    </section>
+
+    <!-- 提示 -->
+    <section class="shortcut-hint">
+      <span class="shortcut">每秒实时刷新 · 时区列表自动记忆 · 点击时间全屏查看</span>
+    </section>
+  </main>
+
+  <!-- 全屏时间覆盖层 -->
+  <div class="fullscreen-clock" id="fullscreen-clock" hidden>
+    <button class="fullscreen-clock__close" id="fs-close" title="关闭（ESC）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="fullscreen-clock__content">
+      <div class="fullscreen-clock__name" id="fs-name">—</div>
+      <div class="fullscreen-clock__tzid" id="fs-tzid">—</div>
+      <div class="fullscreen-clock__time" id="fs-time">—</div>
+      <div class="fullscreen-clock__meta">
+        <span class="fullscreen-clock__offset" id="fs-offset">—</span>
+        <span class="fullscreen-clock__period" id="fs-period">—</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/worldclock/main.js"></script>
+</body>
+</html>

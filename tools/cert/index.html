@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SSL/TLS 证书解析工具 —— 粘贴 PEM 证书或上传 .crt/.cer 文件，本地解析证书主题、签发者、有效期、SAN、公钥、签名算法、SHA-256 指纹等信息" />
+  <title>证书解析 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/cert/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 输入区 -->
+    <section class="input-section glass">
+      <h2 class="section-title">证书输入</h2>
+      <div class="input-row">
+        <textarea class="cert-input" id="cert-input" placeholder="粘贴 PEM 格式证书：&#10;-----BEGIN CERTIFICATE-----&#10;MIIFazCCBFOgAwIBAgISA2Q3...&#10;-----END CERTIFICATE-----" rows="8"></textarea>
+      </div>
+      <div class="input-actions">
+        <label class="btn btn-secondary file-label">
+          选择文件
+          <input type="file" id="cert-file" accept=".crt,.cer,.pem,.der" hidden />
+        </label>
+        <button class="btn btn-primary" id="btn-parse">解析证书</button>
+        <button class="btn btn-secondary" id="btn-clear">清空</button>
+        <button class="btn btn-secondary" id="btn-sample">载入示例</button>
+      </div>
+    </section>
+
+    <!-- 错误提示 -->
+    <section class="error-section" id="error-section" hidden></section>
+
+    <!-- 解析结果 -->
+    <section class="result-section" id="result-section" hidden>
+      <!-- 状态横幅 -->
+      <div class="status-banner" id="cert-status"></div>
+
+      <!-- 基本信息卡片 -->
+      <div class="info-block glass">
+        <h3 class="block-title">基本信息</h3>
+        <div class="info-grid" id="info-basic"></div>
+      </div>
+
+      <!-- 主题 / 签发者 -->
+      <div class="info-block glass">
+        <h3 class="block-title">主题与签发者</h3>
+        <div class="info-grid" id="info-subject"></div>
+      </div>
+
+      <!-- 有效期 -->
+      <div class="info-block glass">
+        <h3 class="block-title">有效期</h3>
+        <div class="info-grid" id="info-validity"></div>
+      </div>
+
+      <!-- 公钥信息 -->
+      <div class="info-block glass">
+        <h3 class="block-title">公钥信息</h3>
+        <div class="info-grid" id="info-key"></div>
+      </div>
+
+      <!-- 扩展信息 -->
+      <div class="info-block glass" id="block-extensions">
+        <h3 class="block-title">扩展信息</h3>
+        <div class="info-grid" id="info-extensions"></div>
+      </div>
+
+      <!-- 指纹 -->
+      <div class="info-block glass">
+        <h3 class="block-title">指纹</h3>
+        <div class="info-grid" id="info-fingerprint"></div>
+      </div>
+    </section>
+
+    <!-- 空状态 -->
+    <section class="empty-state" id="empty-state">
+      粘贴或上传 PEM 证书后点击"解析证书"
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/cert/main.js"></script>
+</body>
+</html>

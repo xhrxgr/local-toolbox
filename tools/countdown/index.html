@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="倒计时工具 —— 番茄钟、专注计时，到期蜂鸣提醒，本地运行无网络依赖" />
+  <title>倒计时 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/countdown/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 时间显示区：SVG 圆环 + 数字 -->
+    <section class="display-section glass">
+      <div class="timer-display" id="timer-display">
+        <svg class="timer-ring" viewBox="0 0 320 320" aria-hidden="true">
+          <circle class="timer-ring__track" cx="160" cy="160" r="148" />
+          <circle class="timer-ring__fill" id="ring-fill" cx="160" cy="160" r="148" />
+        </svg>
+        <div class="timer-digits-wrap">
+          <div class="timer-digits" id="timer-digits">00:25:00</div>
+          <div class="timer-status" id="timer-status">就绪</div>
+        </div>
+      </div>
+      <label class="ms-toggle" title="开启后显示秒后的毫秒（带毫秒数字会变窄以适应圆环）">
+        <input type="checkbox" id="show-ms">
+        <span>显示毫秒</span>
+      </label>
+    </section>
+
+    <!-- 预设时长 -->
+    <section class="preset-section glass">
+      <h2 class="section-title">预设时长</h2>
+      <div class="preset-grid" id="preset-grid">
+        <button class="preset-btn" data-min="1">1 分钟</button>
+        <button class="preset-btn" data-min="3">3 分钟</button>
+        <button class="preset-btn" data-min="5">5 分钟</button>
+        <button class="preset-btn" data-min="10">10 分钟</button>
+        <button class="preset-btn" data-min="15">15 分钟</button>
+        <button class="preset-btn preset-btn--active" data-min="25">25 分钟</button>
+        <button class="preset-btn" data-min="45">45 分钟</button>
+        <button class="preset-btn" data-min="60">60 分钟</button>
+      </div>
+    </section>
+
+    <!-- 自定义时长 -->
+    <section class="custom-section glass">
+      <h2 class="section-title">自定义时长</h2>
+      <div class="custom-inputs">
+        <label class="custom-field">
+          <input type="number" class="custom-input" id="input-hours" min="0" max="23" value="0" />
+          <span class="custom-label">时</span>
+        </label>
+        <span class="custom-sep">:</span>
+        <label class="custom-field">
+          <input type="number" class="custom-input" id="input-minutes" min="0" max="59" value="25" />
+          <span class="custom-label">分</span>
+        </label>
+        <span class="custom-sep">:</span>
+        <label class="custom-field">
+          <input type="number" class="custom-input" id="input-seconds" min="0" max="59" value="0" />
+          <span class="custom-label">秒</span>
+        </label>
+        <button class="btn btn-primary btn-apply" id="btn-apply">应用</button>
+      </div>
+    </section>
+
+    <!-- 控制按钮 -->
+    <section class="controls-section glass">
+      <div class="controls">
+        <button class="btn btn-primary btn-control" id="btn-start">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <span id="btn-start-text">开始</span>
+        </button>
+        <button class="btn btn-control btn-secondary" id="btn-reset" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="1 4 1 10 7 10"/><path d="M3.51 9a9 9 0 1 1 2.13 9.36L1 10"/></svg>
+          重置
+        </button>
+      </div>
+    </section>
+
+    <!-- 快捷键提示 -->
+    <section class="shortcut-hint">
+      <span class="shortcut"><kbd>Space</kbd> 开始 / 暂停</span>
+      <span class="shortcut"><kbd>R</kbd> 重置</span>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/countdown/main.js"></script>
+</body>
+</html>

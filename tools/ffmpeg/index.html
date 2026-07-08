@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="音视频格式转换 —— 浏览器本地处理，文件不上传云端" />
+  <title>音视频转换 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/ffmpeg/style.css" />
+</head>
+<body>
+  <main class="ffmpeg-container">
+    <!-- 文件选择区 -->
+    <section class="upload-section glass">
+      <div class="upload-area" id="upload-area">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p class="upload-text">选择或拖入媒体文件</p>
+        <p class="upload-hint" id="upload-hint">支持多选 · MP4 / MOV / MKV / MTS / WebM / MP3 / WAV / FLAC 等</p>
+        <input type="file" id="file-input" class="file-input-hidden" multiple />
+      </div>
+      <!-- 文件列表 -->
+      <div class="file-list" id="file-list" hidden>
+        <div class="file-list__header">
+          <span class="file-list__count" id="file-list-count">0 个文件</span>
+          <button class="btn btn-sm btn-clear-all" id="btn-clear-all">清空全部</button>
+        </div>
+        <div class="file-list__items" id="file-list-items"></div>
+      </div>
+    </section>
+
+    <!-- 视频预览区（裁剪模式用） -->
+    <section class="trim-preview glass" id="trim-preview" hidden>
+      <div class="trim-preview-controls">
+        <label class="trim-deinterlace-toggle" title="对隔行扫描源（如 MTS）预览时自动去隔行">
+          <input type="checkbox" id="trim-deinterlace-enabled" checked>
+          <span>去隔行预览</span>
+        </label>
+      </div>
+      <div class="trim-video-wrap">
+        <video id="trim-video" preload="metadata" playsinline controls></video>
+        <canvas id="audio-meter" class="audio-meter" hidden></canvas>
+        <div class="trim-video-loading" id="trim-video-loading" hidden>
+          <div class="loading-spinner"></div>
+          <p id="trim-video-loading-text">正在处理预览...</p>
+          <div class="trim-loading-bar"><div class="trim-loading-bar__fill" id="trim-video-loading-fill"></div></div>
+        </div>
+        <div class="trim-codec-warning" id="trim-codec-warning" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div class="trim-codec-warning__body">
+            <strong id="trim-warning-title">当前浏览器无法解码此视频</strong>
+            <p id="trim-warning-reason">常见原因：MTS / M2TS / TS (MPEG-TS)、H.265、AV1 等编码浏览器原生不支持</p>
+            <div class="trim-codec-warning__actions">
+              <button class="btn btn-primary btn-sm" id="btn-transcode-for-preview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                一键转码为 MP4 (H.264) 预览
+              </button>
+              <span class="trim-warning-tip">或直接输入入点/出点时间（无需预览）</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="trim-timeline" id="trim-timeline">
+        <div class="trim-timeline__track">
+          <div class="trim-timeline__selected" id="trim-selected"></div>
+          <div class="trim-timeline__playhead" id="trim-playhead"></div>
+          <div class="trim-timeline__handle trim-timeline__handle--start" id="trim-handle-start" title="入点"></div>
+          <div class="trim-timeline__handle trim-timeline__handle--end" id="trim-handle-end" title="出点"></div>
+        </div>
+      </div>
+      <div class="trim-preview__controls">
+        <button class="trim-play-btn" id="trim-play-btn" aria-label="播放/暂停">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        </button>
+        <span class="trim-time" id="trim-current">00:00.000</span>
+        <span class="trim-time-sep">/</span>
+        <span class="trim-time" id="trim-duration">00:00.000</span>
+        <span class="trim-time-hint">点击轨道跳转 · 拖动两端选择区间</span>
+      </div>
+    </section>
+
+    <!-- 模式选择 -->
+    <section class="mode-section glass">
+      <div class="mode-tabs" id="mode-tabs">
+        <button class="mode-tab mode-tab--active" data-mode="convert">格式转换</button>
+        <button class="mode-tab" data-mode="extract-audio">音频提取</button>
+        <button class="mode-tab" data-mode="trim">视频剪辑</button>
+      </div>
+    </section>
+
+    <!-- ========== 格式转换设置 ========== -->
+    <section class="settings-section glass settings-section--expanded" id="settings-convert">
+      <div class="settings-header" data-toggle="settings-convert-body">
+        <div class="settings-header__title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>输出配置</span>
+          <span class="settings-header__hint" id="settings-convert-summary"></span>
+        </div>
+        <svg class="settings-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+      <div class="settings-body" id="settings-convert-body">
+      <div class="setting">
+        <label class="setting__label" for="output-format">输出格式</label>
+        <select class="setting__select" id="output-format">
+          <optgroup label="视频">
+            <option value="mp4">MP4 (H.264)</option>
+            <option value="webm">WebM (VP9)</option>
+            <option value="mkv">MKV</option>
+            <option value="avi">AVI</option>
+            <option value="mov">MOV</option>
+            <option value="flv">FLV</option>
+            <option value="wmv">WMV</option>
+            <option value="ogv">OGV</option>
+            <option value="ts">TS</option>
+            <option value="m4v">M4V</option>
+            <option value="3gp">3GP</option>
+            <option value="amv">AMV</option>
+            <option value="gif">GIF</option>
+          </optgroup>
+          <optgroup label="音频">
+            <option value="mp3">MP3</option>
+            <option value="aac">AAC</option>
+            <option value="wav">WAV</option>
+            <option value="flac">FLAC</option>
+            <option value="ogg">OGG (Vorbis)</option>
+            <option value="opus">Opus</option>
+            <option value="wma">WMA</option>
+            <option value="m4a">M4A</option>
+            <option value="aiff">AIFF</option>
+            <option value="ac3">AC3</option>
+          </optgroup>
+          <optgroup label="图片">
+            <option value="jpg">JPG</option>
+            <option value="png">PNG</option>
+            <option value="webp">WebP</option>
+            <option value="avif" disabled>AVIF（当前内核不支持）</option>
+            <option value="bmp">BMP</option>
+            <option value="tiff">TIFF</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- 视频编码器 -->
+      <div class="setting" id="setting-vcodec">
+        <label class="setting__label" for="video-codec">视频编码器</label>
+        <select class="setting__select" id="video-codec">
+          <option value="copy" selected>流复制 (Stream Copy) — 保留原始编码</option>
+          <option value="libx264">H.264 (libx264) — 兼容性最好</option>
+          <option value="libx265">H.265 / HEVC (libx265) — 更高压缩</option>
+          <option value="libvpx-vp9">VP9 (libvpx-vp9) — WebM 标准</option>
+          <option value="libvpx">VP8 (libvpx)</option>
+          <option value="libaom-av1" disabled>AV1 (libaom-av1) — 当前内核不支持</option>
+          <option value="mpeg4">MPEG-4 (mpeg4) — 旧 AVI</option>
+          <option value="libxvid">Xvid (libxvid) — 旧 AVI</option>
+        </select>
+      </div>
+
+      <!-- 音频编码器 -->
+      <div class="setting" id="setting-acodec">
+        <label class="setting__label" for="audio-codec">音频编码器</label>
+        <select class="setting__select" id="audio-codec">
+          <option value="copy" selected>流复制 (Stream Copy) — 保留原始编码</option>
+          <option value="aac">AAC — 兼容性最好</option>
+          <option value="libmp3lame">MP3 (libmp3lame)</option>
+          <option value="libopus">Opus (libopus)</option>
+          <option value="libvorbis">Vorbis (libvorbis)</option>
+          <option value="flac">FLAC — 无损</option>
+          <option value="pcm_s16le">PCM (WAV) — 无损</option>
+          <option value="ac3">AC3 — 杜比</option>
+        </select>
+      </div>
+
+      <!-- 分辨率 -->
+      <div class="setting" id="setting-resolution">
+        <label class="setting__label">分辨率</label>
+        <div class="resolution-row">
+          <select class="setting__select" id="resolution-preset">
+            <option value="original">原始分辨率</option>
+            <option value="4320p">8K (4320p)</option>
+            <option value="2160p">4K (2160p)</option>
+            <option value="1440p">2K (1440p)</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
+            <option value="custom">自定义</option>
+          </select>
+          <span class="resolution-custom" id="resolution-custom" hidden>
+            <input type="number" class="setting__input" id="custom-width" placeholder="宽" min="1" />
+            <span class="resolution-x">x</span>
+            <input type="number" class="setting__input" id="custom-height" placeholder="高" min="1" />
+          </span>
+        </div>
+      </div>
+
+      <!-- 帧率 -->
+      <div class="setting" id="setting-fps">
+        <label class="setting__label" for="fps">帧率</label>
+        <select class="setting__select" id="fps">
+          <option value="original">原始帧率</option>
+          <option value="60">60 fps</option>
+          <option value="30">30 fps</option>
+          <option value="25">25 fps</option>
+          <option value="24">24 fps</option>
+          <option value="15">15 fps</option>
+          <option value="10">10 fps</option>
+          <option value="custom">自定义</option>
+        </select>
+        <input type="number" class="setting__input setting__input--inline" id="custom-fps" placeholder="自定义帧率" min="1" max="120" hidden />
+      </div>
+
+      <!-- 视频码率 -->
+      <div class="setting" id="setting-vbitrate">
+        <label class="setting__label" for="video-bitrate">视频码率</label>
+        <select class="setting__select" id="video-bitrate">
+          <option value="auto">自动 (CRF)</option>
+          <option value="500k">500 Kbps</option>
+          <option value="1M">1 Mbps</option>
+          <option value="2M">2 Mbps</option>
+          <option value="4M">4 Mbps</option>
+          <option value="8M">8 Mbps</option>
+          <option value="12M">12 Mbps</option>
+          <option value="20M">20 Mbps</option>
+          <option value="custom">自定义</option>
+        </select>
+        <input type="text" class="setting__input setting__input--inline" id="custom-vbitrate" placeholder="如 2.5M" hidden />
+      </div>
+
+      <!-- 音频码率 -->
+      <div class="setting" id="setting-abitrate">
+        <label class="setting__label" for="audio-bitrate">音频码率</label>
+        <select class="setting__select" id="audio-bitrate">
+          <option value="auto">自动</option>
+          <option value="64k">64 Kbps</option>
+          <option value="128k">128 Kbps</option>
+          <option value="192k">192 Kbps</option>
+          <option value="256k">256 Kbps</option>
+          <option value="320k">320 Kbps</option>
+          <option value="custom">自定义</option>
+        </select>
+        <input type="text" class="setting__input setting__input--inline" id="custom-abitrate" placeholder="如 160k" hidden />
+      </div>
+
+      <!-- 质量预设 -->
+      <div class="setting" id="setting-quality">
+        <label class="setting__label">输出质量</label>
+        <div class="quality-presets">
+          <button class="quality-preset" data-quality="low">
+            <span class="quality-preset__name">低</span>
+            <span class="quality-preset__hint">CRF 28 · 体积小</span>
+          </button>
+          <button class="quality-preset" data-quality="medium">
+            <span class="quality-preset__name">中</span>
+            <span class="quality-preset__hint">CRF 23 · 均衡</span>
+          </button>
+          <button class="quality-preset quality-preset--active" data-quality="high">
+            <span class="quality-preset__name">高</span>
+            <span class="quality-preset__hint">CRF 18 · 接近原画质</span>
+          </button>
+          <button class="quality-preset" data-quality="lossless">
+            <span class="quality-preset__name">无损</span>
+            <span class="quality-preset__hint">CRF 0 · 与原文件一致</span>
+          </button>
+        </div>
+        <p class="setting__hint">默认「高」(CRF 18) 接近原始画质，肉眼难以分辨；「无损」与原文件逐位相同但体积巨大</p>
+      </div>
+
+      <!-- 编码速度 -->
+      <div class="setting" id="setting-preset-speed">
+        <label class="setting__label" for="preset-speed">编码速度</label>
+        <select class="setting__select" id="preset-speed">
+          <option value="ultrafast">极快（文件大）</option>
+          <option value="superfast">超快</option>
+          <option value="veryfast" selected>很快</option>
+          <option value="faster">较快</option>
+          <option value="fast">快</option>
+          <option value="medium">中等</option>
+          <option value="slow">慢</option>
+          <option value="slower">较慢</option>
+          <option value="veryslow">很慢（文件小）</option>
+        </select>
+      </div>
+
+      <!-- 去隔行 -->
+      <div class="setting" id="setting-deinterlace">
+        <label class="setting__label">去隔行扫描</label>
+        <div class="deinterlace-options">
+          <label class="radio-label">
+            <input type="radio" name="deinterlace" value="auto" checked />
+            <span>自动（MTS / TS / M2TS 自动启用）</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="deinterlace" value="on" />
+            <span>强制开启（消除运动画面条纹）</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="deinterlace" value="off" />
+            <span>关闭（保留原始隔行）</span>
+          </label>
+        </div>
+        <p class="setting__hint">隔行扫描的视频（如摄像机录制的 MTS）流复制到 MP4 后运动画面会出现梳状条纹，需启用去隔行重新编码</p>
+      </div>
+
+      <!-- 直通模式小提示 -->
+      <p class="copy-mode-note" id="copy-mode-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <span>直通模式仅做容器封装，不重新编码。如需重编码请选择具体编码器。</span>
+      </p>
+      </div>
+    </section>
+
+    <!-- ========== 提取音频设置 ========== -->
+    <section class="settings-section glass settings-section--expanded" id="settings-extract-audio" hidden>
+      <div class="settings-header" data-toggle="settings-extract-audio-body">
+        <div class="settings-header__title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/>
+            <circle cx="6" cy="18" r="3"/>
+            <circle cx="18" cy="16" r="3"/>
+          </svg>
+          <span>音频参数</span>
+        </div>
+        <svg class="settings-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+      <div class="settings-body" id="settings-extract-audio-body">
+      <div class="setting">
+        <label class="setting__label" for="extract-format">输出格式</label>
+        <select class="setting__select" id="extract-format">
+          <option value="copy" selected>流复制 (Stream Copy) — 保留原始编码</option>
+          <option value="mp3">MP3</option>
+          <option value="aac">AAC</option>
+          <option value="wav">WAV (PCM 无损)</option>
+          <option value="flac">FLAC (无损)</option>
+          <option value="ogg">OGG (Vorbis)</option>
+          <option value="opus">Opus</option>
+          <option value="m4a">M4A (AAC 容器)</option>
+        </select>
+      </div>
+      <div class="setting" id="setting-extract-bitrate">
+        <label class="setting__label" for="extract-bitrate">码率</label>
+        <select class="setting__select" id="extract-bitrate">
+          <option value="128k">128 kbps</option>
+          <option value="192k">192 kbps</option>
+          <option value="256k">256 kbps</option>
+          <option value="320k">320 kbps</option>
+          <option value="lossless">无损</option>
+        </select>
+      </div>
+      </div>
+    </section>
+
+    <!-- ========== 视频裁剪设置 ========== -->
+    <section class="settings-section glass settings-section--expanded" id="settings-trim" hidden>
+      <div class="settings-header" data-toggle="settings-trim-body">
+        <div class="settings-header__title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="3"/>
+            <circle cx="6" cy="18" r="3"/>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+            <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+            <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+          </svg>
+          <span>裁剪参数</span>
+        </div>
+        <svg class="settings-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+      <div class="settings-body" id="settings-trim-body">
+      <div class="setting">
+        <label class="setting__label">裁剪区间</label>
+        <div class="trim-row">
+          <div class="trim-field">
+            <span class="trim-label">入点</span>
+            <input type="text" class="setting__input" id="trim-start" placeholder="00:00:00" value="00:00:00" />
+          </div>
+          <span class="trim-sep">→</span>
+          <div class="trim-field">
+            <span class="trim-label">出点</span>
+            <input type="text" class="setting__input" id="trim-end" placeholder="00:00:00" />
+          </div>
+        </div>
+        <p class="setting__hint">支持 HH:MM:SS 或秒数 · 出点留空则到片尾</p>
+      </div>
+      <div class="setting">
+        <label class="setting__label" for="trim-format">输出格式</label>
+        <select class="setting__select" id="trim-format">
+          <option value="copy" selected>流复制 (Stream Copy) — 保留原始编码</option>
+          <option value="mp4">MP4</option>
+          <option value="webm">WebM</option>
+          <option value="mkv">MKV</option>
+          <option value="mov">MOV</option>
+          <option value="amv">AMV</option>
+          <option value="gif">GIF</option>
+        </select>
+      </div>
+      <div class="setting">
+        <label class="setting__label">裁剪精度</label>
+        <div class="trim-mode-row">
+          <label class="radio-label">
+            <input type="radio" name="trim-mode" value="fast" checked />
+            <span>关键帧定位（极速）</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="trim-mode" value="accurate" />
+            <span>帧级精度（重新编码）</span>
+          </label>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <!-- 转换按钮 -->
+    <button class="btn btn-primary btn-convert" id="btn-convert" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      开始转换
+    </button>
+
+    <!-- 进度区 -->
+    <!-- 处理进度区（量化阶段 + 多文件队列 + 中断） -->
+    <section class="progress-section" id="progress-section" hidden>
+      <div class="progress-stage glass">
+        <div class="progress-stage__header">
+          <span class="progress-stage__title" id="progress-stage-title">准备中...</span>
+          <span class="progress-stage__pct" id="progress-stage-pct">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-stage__status" id="progress-stage-status">正在初始化...</div>
+        <div class="progress-actions" id="progress-actions" hidden>
+          <button class="btn btn-danger" id="btn-cancel-current">放弃当前</button>
+          <button class="btn btn-danger-ghost" id="btn-cancel-all">放弃全部</button>
+        </div>
+      </div>
+
+      <!-- 多文件任务队列 -->
+      <div class="task-queue glass" id="task-queue" hidden>
+        <div class="task-queue__header">
+          <span>任务队列 <span class="task-queue__count" id="task-queue-count">0/0</span></span>
+          <span class="task-queue__overall" id="task-queue-overall">总进度 0%</span>
+        </div>
+        <ul class="task-queue__list" id="task-queue-list"></ul>
+      </div>
+    </section>
+
+    <!-- FFmpeg 加载状态 -->
+    <section class="loading-section" id="loading-section" hidden>
+      <div class="loading-spinner"></div>
+      <p id="loading-text">正在初始化 FFmpeg 内核（约 31 MB）· 首次加载需要数十秒</p>
+    </section>
+
+    <!-- 下载区 -->
+    <!-- 完成区：多文件结果列表 + 下载/放弃 -->
+    <section class="download-section" id="download-section" hidden>
+      <div class="download-info glass">
+        <div class="download-header">
+          <p class="download-success">处理完成</p>
+          <p class="download-stats" id="download-stats"></p>
+        </div>
+        <ul class="result-list" id="result-list"></ul>
+        <div class="download-actions">
+          <button class="btn btn-primary" id="btn-download-all">下载全部</button>
+          <button class="btn btn-clear-result" id="btn-clear-result">放弃全部</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 大文件警告 -->
+    <div class="warning-toast" id="warning-toast" hidden>
+      文件较大（&gt; 200 MB），处理耗时与内存占用较高，建议关闭其他标签页。
+    </div>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/ffmpeg/main.js"></script>
+</body>
+</html>

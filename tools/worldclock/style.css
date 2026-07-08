@@ -1,0 +1,368 @@
+/* ========== 世界时间工具样式 ========== */
+
+.tool-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ========== 设置区 ========== */
+.settings-section {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.ms-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ms-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.ms-toggle:hover {
+  color: var(--text);
+}
+
+.add-tz {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.tz-select {
+  flex: 1;
+  max-width: 320px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.btn-sm {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ========== 时区卡片网格 ========== */
+.clocks-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-md);
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  padding: var(--space-3xl) var(--space-md);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.clock-card {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  transition: all var(--transition-fast);
+}
+
+.clock-card:hover {
+  transform: translateY(-1px);
+}
+
+.clock-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.clock-card__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.clock-card__name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-card__tzid {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clock-card__remove {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.clock-card__remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.clock-card__time {
+  font-family: var(--font-mono);
+  font-size: clamp(0.9rem, 1.8vw, 1.25rem);
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.clock-card__time:hover {
+  color: var(--accent);
+}
+
+.clock-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.clock-card__offset {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.clock-card__period {
+  font-size: var(--text-xs);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-xl);
+  font-weight: 600;
+}
+
+.clock-card__period--today {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.clock-card__period--tomorrow {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.clock-card__period--yesterday {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.clock-card__period--future {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.clock-card__period--past {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ========== 快捷键提示 ========== */
+.shortcut-hint {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 480px) {
+  .clocks-list {
+    grid-template-columns: 1fr;
+  }
+  .add-tz {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .tz-select {
+    max-width: none;
+  }
+}
+
+/* ========== 全屏时间覆盖层 ========== */
+.fullscreen-clock {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fs-fade-in var(--transition-fast) ease-out;
+}
+
+.fullscreen-clock[hidden] {
+  display: none;
+}
+
+@keyframes fs-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fullscreen-clock__close {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fullscreen-clock__close:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.fullscreen-clock__content {
+  text-align: center;
+  padding: var(--space-lg);
+  max-width: 95vw;
+}
+
+.fullscreen-clock__name {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: var(--space-xs);
+}
+
+.fullscreen-clock__tzid {
+  font-family: var(--font-mono);
+  font-size: clamp(0.875rem, 1.5vw, 1.125rem);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xl);
+}
+
+.fullscreen-clock__time {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1em;
+}
+
+.fs-time__date {
+  font-size: clamp(1.25rem, 4vw, 3rem);
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.fs-time__clock {
+  /* 时间+毫秒最长 14 字符（如 07:08:18.234），限制上限确保 1280px 视口不溢出 */
+  font-size: clamp(2rem, 9.5vw, 6rem);
+  white-space: nowrap;
+}
+
+.fullscreen-clock__meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.fullscreen-clock__offset {
+  font-family: var(--font-mono);
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  color: var(--text-secondary);
+}
+
+.fullscreen-clock__period {
+  font-size: clamp(0.875rem, 1.5vw, 1.125rem);
+  padding: 4px var(--space-md);
+  border-radius: var(--radius-xl);
+  font-weight: 600;
+}
+
+/* 复用卡片的 5 色标签 */
+.fullscreen-clock__period--today { background: var(--bg-secondary); color: var(--text-secondary); }
+.fullscreen-clock__period--tomorrow { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.fullscreen-clock__period--yesterday { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.fullscreen-clock__period--future { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.fullscreen-clock__period--past { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+

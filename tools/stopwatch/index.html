@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="秒表工具 —— 毫秒精度计时，计次记录，最佳/最差高亮，CSV 导出，本地运行" />
+  <title>秒表 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/stopwatch/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 时间显示区 -->
+    <section class="display-section glass">
+      <div class="timer-digits" id="timer-digits">00:00:00.000</div>
+      <div class="timer-status" id="timer-status">就绪</div>
+    </section>
+
+    <!-- 控制按钮 -->
+    <section class="controls-section glass">
+      <div class="controls">
+        <button class="btn btn-primary btn-control" id="btn-start">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <span id="btn-start-text">开始</span>
+        </button>
+        <button class="btn btn-control btn-secondary" id="btn-lap" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          计次
+        </button>
+        <button class="btn btn-control btn-secondary" id="btn-reset" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="1 4 1 10 7 10"/><path d="M3.51 9a9 9 0 1 1 2.13 9.36L1 10"/></svg>
+          重置
+        </button>
+      </div>
+    </section>
+
+    <!-- 计次列表 -->
+    <section class="laps-section glass">
+      <div class="laps-header">
+        <h2 class="section-title">计次记录</h2>
+        <div class="laps-actions">
+          <button class="btn btn-sm btn-export" id="btn-export" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导出 CSV
+          </button>
+          <button class="btn btn-sm btn-clear-laps" id="btn-clear-laps" disabled>清空</button>
+        </div>
+      </div>
+      <div class="lap-list" id="lap-list">
+        <div class="lap-empty">暂无计次记录，运行秒表后点击"计次"按钮记录</div>
+      </div>
+    </section>
+
+    <!-- 快捷键提示 -->
+    <section class="shortcut-hint">
+      <span class="shortcut"><kbd>Space</kbd> 开始 / 暂停</span>
+      <span class="shortcut"><kbd>L</kbd> 计次</span>
+      <span class="shortcut"><kbd>R</kbd> 重置</span>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/stopwatch/main.js"></script>
+</body>
+</html>

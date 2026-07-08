@@ -1,0 +1,33 @@
+/* 浅色主题（默认跟随系统，通过 JS 切换 data-theme） */
+:root {
+  --bg: #f1f5f9;
+  --bg-secondary: #e2e8f0;
+  --card: rgba(255, 255, 255, 0.85);
+  --card-hover: rgba(255, 255, 255, 0.95);
+  --text: #0f172a;
+  --text-secondary: #64748b;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(99, 102, 241, 0.4);
+  --tag-bg: rgba(99, 102, 241, 0.1);
+  --tag-text: #6366f1;
+  --disabled-opacity: 0.5;
+}
+
+/* 深色主题 */
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --bg-secondary: #1e293b;
+  --card: rgba(30, 41, 59, 0.8);
+  --card-hover: rgba(30, 41, 59, 0.95);
+  --text: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --accent: #818cf8;
+  --accent-hover: #6366f1;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(129, 140, 248, 0.4);
+  --tag-bg: rgba(129, 140, 248, 0.15);
+  --tag-text: #a5b4fc;
+  --disabled-opacity: 0.35;
+}
