@@ -10,9 +10,13 @@
 /* ========== PEM ↔ DER ========== */
 function pemToDer(pem) {
   // 提取 -----BEGIN ...----- ... -----END ...----- 之间的内容
+  const pemMatch = pem.match(/-----BEGIN (\w+)-----/);
+  if (pemMatch && pemMatch[1] !== 'CERTIFICATE') {
+    throw new Error(`输入的是 ${pemMatch[1]}，不是证书（CERTIFICATE）。请粘贴 X.509 证书的 PEM 内容`);
+  }
   const match = pem.match(/-----BEGIN CERTIFICATE-----(?:[\s\S]*?)-----END CERTIFICATE-----/);
   if (!match) {
-    throw new Error('未找到有效的 PEM 证书块（需包含 -----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----）');
+    throw new Error('未找到有效的 PEM 证书块（需包含 -----BEGIN CERTIFICATE----- 和 -----END CERTIFICATE-----）');
   }
   const b64 = match[0]
     .replace(/-----BEGIN CERTIFICATE-----/, '')
@@ -84,8 +88,9 @@ const ASN1 = {
 };
 
 function parseTlv(bytes, offset) {
-  if (offset >= bytes.length) throw new Error('解析溢出');
+  if (offset >= bytes.length) throw new Error('证书数据不完整（解析溢出）');
   const tag = bytes[offset];
+  if (offset + 1 >= bytes.length) throw new Error('证书数据不完整（缺少长度字节）');
   const lengthByte = bytes[offset + 1];
   let length;
   let valueOffset;
@@ -95,6 +100,7 @@ function parseTlv(bytes, offset) {
   } else {
     const numBytes = lengthByte & 0x7F;
     if (numBytes === 0) throw new Error('不支持 indefinite length');
+    if (offset + 2 + numBytes > bytes.length) throw new Error('证书数据不完整（长度字段截断）');
     length = 0;
     for (let i = 0; i < numBytes; i++) {
       length = (length << 8) | bytes[offset + 2 + i];
@@ -385,7 +391,9 @@ function parseCertFromDer(der) {
   if (serialHex.startsWith('00') && serialHex.length > 2) serialHex = serialHex.slice(2);
 
   // 签名算法
-  const sigAlgOid = parseOid(parseChildren(sigAlg.value)[0].value);
+  const sigAlgChildren = parseChildren(sigAlg.value);
+  if (!sigAlgChildren.length) throw new Error('证书结构无效：签名算法字段为空');
+  const sigAlgOid = parseOid(sigAlgChildren[0].value);
 
   // 主题 / 签发者
   const subjectRdns = parseName(subject.value);
@@ -393,11 +401,13 @@ function parseCertFromDer(der) {
 
   // 有效期
   const validityChildren = parseChildren(validity.value);
+  if (!validityChildren.length) throw new Error('证书结构无效：有效期字段为空');
   const notBefore = parseTime(validityChildren[0]);
   const notAfter = parseTime(validityChildren[1]);
 
   // 公钥信息
   const spkiChildren = parseChildren(spki.value);
+  if (!spkiChildren.length) throw new Error('证书结构无效：公钥信息字段为空');
   const pkAlgOid = parseOid(parseChildren(spkiChildren[0].value)[0].value);
   const pkBitString = spkiChildren[1];
 
@@ -498,17 +508,24 @@ function renderCertInfo(certInfo) {
   // 状态横幅
   const now = new Date();
   let statusHtml;
-  if (now < certInfo.notBefore) {
+  if (certInfo.notBefore && isNaN(certInfo.notBefore.getTime())) {
+    // 有效性无法判断
+    statusHtml = `<div class="status-banner--valid">有效期信息不完整</div>`;
+  } else if (certInfo.notBefore && now < certInfo.notBefore) {
     const days = daysBetween(now, certInfo.notBefore);
     statusHtml = `<div class="status-banner--pending">证书尚未生效 · 还有 ${days} 天生效</div>`;
-  } else if (now > certInfo.notAfter) {
-    const days = daysBetween(certInfo.notAfter, now);
-    statusHtml = `<div class="status-banner--expired">证书已过期 · 已过期 ${days} 天</div>`;
+  } else if (certInfo.notAfter && !isNaN(certInfo.notAfter.getTime())) {
+    if (now > certInfo.notAfter) {
+      const days = daysBetween(certInfo.notAfter, now);
+      statusHtml = `<div class="status-banner--expired">证书已过期 · 已过期 ${days} 天</div>`;
+    } else {
+      const days = daysBetween(now, certInfo.notAfter);
+      let cls = 'status-banner--valid';
+      if (days < 30) cls = 'status-banner--warning';
+      statusHtml = `<div class="${cls}">证书有效 · 还有 ${days} 天过期</div>`;
+    }
   } else {
-    const days = daysBetween(now, certInfo.notAfter);
-    let cls = 'status-banner--valid';
-    if (days < 30) cls = 'status-banner--warning';
-    statusHtml = `<div class="${cls}">证书有效 · 还有 ${days} 天过期</div>`;
+    statusHtml = `<div class="status-banner--valid">有效期信息不完整</div>`;
   }
   document.getElementById('cert-status').innerHTML = statusHtml;
 
@@ -586,6 +603,11 @@ function renderCertInfo(certInfo) {
 }
 
 async function renderFingerprints(der) {
+  if (!window.crypto || !window.crypto.subtle) {
+    document.getElementById('info-fingerprint').innerHTML =
+      `<div class="info-item info-item--full"><span class="info-value info-value--empty">指纹计算需要 HTTPS 环境或现代浏览器（Web Crypto API 不可用）</span></div>`;
+    return;
+  }
   const [sha256Fp, sha1Fp] = await Promise.all([sha256(der), sha1(der)]);
   document.getElementById('info-fingerprint').innerHTML =
     `<div class="info-item info-item--full"><span class="info-label">SHA-256</span><code class="info-value info-value--mono info-value--break">${sha256Fp}</code></div>` +
@@ -645,7 +667,8 @@ async function parseCert() {
         `<div class="info-item info-item--full"><span class="info-value info-value--empty">指纹计算失败：${escapeHtml(fpErr.message)}</span></div>`;
     }
   } catch (e) {
-    showError(e.message + (e.stack ? '\n' + e.stack.split('\n').slice(0, 3).join('\n') : ''));
+    console.error('证书解析错误:', e);
+    showError(e.message || '解析失败');
     errorSection.hidden = false;
     resultSection.hidden = true;
     emptyState.hidden = true;
@@ -701,25 +724,33 @@ KPpdzvvtTnOPlC7SQZSYmdunr3Bf9b77AiC/ZidstK36dRILKz7OA54=
 }
 
 function handleFile(file) {
+  if (file.size > 5 * 1024 * 1024) {
+    showError('文件过大（超过 5MB），可能不是有效的证书文件');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
-    let content = e.target.result;
-    if (file.name.match(/\.(der|crt|cer)$/i) && !/-----BEGIN/.test(content)) {
-      // 二进制 DER 文件，转 hex
+    const content = e.target.result;
+    const isDerExt = file.name.match(/\.(der|crt|cer)$/i);
+    if (isDerExt && content instanceof ArrayBuffer) {
       const bytes = new Uint8Array(content);
-      if (file.type === 'application/octet-stream' || file.type === '') {
-        // 转 PEM
-        const der = bytes;
-        document.getElementById('cert-input').value = derToPem(der);
+      // 首字节 0x30 = DER SEQUENCE，判定为二进制 DER
+      if (bytes.length > 0 && bytes[0] === 0x30) {
+        document.getElementById('cert-input').value = derToPem(bytes);
       } else {
-        document.getElementById('cert-input').value = content;
+        // 可能是文本 PEM，用 readAsText 重读
+        const textReader = new FileReader();
+        textReader.onload = (e2) => {
+          document.getElementById('cert-input').value = e2.target.result;
+        };
+        textReader.readAsText(file);
       }
-    } else {
+    } else if (typeof content === 'string') {
       document.getElementById('cert-input').value = content;
     }
   };
-  // 优先以文本读取（PEM 是文本）
-  if (file.name.match(/\.der$/i)) {
+  // 对 .der/.crt/.cer 用 readAsArrayBuffer，其他用 readAsText
+  if (file.name.match(/\.(der|crt|cer)$/i)) {
     reader.readAsArrayBuffer(file);
   } else {
     reader.readAsText(file);

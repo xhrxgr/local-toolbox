@@ -66,7 +66,15 @@ function loadState() {
     if (raw) {
       const p = JSON.parse(raw);
       if (Array.isArray(p.zones)) {
-        state.zones = p.zones.filter(z => typeof z === 'string' && z.length > 0);
+        state.zones = p.zones.filter(z => {
+          if (typeof z !== 'string' || z.length === 0) return false;
+          try {
+            Intl.DateTimeFormat('en-US', { timeZone: z });
+            return true;
+          } catch {
+            return false;
+          }
+        });
       }
     }
   } catch {}
@@ -139,22 +147,26 @@ function getDayPeriod(tzId) {
   } catch { return { label: '', color: '' }; }
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function renderList() {
   if (state.zones.length === 0) {
-    listEl.innerHTML = '<div class="empty-state">点击右上角"添加时区"开始</div>';
+    listEl.innerHTML = '<div class="empty-state">点击上方"添加时区"按钮开始</div>';
     return;
   }
   listEl.innerHTML = state.zones.map(tzId => {
     const info = getZoneInfo(tzId);
     const period = getDayPeriod(tzId);
     return `
-      <div class="clock-card glass" data-tz="${tzId}">
+      <div class="clock-card glass" data-tz="${escapeHtml(tzId)}">
         <div class="clock-card__head">
           <div class="clock-card__title">
-            <h3 class="clock-card__name">${info.name}</h3>
-            <span class="clock-card__tzid">${tzId}</span>
+            <h3 class="clock-card__name">${escapeHtml(info.name)}</h3>
+            <span class="clock-card__tzid">${escapeHtml(tzId)}</span>
           </div>
-          <button class="clock-card__remove" data-action="remove" data-tz="${tzId}" title="移除">
+          <button class="clock-card__remove" data-action="remove" data-tz="${escapeHtml(tzId)}" title="移除">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -265,7 +277,11 @@ function closeFullscreen() {
 
 /* ========== 操作 ========== */
 function addZone(tzId) {
-  if (!tzId || state.zones.includes(tzId)) return;
+  if (!tzId) return;
+  if (state.zones.includes(tzId)) {
+    alert('该时区已添加');
+    return;
+  }
   state.zones.push(tzId);
   saveState();
   renderList();
@@ -273,6 +289,7 @@ function addZone(tzId) {
 }
 
 function removeZone(tzId) {
+  if (fsCurrentTz === tzId) closeFullscreen();
   state.zones = state.zones.filter(z => z !== tzId);
   saveState();
   renderList();
@@ -288,8 +305,15 @@ function populateTzSelect() {
     all.set(state.browserTz, { id: state.browserTz, name: cityName, offset: getCurrentOffset(state.browserTz) });
   }
   // 按 offset + 名称排序
+  function offsetToMinutes(offset) {
+    const sign = offset.startsWith('-') ? -1 : 1;
+    const [h, m] = offset.replace(/[+-]/, '').split(':').map(Number);
+    return sign * (h * 60 + (m || 0));
+  }
   const list = [...all.values()].sort((a, b) => {
-    if (a.offset !== b.offset) return a.offset.localeCompare(b.offset);
+    const aMin = offsetToMinutes(a.offset);
+    const bMin = offsetToMinutes(b.offset);
+    if (aMin !== bMin) return aMin - bMin;
     return a.name.localeCompare(b.name);
   });
   tzSelect.innerHTML = '<option value="">— 选择时区 —</option>' +
@@ -345,7 +369,10 @@ function initWorldclock() {
 
   btnAddTz.addEventListener('click', () => {
     const tzId = tzSelect.value;
-    if (!tzId) return;
+    if (!tzId) {
+      alert('请先选择一个时区');
+      return;
+    }
     addZone(tzId);
     tzSelect.value = '';
   });

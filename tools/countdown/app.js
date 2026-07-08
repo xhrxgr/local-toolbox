@@ -51,11 +51,12 @@ function formatTime(ms, highPrecision) {
 }
 
 function formatOvertime(ms) {
-  // 超时显示 +MM:SS
+  if (ms < 0) ms = 0;
   const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  return `+${pad(m)}:${pad(s)}`;
+  return `+${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
 /* ========== 持久化 ========== */
@@ -82,7 +83,12 @@ function loadState() {
     const p = JSON.parse(raw);
     if (typeof p.totalMs !== 'number' || p.totalMs <= 0) return false;
     state.totalMs = p.totalMs;
-    if (p.running && p.wallStart) {
+    // 字段类型校验
+    if (typeof p.expired !== 'boolean') p.expired = false;
+    const canRestoreRunning = p.running
+      && typeof p.savedRemainingMs === 'number' && p.savedRemainingMs >= 0
+      && typeof p.wallStart === 'number' && p.wallStart > 0;
+    if (canRestoreRunning) {
       // 计算刷新期间流失的时间
       const wallElapsed = Date.now() - p.wallStart;
       const remaining = p.savedRemainingMs - wallElapsed;
@@ -107,6 +113,14 @@ function loadState() {
       state.remainingMs = p.remainingMs > 0 ? p.remainingMs : p.totalMs;
       state.running = false;
       state.expired = false;
+    }
+    // 恢复后检查 NaN，异常则重置为默认状态
+    if (isNaN(state.remainingMs) || isNaN(state.startTimestamp)) {
+      state.running = false;
+      state.expired = false;
+      state.remainingMs = state.totalMs;
+      state.savedRemainingMs = state.totalMs;
+      state.startTimestamp = 0;
     }
     return true;
   } catch { return false; }
@@ -141,6 +155,7 @@ function tick() {
 
 /* ========== 控制 ========== */
 function start() {
+  if (state.running) return;
   if (state.remainingMs <= 0 && !state.expired) return;
   if (state.expired) {
     // 已超时，不允许继续"开始"，需先重置
@@ -218,6 +233,8 @@ function onExpire() {
     try {
       new Notification('⏰ 倒计时结束', { body: '时间到了！', silent: false });
     } catch {}
+  } else if ('Notification' in window && Notification.permission !== 'granted') {
+    console.warn('倒计时结束，但通知权限未授予（' + Notification.permission + '），无法弹出桌面通知');
   }
   startTitleFlash();
 }
@@ -413,7 +430,10 @@ function initCountdown() {
 
   document.getElementById('btn-apply').addEventListener('click', () => {
     const ms = readInputsToMs();
-    if (ms <= 0) return;
+    if (ms <= 0) {
+      alert('请设置大于 0 的时长');
+      return;
+    }
     setDuration(ms);
     clearPresetActive();
     const presetBtn = findPresetByMs(ms);
@@ -424,6 +444,7 @@ function initCountdown() {
     btn.addEventListener('click', () => {
       if (state.running) return;
       const min = parseInt(btn.dataset.min);
+      if (isNaN(min) || min <= 0) return;
       const ms = min * 60 * 1000;
       setDuration(ms);
       clearPresetActive();

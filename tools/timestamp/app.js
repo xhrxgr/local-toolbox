@@ -11,7 +11,7 @@ const PAGE_TITLE = '时间戳 - 网页工具箱';
 let nowSecEl, nowMsEl, nowLocalEl;
 let tsInput, tsUnit, tsResult, btnTsConvert;
 let dateInput, dateResult, btnDateConvert;
-let rafId = 0;
+let timerId = 0;
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
@@ -44,7 +44,7 @@ function tick() {
   nowSecEl.textContent = String(sec);
   nowMsEl.textContent = String(ms);
   nowLocalEl.textContent = formatLocalTime(now);
-  rafId = setTimeout(tick, 1000 - (Date.now() % 1000)); // 对齐到秒边界
+  timerId = setTimeout(tick, 1000 - (Date.now() % 1000)); // 对齐到秒边界
 }
 
 /* ========== 转换逻辑 ========== */
@@ -55,17 +55,12 @@ function convertTsToDate() {
     tsResult.classList.add('convert-result--error');
     return;
   }
-  if (!/^-?\d+(\.\d+)?$/.test(raw)) {
+  if (!/^-?\d+(\.\d*)?$|^-?\.\d+$/.test(raw)) {
     tsResult.textContent = '时间戳格式无效，应为整数或浮点数';
     tsResult.classList.add('convert-result--error');
     return;
   }
   let num = parseFloat(raw);
-  if (isNaN(num)) {
-    tsResult.textContent = '时间戳无效';
-    tsResult.classList.add('convert-result--error');
-    return;
-  }
   // 自动判断单位：< 1e12 视为秒
   const unit = tsUnit.value;
   let actualMs;
@@ -113,19 +108,33 @@ function convertDateToTs() {
 }
 
 /* ========== 复制 ========== */
-function copyToClipboard(text, btn) {
-  if (!navigator.clipboard) {
-    // 回退
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); } catch {}
-    document.body.removeChild(ta);
-  } else {
-    navigator.clipboard.writeText(text).catch(() => {});
+async function copyToClipboard(text, btn) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    showCopyFeedback(btn);
+  } catch (e) {
+    console.warn('复制失败:', e);
+    if (btn) {
+      const original = btn.textContent;
+      btn.textContent = '✗';
+      btn.style.color = 'var(--danger, #ef4444)';
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.style.color = '';
+      }, 1200);
+    }
   }
-  showCopyFeedback(btn);
 }
 
 function showCopyFeedback(btn) {
@@ -156,6 +165,7 @@ function initTimestamp() {
   const tz = now.getTimezoneOffset() * 60000;
   const localISO = new Date(now.getTime() - tz).toISOString().slice(0, 19);
   dateInput.value = localISO;
+  convertDateToTs();
 
   // 启动实时刷新
   tick();

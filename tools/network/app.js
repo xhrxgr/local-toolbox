@@ -50,6 +50,10 @@ function formatMs(ms) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 /* ========== 目标信息解析（DoH + IP 地理位置查询）========== */
 // 通过 DoH 查询域名 A 记录，返回 IP 数组
 async function resolveDomain(domain) {
@@ -122,9 +126,11 @@ async function showTargetInfo(url, elId) {
 
 /* ========== 模式 1：延迟测试 (HTTP Ping) ========== */
 const pingState = { running: false, samples: [], sent: 0, recv: 0 };
+let pingAbortController = null;
 
 async function pingOnce(url, timeoutMs) {
   const controller = new AbortController();
+  pingAbortController = controller;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const sep = url.includes('?') ? '&' : '?';
   const target = url + sep + '_t=' + Date.now();
@@ -182,7 +188,10 @@ function appendPingLog(seq, result) {
 
 async function startPing() {
   const url = normalizeUrl(document.getElementById('ping-url').value);
-  if (!url) return;
+  if (!url) {
+    alert('请输入目标地址');
+    return;
+  }
   const count = parseInt(document.getElementById('ping-count').value) || 10;
   const interval = parseInt(document.getElementById('ping-interval').value) || 1000;
   const timeout = parseInt(document.getElementById('ping-timeout').value) || 5000;
@@ -219,6 +228,9 @@ async function startPing() {
 
 function stopPing() {
   pingState.running = false;
+  if (pingAbortController) {
+    try { pingAbortController.abort(); } catch {}
+  }
 }
 
 /* ========== 模式 2：连接诊断 (TCPing) ========== */
@@ -226,7 +238,10 @@ async function runDiag() {
   const url = normalizeUrl(document.getElementById('diag-url').value);
   const resultEl = document.getElementById('diag-result');
   const noteEl = document.getElementById('diag-note');
-  if (!url) return;
+  if (!url) {
+    alert('请输入目标地址');
+    return;
+  }
 
   // 先解析并显示目标信息（不阻塞诊断主流程）
   showTargetInfo(url, 'diag-target-info');
@@ -416,14 +431,20 @@ function runUploadTest() {
   };
 
   xhr.onload = () => {
-    const totalTime = (performance.now() - t0) / 1000;
-    const avgSpeed = size / totalTime;
-    fillEl.style.width = '100%';
-    textEl.textContent = formatSpeed(avgSpeed);
-    resultEl.innerHTML = `
-      <div class="speed-result__row"><span>上传量</span><strong>${formatBytes(size)}</strong></div>
-      <div class="speed-result__row"><span>耗时</span><strong>${totalTime.toFixed(2)} s</strong></div>
-      <div class="speed-result__row speed-result__row--highlight"><span>平均速度</span><strong>${formatSpeed(avgSpeed)}</strong></div>`;
+    if (xhr.status >= 200 && xhr.status < 300) {
+      const totalTime = (performance.now() - t0) / 1000;
+      const avgSpeed = size / totalTime;
+      fillEl.style.width = '100%';
+      textEl.textContent = formatSpeed(avgSpeed);
+      resultEl.innerHTML = `
+        <div class="speed-result__row"><span>上传量</span><strong>${formatBytes(size)}</strong></div>
+        <div class="speed-result__row"><span>耗时</span><strong>${totalTime.toFixed(2)} s</strong></div>
+        <div class="speed-result__row speed-result__row--highlight"><span>平均速度</span><strong>${formatSpeed(avgSpeed)}</strong></div>`;
+    } else {
+      fillEl.style.width = '100%';
+      textEl.textContent = '上传失败';
+      resultEl.innerHTML = `<div class="diag-error">上传失败：服务器返回 HTTP ${xhr.status}</div>`;
+    }
     speedRunning = false;
     baseBtn.disabled = false;
     baseBtn.textContent = '开始上传';
@@ -445,7 +466,10 @@ async function queryDNS() {
   const type = document.getElementById('dns-type').value;
   const provider = document.getElementById('dns-provider').value;
   const resultEl = document.getElementById('dns-result');
-  if (!domain) return;
+  if (!domain) {
+    alert('请输入域名');
+    return;
+  }
 
   resultEl.innerHTML = '<div class="empty-state">查询中…</div>';
 
@@ -475,7 +499,7 @@ async function queryDNS() {
     let html = '<table class="dns-table"><thead><tr><th>名称</th><th>类型</th><th>TTL</th><th>值</th></tr></thead><tbody>';
     const typeNames = { 1: 'A', 2: 'NS', 5: 'CNAME', 6: 'SOA', 15: 'MX', 16: 'TXT', 28: 'AAAA', 257: 'CAA' };
     answers.forEach(a => {
-      html += `<tr><td>${a.name}</td><td>${typeNames[a.type] || a.type}</td><td>${a.TTL}s</td><td class="dns-value">${a.data}</td></tr>`;
+      html += `<tr><td>${escapeHtml(a.name)}</td><td>${typeNames[a.type] || a.type}</td><td>${a.TTL}s</td><td class="dns-value">${escapeHtml(a.data)}</td></tr>`;
     });
     html += '</tbody></table>';
     resultEl.innerHTML = html;
@@ -503,6 +527,7 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 5000) {
 // JSONP 请求（用于不支持 CORS 的国内 IP 查询服务，如 pconline）
 function jsonp(url, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
+    let settled = false;
     const cbName = '__jsonp_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
     let timer;
@@ -512,15 +537,21 @@ function jsonp(url, timeoutMs = 5000) {
       if (script.parentNode) script.parentNode.removeChild(script);
     };
     timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(new Error('JSONP 超时'));
     }, timeoutMs);
     window[cbName] = (data) => {
+      if (settled) return;
+      settled = true;
       cleanup();
       resolve(data);
     };
     script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
     script.onerror = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(new Error('JSONP 加载失败'));
     };

@@ -27,14 +27,18 @@ function strToBase64(str) {
 function base64ToStr(b64) {
   // 清理：去掉换行、空格
   const clean = b64.replace(/\s+/g, '');
+  if (!clean) throw new Error('输入为空');
   // 校验
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) {
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) {
     throw new Error('包含非法 Base64 字符');
+  }
+  if (clean.length % 4 !== 0) {
+    throw new Error('Base64 字符串长度必须是 4 的倍数');
   }
   const bin = atob(clean);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 }
 
 /* ========== 通用：复制到剪贴板 ========== */
@@ -83,7 +87,7 @@ function b64Encode() {
     output.value = result;
     const byteLen = new TextEncoder().encode(input).length;
     showMeta(meta, `输入 ${input.length} 字符 / ${byteLen} 字节 → 输出 ${result.length} 字符
-      <button class="meta-btn" data-copy="${result.replace(/"/g, '&quot;')}">复制</button>`);
+      <button class="meta-btn" data-copy="${encodeURIComponent(result)}">复制</button>`);
     bindMetaCopy(meta);
   } catch (e) {
     output.value = '';
@@ -105,7 +109,7 @@ function b64Decode() {
     output.value = result;
     const byteLen = input.replace(/\s+/g, '').length;
     showMeta(meta, `输入 ${byteLen} 字符 → 输出 ${result.length} 字符 / ${new TextEncoder().encode(result).length} 字节
-      <button class="meta-btn" data-copy="${result.replace(/"/g, '&quot;')}">复制</button>`);
+      <button class="meta-btn" data-copy="${encodeURIComponent(result)}">复制</button>`);
     bindMetaCopy(meta);
   } catch (e) {
     output.value = '';
@@ -145,7 +149,7 @@ function urlEncode() {
     output.value = result;
     const encodedPct = ((result.length - input.length) / Math.max(input.length, 1) * 100).toFixed(1);
     showMeta(meta, `输入 ${input.length} 字符 → 输出 ${result.length} 字符（+${encodedPct}%）
-      <button class="meta-btn" data-copy="${result.replace(/"/g, '&quot;')}">复制</button>`);
+      <button class="meta-btn" data-copy="${encodeURIComponent(result)}">复制</button>`);
     bindMetaCopy(meta);
   } catch (e) {
     output.value = '';
@@ -166,7 +170,7 @@ function urlDecode() {
     const result = decodeURIComponent(input);
     output.value = result;
     showMeta(meta, `输入 ${input.length} 字符 → 输出 ${result.length} 字符
-      <button class="meta-btn" data-copy="${result.replace(/"/g, '&quot;')}">复制</button>`);
+      <button class="meta-btn" data-copy="${encodeURIComponent(result)}">复制</button>`);
     bindMetaCopy(meta);
   } catch (e) {
     output.value = '';
@@ -214,16 +218,20 @@ function asciiConvert() {
       // 支持空格、逗号、0x 前缀
       const parts = input.split(/[\s,]+/).filter(Boolean);
       const codes = parts.map((p) => {
-        if (/^0x[0-9a-fA-F]+$/i.test(p)) return parseInt(p.slice(2), 16);
-        if (/^\d+$/.test(p)) return parseInt(p, 10);
-        throw new Error(`无法识别的码值："${p}"`);
+        let c;
+        if (/^0x[0-9a-fA-F]+$/i.test(p)) c = parseInt(p.slice(2), 16);
+        else if (/^\d+$/.test(p)) c = parseInt(p, 10);
+        else throw new Error(`无法识别的码值："${p}"`);
+        if (c < 0 || c > 0x10FFFF) throw new Error('码值超出 Unicode 范围：' + c);
+        if (c >= 0xD800 && c <= 0xDFFF) throw new Error('码值在代理区范围内，无法独立表示：' + c);
+        return c;
       });
       result = codes.map((c) => String.fromCodePoint(c)).join('');
     }
     output.value = result;
     const charCount = mode === 'char' ? result.length : [...input].length;
     showMeta(meta, `共 ${charCount} 个字符
-      <button class="meta-btn" data-copy="${result.replace(/"/g, '&quot;')}">复制</button>`);
+      <button class="meta-btn" data-copy="${encodeURIComponent(result)}">复制</button>`);
     bindMetaCopy(meta);
   } catch (e) {
     output.value = '';
@@ -239,6 +247,8 @@ function asciiSwap() {
   input.value = v;
   output.value = '';
   document.getElementById('ascii-meta').innerHTML = '';
+  // 自动切换为码→文本模式
+  document.getElementById('ascii-mode').value = 'char';
 }
 
 function asciiClear() {
@@ -288,6 +298,7 @@ function uniConvert() {
         result += input.slice(lastEnd, match.index);
         const hex = match[1] || match[2];
         const cp = parseInt(hex, 16);
+        if (cp > 0x10FFFF) throw new Error('码点超出 Unicode 范围：U+' + hex.toUpperCase());
         // 处理代理对：如果是高代理，检查下一个是否是低代理
         if (cp >= 0xd800 && cp <= 0xdbff) {
           // 检查下一个 \uXXXX 是否是低代理
@@ -297,7 +308,7 @@ function uniConvert() {
             if (nextCp >= 0xdc00 && nextCp <= 0xdfff) {
               const fullCp = 0x10000 + ((cp - 0xd800) << 10) + (nextCp - 0xdc00);
               result += String.fromCodePoint(fullCp);
-              re.lastIndex += nextMatch[0].length;
+              re.lastIndex += nextMatch.index + nextMatch[0].length;
               lastEnd = re.lastIndex;
               continue;
             }
@@ -311,7 +322,7 @@ function uniConvert() {
     output.value = result;
     const charCount = mode === 'unescape' ? [...result].length : [...input].length;
     showMeta(meta, `共 ${charCount} 个字符
-      <button class="meta-btn" data-copy="${result.replace(/"/g, '&quot;')}">复制</button>`);
+      <button class="meta-btn" data-copy="${encodeURIComponent(result)}">复制</button>`);
     bindMetaCopy(meta);
   } catch (e) {
     output.value = '';
@@ -327,6 +338,8 @@ function uniSwap() {
   input.value = v;
   output.value = '';
   document.getElementById('uni-meta').innerHTML = '';
+  // 自动切换为反转义模式
+  document.getElementById('uni-mode').value = 'unescape';
 }
 
 function uniClear() {
@@ -339,7 +352,7 @@ function uniClear() {
 function bindMetaCopy(metaEl) {
   metaEl.querySelectorAll('.meta-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const text = btn.dataset.copy || '';
+      const text = decodeURIComponent(btn.dataset.copy || '');
       const ok = await copyText(text);
       if (ok) {
         const original = btn.textContent;

@@ -57,16 +57,15 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const p = JSON.parse(raw);
-    state.elapsedMs = p.elapsedMs || 0;
-    state.laps = Array.isArray(p.laps) ? p.laps : [];
-    if (p.running && p.wallStart) {
+    state.elapsedMs = (typeof p.elapsedMs === 'number' && p.elapsedMs >= 0 && isFinite(p.elapsedMs)) ? p.elapsedMs : 0;
+    state.laps = Array.isArray(p.laps) ? p.laps.filter(l => l && typeof l.totalMs === 'number' && typeof l.splitMs === 'number' && isFinite(l.totalMs) && isFinite(l.splitMs)) : [];
+    if (p.running && typeof p.wallStart === 'number' && p.wallStart > 0) {
       // 刷新恢复：用 wall clock 计算刷新期间流失的时间
       const wallElapsed = Date.now() - p.wallStart;
       state.running = true;
       state.startTimestamp = performance.now();
       state.wallStart = p.wallStart;
-      state.elapsedMs = p.elapsedMs; // 已累计的（不含刷新期间）
-      // 刷新期间也计入运行时间
+      // 已累计的（不含刷新期间）+ 刷新期间也计入运行时间
       state.elapsedMs = p.elapsedMs + wallElapsed;
       // 注意：startTimestamp 设为现在，elapsedMs 已经包含刷新期间
       // 这样后续 tick 计算 currentElapsed = elapsedMs + (now - startTimestamp) 会从刷新点继续
@@ -82,6 +81,7 @@ function tick() {
   if (!state.running) return;
   const now = performance.now();
   const currentElapsed = state.elapsedMs + (now - state.startTimestamp);
+  if (!isFinite(currentElapsed)) return;
   render(currentElapsed);
   rafId = requestAnimationFrame(tick);
 }
@@ -123,7 +123,10 @@ function toggleStartPause() {
 
 function lap() {
   if (!state.running) return;
-  if (state.laps.length >= MAX_LAPS) return;
+  if (state.laps.length >= MAX_LAPS) {
+    alert('已达计次上限（' + MAX_LAPS + ' 次）');
+    return;
+  }
   const totalMs = getCurrentElapsed();
   const prevTotal = state.laps.length > 0 ? state.laps[state.laps.length - 1].totalMs : 0;
   state.laps.push({
@@ -204,6 +207,11 @@ function renderLaps() {
       if (l.splitMs < minSplit) { minSplit = l.splitMs; bestIdx = i; }
       if (l.splitMs > maxSplit) { maxSplit = l.splitMs; worstIdx = i; }
     });
+    // 所有 split 相等则不高亮任何条目
+    if (minSplit === maxSplit) {
+      bestIdx = -1;
+      worstIdx = -1;
+    }
   }
 
   // 倒序显示（最新在最上方）

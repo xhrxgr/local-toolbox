@@ -246,7 +246,10 @@ function addFiles(newFiles) {
       setTimeout(() => { toast.hidden = true; }, 5000);
     }
     const dup = files.find(e => e.name === f.name && e.size === f.size && e.lastModified === f.lastModified);
-    if (dup) continue;
+    if (dup) {
+      console.log('跳过重复文件:', f.name);
+      continue;
+    }
     files.push(f);
   }
 
@@ -672,16 +675,19 @@ async function executeConvert(file, onStage) {
   }
 
   // 注册进度回调
-  ffmpeg.on('progress', ({ progress }) => {
+  const convertProgressHandler = ({ progress }) => {
     if (taskQueue.abortRequested) return;
+    if (!isFinite(progress)) return;
     const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
     onStage(Stage.CONVERT, `正在转换 ${file.name}...`, pct);
-  });
-  ffmpeg.on('log', ({ message }) => {
+  };
+  const convertLogHandler = ({ message }) => {
     if (message && !message.includes('frame=')) {
       onStage(Stage.CONVERT, `正在转换 ${file.name}... ${message.slice(0, 60)}`, undefined);
     }
-  });
+  };
+  ffmpeg.on('progress', convertProgressHandler);
+  ffmpeg.on('log', convertLogHandler);
 
   onStage(Stage.CONVERT, `开始转换 → ${outputFormat.toUpperCase()}`, 10);
   try {
@@ -692,8 +698,8 @@ async function executeConvert(file, onStage) {
     }
     throw err;
   } finally {
-    ffmpeg.off('progress');
-    ffmpeg.off('log');
+    ffmpeg.off('progress', convertProgressHandler);
+    ffmpeg.off('log', convertLogHandler);
   }
 
   onStage(Stage.READ_RESULT, '正在读取处理结果...', 96);
@@ -746,6 +752,7 @@ async function executeExtract(file, onStage) {
   args.push(outputName);
 
   ffmpeg.on('progress', ({ progress }) => {
+    if (!isFinite(progress)) return;
     const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
     onStage(Stage.CONVERT, `正在提取音频...`, pct);
   });
@@ -782,10 +789,15 @@ async function executeTrim(file, onStage) {
 
   const format = document.getElementById('trim-format').value;
   const trimMode = document.querySelector('input[name="trim-mode"]:checked')?.value || 'fast';
-  const startTime = parseTime(document.getElementById('trim-start').value) || 0;
-  const endTime = document.getElementById('trim-end').value
-    ? parseTime(document.getElementById('trim-end').value)
-    : null;
+  const parsedStart = parseTime(document.getElementById('trim-start').value);
+  if (parsedStart !== null && isNaN(parsedStart)) throw new Error('入点时间格式无效');
+  const startTime = parsedStart || 0;
+  const endTimeRaw = document.getElementById('trim-end').value;
+  const endTime = endTimeRaw ? parseTime(endTimeRaw) : null;
+  if (endTimeRaw && isNaN(endTime)) throw new Error('出点时间格式无效');
+  if (endTime !== null && !isNaN(endTime) && endTime > 0 && startTime >= endTime) {
+    throw new Error('入点必须小于出点');
+  }
 
   const inputExt = file.name.split('.').pop()?.toLowerCase() || 'mp4';
   const inputName = `input_${Date.now()}.${inputExt}`;
@@ -846,6 +858,7 @@ async function executeTrim(file, onStage) {
   }
 
   ffmpeg.on('progress', ({ progress }) => {
+    if (!isFinite(progress)) return;
     const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
     onStage(Stage.CONVERT, `正在裁剪...`, pct);
   });
@@ -912,9 +925,13 @@ function showResults() {
       const i = parseInt(btn.dataset.i);
       const r = valid[i];
       if (r.blob) {
-        // blob 已通过 URL.createObjectURL 暴露，浏览器自动 GC
-        // 找到对应的 li 元素移除
-        btn.closest('li').remove();
+        // 释放对应的 blob URL
+        const li = btn.closest('li');
+        const link = li.querySelector('.result-item__dl');
+        if (link && link.href.startsWith('blob:')) {
+          URL.revokeObjectURL(link.href);
+        }
+        li.remove();
         // 更新统计
         const remaining = listEl.querySelectorAll('li').length;
         if (remaining === 0) {
@@ -959,6 +976,9 @@ function bindCancelButtons() {
   });
 
   document.getElementById('btn-clear-result').addEventListener('click', () => {
+    document.querySelectorAll('#result-list .result-item__dl').forEach(a => {
+      if (a.href.startsWith('blob:')) URL.revokeObjectURL(a.href);
+    });
     document.getElementById('download-section').hidden = true;
     document.getElementById('result-list').innerHTML = '';
     document.getElementById('btn-convert').hidden = false;
@@ -1443,6 +1463,7 @@ function setupTrimTimeline() {
     const rect = timeline.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
     const t = Math.max(0, Math.min(1, pct)) * trimState.duration;
+    if (!isFinite(t)) return;
     // 跳转前先暂停，避免 currentTime 抖动
     video.pause();
     video.currentTime = t;
