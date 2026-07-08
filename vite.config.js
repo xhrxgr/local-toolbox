@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/local-toolbox/' : '/',
   build: {
     rollupOptions: {
       input: {
@@ -37,4 +38,4 @@ export default defineConfig({
       },
     },
   ],
-});
+}));

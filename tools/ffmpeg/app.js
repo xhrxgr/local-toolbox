@@ -170,6 +170,11 @@ async function fetchCoreFile(file) {
 async function loadFFmpeg() {
   if (ffmpeg) return ffmpeg;
 
+  // GitHub Pages 等静态托管不支持 COOP/COEP 头，SharedArrayBuffer 不可用
+  if (!self.crossOriginIsolated) {
+    throw new Error('当前环境不支持 SharedArrayBuffer（FFmpeg 多线程必需）。请使用本地 npm run dev 或自托管服务器（需配置 COOP/COEP 响应头）运行此工具。');
+  }
+
   const loadingSection = document.getElementById('loading-section');
   loadingSection.hidden = false;
   const loadingText = document.getElementById('loading-text');
