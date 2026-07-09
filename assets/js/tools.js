@@ -101,18 +101,26 @@ const ICONS = {
 };
 
 /**
+ * 获取基础路径（支持 GitHub Pages 子路径部署）
+ */
+function getBasePath() {
+  return typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/';
+}
+
+/**
  * 渲染工具卡片
  */
 function renderTools(filter = 'all') {
   const grid = document.getElementById('tools-grid');
   if (!grid) return;
 
+  const base = getBasePath();
   const filtered = filter === 'all' ? TOOLS : TOOLS.filter((t) => t.category === filter);
 
   grid.innerHTML = filtered
     .map(
       (tool) => `
-    <a href="${tool.available ? tool.path : 'javascript:void(0)'}"
+    <a href="${tool.available ? base + tool.path.replace(/^\//, '') : 'javascript:void(0)'}"
        class="tool-card glass ${tool.available ? '' : 'tool-card--disabled'}"
        ${!tool.available ? 'aria-disabled="true" tabindex="-1"' : ''}>
       <div class="tool-card__icon">${ICONS[tool.icon] || ''}</div>

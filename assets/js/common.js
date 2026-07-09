@@ -35,10 +35,11 @@ function updateThemeIcon() {
  * @param {string} toolName - 工具名称
  */
 function injectToolHeader(toolName) {
+  const base = (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/') || '/';
   const header = document.createElement('header');
   header.className = 'tool-header';
   header.innerHTML = `
-    <a href="/" class="back">
+    <a href="${base}" class="back">
       <svg class="back-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="10 3 5 8 10 13"></polyline>
       </svg>
