@@ -1,0 +1,10 @@
+(function(){let e=document.createElement(`link`).relList;if(e&&e.supports&&e.supports(`modulepreload`))return;for(let e of document.querySelectorAll(`link[rel="modulepreload"]`))n(e);new MutationObserver(e=>{for(let t of e)if(t.type===`childList`)for(let e of t.addedNodes)e.tagName===`LINK`&&e.rel===`modulepreload`&&n(e)}).observe(document,{childList:!0,subtree:!0});function t(e){let t={};return e.integrity&&(t.integrity=e.integrity),e.referrerPolicy&&(t.referrerPolicy=e.referrerPolicy),e.crossOrigin===`use-credentials`?t.credentials=`include`:e.crossOrigin===`anonymous`?t.credentials=`omit`:t.credentials=`same-origin`,t}function n(e){if(e.ep)return;e.ep=!0;let n=t(e);fetch(e.href,n)}})();function e(){localStorage.getItem(`theme`)===`dark`?document.documentElement.dataset.theme=`dark`:document.documentElement.dataset.theme=`light`,n()}function t(){let e=document.documentElement.dataset.theme===`dark`?`light`:`dark`;document.documentElement.dataset.theme=e,localStorage.setItem(`theme`,e),n()}function n(){let e=document.documentElement.dataset.theme===`dark`;document.querySelectorAll(`.theme-toggle`).forEach(t=>{t.textContent=e?`☀️`:`🌙`,t.setAttribute(`aria-label`,e?`切换到浅色模式`:`切换到深色模式`)})}function r(e){let t=document.createElement(`header`);t.className=`tool-header`,t.innerHTML=`
+    <a href="/local-toolbox/" class="back">
+      <svg class="back-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="10 3 5 8 10 13"></polyline>
+      </svg>
+      工具箱
+    </a>
+    <h1>${e}</h1>
+    <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()">🌙</button>
+  `,document.body.prepend(t)}window.toggleTheme=t,window.injectToolHeader=r,e(),window.matchMedia(`(prefers-color-scheme: dark)`).addEventListener(`change`,e=>{localStorage.getItem(`theme`)||(document.documentElement.dataset.theme=e.matches?`dark`:`light`,n())});export{r as t};
