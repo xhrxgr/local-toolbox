@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-bak/
 dist.zip
 .trae/
 .superpowers/
@@ -14,3 +15,4 @@ conversation_summary.md
 .screenshots/
 sw.png
 stopwatch-final.png
+pages-deployed.png
