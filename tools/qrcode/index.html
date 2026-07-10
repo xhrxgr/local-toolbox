@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="二维码工具 —— 生成（自定义颜色/纠错/尺寸，PNG/SVG 下载）+ 图片识别，全部本地运行" />
+  <title>二维码 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/qrcode/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="generate">生成</button>
+      <button class="mode-tab" data-mode="recognize">识别</button>
+    </nav>
+
+    <!-- ========== 生成 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-generate">
+      <div class="panel-desc">输入文本实时生成二维码，支持自定义纠错级别、尺寸、前景/背景色，可下载 PNG 或 SVG。全部本地运行。</div>
+
+      <div class="qr-gen-row">
+        <label class="qr-label" for="qr-text">文本内容</label>
+        <textarea class="qr-input" id="qr-text" placeholder="输入文本生成二维码..." rows="4"></textarea>
+      </div>
+
+      <div class="qr-options">
+        <div class="qr-option">
+          <span class="qr-option__label">纠错级别</span>
+          <div class="qr-ecl" id="qr-ecl">
+            <label class="qr-ecl__item"><input type="radio" name="qr-ecl" value="L" /><span>L (7%)</span></label>
+            <label class="qr-ecl__item"><input type="radio" name="qr-ecl" value="M" checked /><span>M (15%)</span></label>
+            <label class="qr-ecl__item"><input type="radio" name="qr-ecl" value="Q" /><span>Q (25%)</span></label>
+            <label class="qr-ecl__item"><input type="radio" name="qr-ecl" value="H" /><span>H (30%)</span></label>
+          </div>
+        </div>
+
+        <div class="qr-option">
+          <span class="qr-option__label">尺寸 <span class="qr-option__value" id="qr-size-value">256px</span></span>
+          <input type="range" class="qr-range" id="qr-size" min="128" max="512" step="8" value="256" />
+        </div>
+
+        <div class="qr-option qr-option--colors">
+          <div class="qr-color">
+            <span class="qr-option__label">前景色</span>
+            <input type="color" class="qr-color-input" id="qr-fg" value="#000000" />
+          </div>
+          <div class="qr-color">
+            <span class="qr-option__label">背景色</span>
+            <input type="color" class="qr-color-input" id="qr-bg" value="#ffffff" />
+          </div>
+        </div>
+      </div>
+
+      <div class="qr-gen-actions">
+        <button class="btn btn-primary" id="btn-qr-generate">生成</button>
+      </div>
+
+      <div class="qr-preview-area" id="qr-preview-area">
+        <div class="qr-preview-empty" id="qr-preview-empty">输入文本后将自动生成二维码</div>
+        <img class="qr-preview-img" id="qr-preview-img" alt="二维码预览" hidden />
+      </div>
+
+      <div class="qr-download" id="qr-download">
+        <button class="btn btn-secondary" id="btn-qr-png" disabled>下载 PNG</button>
+        <button class="btn btn-secondary" id="btn-qr-svg" disabled>下载 SVG</button>
+      </div>
+
+      <div class="qr-meta" id="qr-meta"></div>
+    </section>
+
+    <!-- ========== 识别 ========== -->
+    <section class="mode-panel glass" id="panel-recognize">
+      <div class="panel-desc">拖入图片或点击选择，支持 PNG/JPEG/GIF/BMP/WebP，可批量识别；也可用 Ctrl+V 粘贴图片。全部本地运行。</div>
+
+      <div class="qr-dropzone" id="qr-dropzone" tabindex="0">
+        <svg class="qr-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <div class="qr-dropzone__text">
+          <span class="qr-dropzone__primary">点击选择图片或拖放到此处</span>
+          <span class="qr-dropzone__secondary">支持 PNG / JPEG / GIF / BMP / WebP，可多选，也可 Ctrl+V 粘贴</span>
+        </div>
+        <input type="file" id="qr-file" accept="image/png,image/jpeg,image/gif,image/bmp,image/webp" multiple hidden />
+      </div>
+
+      <div class="qr-camera-btn-row">
+        <button class="btn btn-primary" id="btn-qr-camera">摄像头扫描</button>
+      </div>
+
+      <div class="qr-camera" id="qr-camera" hidden>
+        <div class="qr-camera__view">
+          <video class="qr-camera__video" id="qr-camera-video" autoplay playsinline muted></video>
+          <div class="qr-camera__overlay">
+            <div class="qr-camera__frame"></div>
+            <div class="qr-camera__scan-line"></div>
+          </div>
+        </div>
+        <div class="qr-camera__status" id="qr-camera-status">正在扫描二维码...</div>
+        <div class="qr-camera__controls">
+          <button class="btn btn-secondary" id="btn-qr-camera-stop">停止扫描</button>
+        </div>
+      </div>
+
+      <div class="qr-rec-actions" id="qr-rec-actions" hidden>
+        <button class="btn btn-secondary" id="btn-qr-clear-rec">清空结果</button>
+      </div>
+
+      <div class="qr-result-list" id="qr-result-list"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/qrcode/main.js"></script>
+</body>
+</html>

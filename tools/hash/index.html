@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="UUID/哈希生成器 —— UUID v1/v4/v7 生成 + MD5/SHA 哈希 + HMAC，全部本地运行" />
+  <title>UUID/哈希 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/hash/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="uuid">UUID 生成</button>
+      <button class="mode-tab" data-mode="hash">哈希计算</button>
+    </nav>
+
+    <!-- ========== UUID 生成 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-uuid">
+      <div class="panel-desc">UUID 生成器，支持 v1（基于时间）、v4（随机）、v7（时间排序随机）三种版本，使用 crypto 安全随机源。</div>
+
+      <div class="uuid-controls">
+        <div class="uuid-field">
+          <span class="uuid-field__label">版本</span>
+          <div class="seg-group" id="uuid-version">
+            <label class="seg"><input type="radio" name="uuid-ver" value="v1" /><span>v1</span></label>
+            <label class="seg"><input type="radio" name="uuid-ver" value="v4" checked /><span>v4</span></label>
+            <label class="seg"><input type="radio" name="uuid-ver" value="v7" /><span>v7</span></label>
+          </div>
+        </div>
+        <div class="uuid-field">
+          <label class="uuid-field__label" for="uuid-count">数量</label>
+          <input type="number" class="uuid-count" id="uuid-count" min="1" max="100" value="1" />
+        </div>
+        <button class="btn btn-primary" id="btn-uuid-generate">生成</button>
+        <button class="btn btn-secondary" id="btn-uuid-copyall">复制全部</button>
+      </div>
+
+      <div class="uuid-result" id="uuid-result">
+        <div class="uuid-empty">点击"生成"按钮创建 UUID</div>
+      </div>
+    </section>
+
+    <!-- ========== 哈希计算 ========== -->
+    <section class="mode-panel glass" id="panel-hash">
+      <div class="panel-desc">哈希计算，支持 MD5 / SHA-1 / SHA-256 / SHA-512，可选 HMAC 模式，支持文本与文件输入。全部本地运行。</div>
+
+      <div class="hash-controls">
+        <select class="codec-select" id="hash-algo">
+          <option value="MD5">MD5（128 位）</option>
+          <option value="SHA-1">SHA-1（160 位）</option>
+          <option value="SHA-256" selected>SHA-256（256 位）</option>
+          <option value="SHA-512">SHA-512（512 位）</option>
+        </select>
+        <label class="hmac-toggle">
+          <input type="checkbox" id="hash-hmac" />
+          <span>HMAC</span>
+        </label>
+        <input type="text" class="hmac-key" id="hash-hmac-key" placeholder="HMAC 密钥" hidden />
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label">文本输入</label>
+        <textarea class="codec-input" id="hash-text" placeholder="输入要计算哈希的文本（Ctrl+Enter 计算）" rows="5"></textarea>
+      </div>
+
+      <div class="hash-dropzone" id="hash-dropzone" tabindex="0">
+        <svg class="hash-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div class="hash-dropzone__text">
+          <span class="hash-dropzone__primary">拖入文件计算哈希</span>
+          <span class="hash-dropzone__secondary" id="hash-file-name">或点击此处选择文件</span>
+        </div>
+        <input type="file" id="hash-file" hidden />
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-hash-compute">计算哈希</button>
+        <button class="btn btn-secondary" id="btn-hash-clear">清空</button>
+      </div>
+
+      <div class="hash-result" id="hash-result" hidden>
+        <div class="hash-result__row">
+          <label class="hash-result__label">Hex</label>
+          <textarea class="hash-result__value" id="hash-hex" readonly rows="2"></textarea>
+          <button class="meta-btn" id="btn-copy-hex">复制</button>
+        </div>
+        <div class="hash-result__row">
+          <label class="hash-result__label">Base64</label>
+          <textarea class="hash-result__value" id="hash-b64" readonly rows="2"></textarea>
+          <button class="meta-btn" id="btn-copy-b64">复制</button>
+        </div>
+        <div class="hash-result__meta" id="hash-meta"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/hash/main.js"></script>
+</body>
+</html>

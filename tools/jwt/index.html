@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="JWT 解析工具 —— 实时解码 Header/Payload/Signature，检查过期时间，解释标准声明，全部本地运行" />
+  <title>JWT 解析 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/jwt/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 输入区 -->
+    <section class="glass jwt-input-panel">
+      <div class="jwt-input-head">
+        <label class="jwt-input-label" for="jwt-input">粘贴 JWT</label>
+        <div class="jwt-input-actions">
+          <button class="btn btn-secondary" id="btn-jwt-sample">载入示例</button>
+          <button class="btn btn-secondary" id="btn-jwt-clear">清空</button>
+        </div>
+      </div>
+      <textarea class="jwt-input" id="jwt-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0...（格式：header.payload.signature）" rows="4"></textarea>
+      <div class="jwt-tip">输入即实时解析。Ctrl+Enter 也可触发解析。所有解析在浏览器本地完成，不会上传。</div>
+      <div class="jwt-error" id="jwt-error" hidden></div>
+    </section>
+
+    <!-- 状态横幅 -->
+    <div class="jwt-banner" id="jwt-banner" hidden></div>
+
+    <!-- 三栏卡片 -->
+    <div class="jwt-parts">
+      <section class="glass jwt-card" id="card-header"></section>
+      <section class="glass jwt-card" id="card-payload"></section>
+      <section class="glass jwt-card" id="card-signature"></section>
+    </div>
+
+    <!-- 声明详情 -->
+    <section class="glass jwt-claims" id="claims-section"></section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/jwt/main.js"></script>
+</body>
+</html>

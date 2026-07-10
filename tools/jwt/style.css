@@ -1,0 +1,357 @@
+/* ========== JWT 解析工具样式 ========== */
+
+.tool-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ========== 按钮（与 encoding 工具一致） ========== */
+.btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+
+/* ========== 输入区 ========== */
+.jwt-input-panel {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.jwt-input-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.jwt-input-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.jwt-input-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.jwt-input {
+  width: 100%;
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  min-height: 100px;
+  word-break: break-all;
+  line-height: 1.5;
+  transition: border-color var(--transition-fast);
+}
+
+.jwt-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.jwt-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.jwt-tip {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ========== 错误提示 ========== */
+.jwt-error {
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: var(--radius-md);
+  color: #ef4444;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* ========== 状态横幅（4 色） ========== */
+.jwt-banner {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.jwt-banner--green {
+  background: rgba(34, 197, 94, 0.1);
+  border-left-color: #22c55e;
+}
+.jwt-banner--yellow {
+  background: rgba(234, 179, 8, 0.12);
+  border-left-color: #eab308;
+}
+.jwt-banner--red {
+  background: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+.jwt-banner--blue {
+  background: var(--tag-bg);
+  border-left-color: var(--accent);
+}
+
+.jwt-banner__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.jwt-banner__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.jwt-banner--green .jwt-banner__dot { background: #22c55e; }
+.jwt-banner--yellow .jwt-banner__dot { background: #eab308; }
+.jwt-banner--red .jwt-banner__dot { background: #ef4444; }
+.jwt-banner--blue .jwt-banner__dot { background: var(--accent); }
+
+.jwt-banner__title {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.jwt-banner--green .jwt-banner__title { color: #22c55e; }
+.jwt-banner--yellow .jwt-banner__title { color: #eab308; }
+.jwt-banner--red .jwt-banner__title { color: #ef4444; }
+.jwt-banner--blue .jwt-banner__title { color: var(--accent); }
+
+.jwt-banner__detail {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding-left: 18px;
+}
+
+/* ========== 三栏卡片 ========== */
+.jwt-parts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.jwt-card {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-height: 120px;
+}
+
+.jwt-card:empty {
+  display: none;
+}
+
+.jwt-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.jwt-card__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.jwt-card__pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: var(--bg);
+  color: var(--text);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: auto;
+  max-height: 320px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* 复制按钮 */
+.jwt-copy {
+  padding: 4px var(--space-sm);
+  font-size: var(--text-xs);
+  background: var(--card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.jwt-copy:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.jwt-copy--success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+/* ========== 声明详情表 ========== */
+.jwt-claims {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.jwt-claims:empty {
+  display: none;
+}
+
+.jwt-claims__head {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.jwt-claims__wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.jwt-claims__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  min-width: 480px;
+}
+
+.jwt-claims__table th,
+.jwt-claims__table td {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.jwt-claims__table th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.jwt-claims__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.jwt-claims__table tbody tr:hover {
+  background: var(--bg-secondary);
+}
+
+.jwt-claims__key {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.jwt-claims__desc {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.jwt-claims__val {
+  font-family: var(--font-mono);
+  color: var(--text);
+  word-break: break-all;
+}
+
+.jwt-claims__tag {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: var(--radius-sm);
+  margin-left: 6px;
+  vertical-align: middle;
+  font-family: var(--font-sans);
+}
+
+.jwt-claims__tag--std {
+  background: var(--tag-bg);
+  color: var(--tag-text);
+}
+
+.jwt-claims__tag--custom {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.jwt-claims__empty {
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 860px) {
+  .jwt-parts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .btn {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-xs);
+  }
+  .jwt-input-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .jwt-input-actions {
+    justify-content: flex-end;
+  }
+}

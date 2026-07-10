@@ -1,0 +1,304 @@
+/* ========== JSON 工具样式 ========== */
+
+.tool-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ========== 顶部操作栏 ========== */
+.json-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  align-items: center;
+}
+
+.json-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.json-path {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex: 1;
+  min-width: 280px;
+}
+
+.json-path-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.json-path-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.json-path-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ========== 主区域：左右分栏 ========== */
+.json-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+
+.json-pane {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  gap: var(--space-sm);
+  min-height: 420px;
+}
+
+.json-pane__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.json-pane__label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: auto;
+}
+
+.json-pane__btn {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
+}
+
+.json-pane__btn--success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+/* ========== 文本框 ========== */
+.json-textarea {
+  flex: 1;
+  width: 100%;
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  resize: none;
+  min-height: 320px;
+  line-height: 1.5;
+  word-break: break-all;
+  transition: border-color var(--transition-fast);
+}
+
+.json-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.json-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.json-textarea--output {
+  background: var(--bg);
+  cursor: text;
+}
+
+/* ========== 树形视图 ========== */
+.json-tree {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  line-height: 1.6;
+  min-height: 320px;
+  white-space: pre-wrap;
+}
+
+.tree-node {
+  position: relative;
+}
+
+.tree-node__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  word-break: break-all;
+}
+
+.tree-node__header--collapsible {
+  cursor: pointer;
+}
+
+.tree-node__header--collapsible:hover {
+  color: var(--text);
+}
+
+.tree-toggle {
+  user-select: none;
+  color: var(--text-secondary);
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.tree-node__header--collapsible .tree-toggle:hover {
+  color: var(--accent);
+}
+
+.tree-key {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.tree-count {
+  color: var(--text-secondary);
+}
+
+.tree-value {
+  word-break: break-all;
+}
+
+.tree-value--string {
+  color: #22c55e;
+}
+
+.tree-value--number {
+  color: #60a5fa;
+}
+
+.tree-value--boolean {
+  color: #f59e0b;
+}
+
+.tree-value--null {
+  color: var(--text-secondary);
+}
+
+.tree-node.collapsed > .tree-children {
+  display: none;
+}
+
+.tree-empty {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* ========== 底部元信息 ========== */
+.json-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  align-items: center;
+}
+
+.json-meta__sep {
+  opacity: 0.5;
+}
+
+.json-meta__status {
+  margin-left: auto;
+  font-weight: 500;
+  text-align: right;
+}
+
+.json-meta__status--ok {
+  color: #22c55e;
+}
+
+.json-meta__status--err {
+  color: #ef4444;
+}
+
+/* ========== 按钮（与编码工具统一） ========== */
+.btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 860px) {
+  .json-main {
+    grid-template-columns: 1fr;
+  }
+  .json-pane {
+    min-height: 280px;
+  }
+  .json-textarea,
+  .json-tree {
+    min-height: 220px;
+  }
+  .btn {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-xs);
+  }
+  .json-meta__status {
+    margin-left: 0;
+    width: 100%;
+  }
+}

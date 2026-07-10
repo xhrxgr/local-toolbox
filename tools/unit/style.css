@@ -1,0 +1,176 @@
+/* ========== 单位转换工具样式 ========== */
+
+.tool-container {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ========== 模式 Tab ========== */
+.mode-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.mode-tab:hover {
+  color: var(--text);
+  background: var(--bg-secondary);
+}
+
+.mode-tab--active {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* ========== 面板 ========== */
+.mode-panel {
+  display: none;
+  padding: var(--space-lg);
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.mode-panel--active {
+  display: flex;
+}
+
+.panel-desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent);
+}
+
+/* ========== 转换器布局：左 | 交换 | 右 ========== */
+.unit-converter {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.unit-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.unit-input {
+  width: 100%;
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.unit-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.unit-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* 交换按钮（圆形，hover 旋转） */
+.unit-swap {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xl);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.unit-swap:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: rotate(180deg);
+}
+
+.unit-swap:active {
+  transform: rotate(180deg) scale(0.92);
+}
+
+/* ========== 下拉框（与 encoding 工具一致） ========== */
+.codec-select {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.codec-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ========== 响应式：窄屏纵向堆叠 ========== */
+@media (max-width: 640px) {
+  .unit-converter {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: var(--space-sm);
+  }
+
+  .unit-swap {
+    margin: 0 auto;
+    transform: rotate(90deg);
+  }
+
+  .unit-swap:hover {
+    transform: rotate(270deg);
+  }
+
+  .unit-swap:active {
+    transform: rotate(270deg) scale(0.92);
+  }
+
+  .unit-input {
+    font-size: var(--text-base);
+  }
+}

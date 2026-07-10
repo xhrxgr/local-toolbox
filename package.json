@@ -12,6 +12,9 @@
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "jsqr": "^1.4.0",
+    "marked": "^18.0.5",
+    "qrcode": "^1.5.4",
     "vite": "^8.1.3"
   }
 }

@@ -1,0 +1,382 @@
+/* ========== 文本对比工具样式 ========== */
+
+.tool-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* ========== 输入区 ========== */
+.diff-input-panel {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.diff-input-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.diff-input-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.diff-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diff-textarea {
+  width: 100%;
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  min-height: 180px;
+  line-height: 1.5;
+  transition: border-color var(--transition-fast);
+}
+
+.diff-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.diff-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.diff-hint {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+/* ========== 选项栏 ========== */
+.diff-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+}
+
+.diff-option-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.diff-option-label {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diff-select {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.diff-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.diff-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.diff-checkbox input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.diff-options-spacer {
+  flex: 1;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+
+.btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========== 警告 / 统计 ========== */
+.diff-warning {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.diff-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.diff-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-mono);
+}
+
+.diff-stat b {
+  font-weight: 700;
+}
+
+.diff-stat--add {
+  color: #22c55e;
+}
+
+.diff-stat--del {
+  color: #ef4444;
+}
+
+.diff-stat--eq {
+  color: var(--text-secondary);
+}
+
+/* ========== 结果区 ========== */
+.diff-result {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diff-empty {
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.diff-view {
+  max-height: 65vh;
+  overflow: auto;
+  border-radius: var(--radius-md);
+}
+
+/* ========== diff 表格 ========== */
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.diff-table--split {
+  table-layout: fixed;
+}
+
+.diff-table--inline {
+  table-layout: fixed;
+}
+
+.diff-table td,
+.diff-table th {
+  border: none;
+  vertical-align: top;
+}
+
+/* 列宽 */
+.diff-col-ln {
+  width: 48px;
+}
+
+.diff-col-sign {
+  width: 28px;
+}
+
+.diff-table--split .diff-col-code {
+  width: calc((100% - 96px) / 2);
+}
+
+.diff-table--inline .diff-col-code {
+  width: auto;
+}
+
+/* 表头（并排视图） */
+.diff-th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* 行号列 */
+.diff-ln {
+  min-width: 48px;
+  padding: 1px 8px;
+  text-align: right;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  user-select: none;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.diff-ln--empty {
+  background: transparent;
+}
+
+/* 符号列（内联） */
+.diff-sign {
+  min-width: 28px;
+  text-align: center;
+  font-weight: 700;
+  user-select: none;
+  padding: 1px 4px;
+}
+
+.diff-sign--delete {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.diff-sign--insert {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.diff-sign--equal {
+  color: var(--text-secondary);
+}
+
+/* 代码列 */
+.diff-code {
+  padding: 1px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.diff-code--equal {
+  background: transparent;
+}
+
+.diff-code--delete {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.diff-code--insert {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.diff-code--empty {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+/* 字符级高亮 */
+.char-del {
+  background: rgba(239, 68, 68, 0.35);
+  border-radius: 2px;
+}
+
+.char-ins {
+  background: rgba(34, 197, 94, 0.35);
+  border-radius: 2px;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 720px) {
+  .diff-input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diff-options {
+    gap: var(--space-xs);
+  }
+
+  .diff-options-spacer {
+    display: none;
+  }
+
+  .btn {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--text-xs);
+  }
+
+  .diff-select {
+    flex: 1;
+    min-width: 90px;
+  }
+}

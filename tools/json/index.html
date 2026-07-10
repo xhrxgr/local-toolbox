@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="JSON 工具 —— 格式化/压缩/校验/转义/排序/树形展示/JSONPath 查询，全部本地运行" />
+  <title>JSON 工具 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/json/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 顶部操作栏 -->
+    <section class="json-toolbar glass">
+      <div class="json-actions">
+        <button class="btn btn-primary" id="btn-format2">格式化（2 空格）</button>
+        <button class="btn btn-secondary" id="btn-format4">格式化（4 空格）</button>
+        <button class="btn btn-secondary" id="btn-compress">压缩</button>
+        <button class="btn btn-secondary" id="btn-validate">校验</button>
+        <button class="btn btn-secondary" id="btn-escape">转义</button>
+        <button class="btn btn-secondary" id="btn-unescape">反转义</button>
+        <button class="btn btn-secondary" id="btn-sort">排序</button>
+        <button class="btn btn-secondary" id="btn-view-toggle">树形视图</button>
+      </div>
+      <div class="json-path">
+        <input type="text" id="json-path-input" class="json-path-input" placeholder="JSONPath 查询，如 $.user.name 或 $.items[0]" />
+        <button class="btn btn-secondary" id="btn-query">查询</button>
+      </div>
+    </section>
+
+    <!-- 主区域：左右分栏 -->
+    <section class="json-main">
+      <div class="json-pane glass">
+        <div class="json-pane__head">
+          <span class="json-pane__label">输入</span>
+          <button class="btn btn-secondary json-pane__btn" id="btn-clear">清空</button>
+          <button class="btn btn-secondary json-pane__btn" id="btn-copy-in">复制</button>
+        </div>
+        <textarea class="json-textarea" id="json-input" placeholder="粘贴或输入 JSON 文本（Ctrl+Enter 格式化 2 空格）"></textarea>
+      </div>
+      <div class="json-pane glass">
+        <div class="json-pane__head">
+          <span class="json-pane__label">输出</span>
+          <button class="btn btn-secondary json-pane__btn" id="btn-copy-out">复制</button>
+        </div>
+        <textarea class="json-textarea json-textarea--output" id="json-output" placeholder="结果将显示在这里" readonly></textarea>
+        <div class="json-tree" id="json-tree" hidden></div>
+      </div>
+    </section>
+
+    <!-- 底部元信息 -->
+    <section class="json-meta glass" id="json-meta">
+      <span class="json-meta__item" id="meta-chars">字符数 0</span>
+      <span class="json-meta__sep">·</span>
+      <span class="json-meta__item" id="meta-bytes">字节数 0</span>
+      <span class="json-meta__sep">·</span>
+      <span class="json-meta__item" id="meta-depth">层级深度 0</span>
+      <span class="json-meta__status" id="meta-status"></span>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/json/main.js"></script>
+</body>
+</html>
