@@ -419,6 +419,25 @@
           <option value="gif">GIF</option>
         </select>
       </div>
+      <div class="setting" id="setting-trim-vcodec">
+        <label class="setting__label" for="trim-vcodec">视频编码器（精准模式）</label>
+        <select class="setting__select" id="trim-vcodec">
+          <option value="copy" selected>流复制 (Stream Copy) — 保留原始编码</option>
+          <option value="libx264">H.264 (libx264) — 兼容性最好</option>
+          <option value="libx265">H.265 / HEVC (libx265)</option>
+          <option value="libvpx-vp9">VP9 (libvpx-vp9)</option>
+          <option value="mpeg4">MPEG-4 (mpeg4)</option>
+        </select>
+      </div>
+      <div class="setting" id="setting-trim-acodec">
+        <label class="setting__label" for="trim-acodec">音频编码器（精准模式）</label>
+        <select class="setting__select" id="trim-acodec">
+          <option value="copy" selected>流复制 (Stream Copy) — 保留原始编码</option>
+          <option value="aac">AAC</option>
+          <option value="libmp3lame">MP3 (libmp3lame)</option>
+          <option value="libopus">Opus (libopus)</option>
+        </select>
+      </div>
       <div class="setting">
         <label class="setting__label">裁剪精度</label>
         <div class="trim-mode-row">

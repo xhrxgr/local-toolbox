@@ -723,6 +723,17 @@ async function executeConvert(file, onStage) {
   return { cancelled: false, blob, format: outputFormat };
 }
 
+// 音频格式→编码器映射（格式名不能直接当编码器名用）
+const EXTRACT_FORMAT_TO_CODEC = {
+  mp3: 'libmp3lame',
+  aac: 'aac',
+  wav: 'pcm_s16le',
+  flac: 'flac',
+  ogg: 'libvorbis',
+  opus: 'libopus',
+  m4a: 'aac',
+};
+
 async function executeExtract(file, onStage) {
   // 简化实现：调用原来的 doExtractAudio 逻辑
   onStage(Stage.LOAD_FFMPEG, '检查 FFmpeg 内核...', 5);
@@ -740,7 +751,8 @@ async function executeExtract(file, onStage) {
   if (format === 'copy') {
     args.push('-c:a', 'copy');
   } else {
-    args.push('-c:a', format);
+    const codec = EXTRACT_FORMAT_TO_CODEC[format] || format;
+    args.push('-c:a', codec);
     const abitrate = document.getElementById('extract-bitrate').value;
     if (abitrate === 'custom') {
       const custom = document.getElementById('custom-extract-bitrate').value;
@@ -1713,38 +1725,78 @@ export function initFFmpeg() {
     }
   }
 
-  // 格式切换时自动调整编码器选项
+  // 格式切换时自动调整编码器选项 & 视频/图片输出时隐藏/显示视频设置
   const vcodecSelect = document.getElementById('video-codec');
   const acodecSelect = document.getElementById('audio-codec');
   const originalVcodecOptions = vcodecSelect.innerHTML;
   const originalAcodecOptions = acodecSelect.innerHTML;
 
+  // 视频相关设置项（音频/图片输出时应隐藏）
+  const VIDEO_SETTING_IDS = [
+    'setting-vcodec',     // 视频编码器
+    'setting-resolution', // 分辨率
+    'setting-fps',        // 帧率
+    'setting-vbitrate',   // 视频码率
+    'setting-preset-speed', // 编码速度
+    'setting-quality',    // 输出质量（CRF）
+    'setting-deinterlace', // 去隔行
+  ];
+
+  function updateVideoSettingsVisibility() {
+    const fmt = document.getElementById('output-format').value;
+    const hideVideo = AUDIO_FORMATS.includes(fmt) || IMAGE_FORMATS.includes(fmt);
+    VIDEO_SETTING_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.hidden = hideVideo;
+    });
+    // 图片输出时额外隐藏音频码率（图片无音频流）
+    const hideAudio = IMAGE_FORMATS.includes(fmt);
+    const abitrateSetting = document.getElementById('setting-abitrate');
+    if (abitrateSetting) abitrateSetting.hidden = hideAudio;
+    // 更新 copy-mode 提示
+    updateCopyModeUI();
+  }
+
   function filterCodecsForFormat() {
     const fmt = document.getElementById('output-format').value;
-    const map = FORMAT_CODEC_MAP[fmt];
-    if (map) {
-      // 视频格式：只保留该格式支持的编码器选项
-      vcodecSelect.innerHTML = map.vcodecOptions.map(v => {
-        const labels = { 'libvpx-vp9': 'VP9 (libvpx-vp9)', 'libvpx': 'VP8 (libvpx)', 'libtheora': 'Theora (libtheora)' };
-        return `<option value="${v}">${labels[v] || v}</option>`;
-      }).join('');
-      vcodecSelect.value = map.vcodec;
-      acodecSelect.innerHTML = map.acodecOptions.map(a => {
-        const labels = { 'libopus': 'Opus (libopus)', 'libvorbis': 'Vorbis (libvorbis)' };
-        return `<option value="${a}">${labels[a] || a}</option>`;
-      }).join('');
-      acodecSelect.value = map.acodec;
-    } else if (AUDIO_FORMAT_CODEC_MAP[fmt]) {
-      // 音频格式：锁定为容器要求的编码器
-      vcodecSelect.innerHTML = originalVcodecOptions;
-      const forcedCodec = AUDIO_FORMAT_CODEC_MAP[fmt];
-      const labels = { 'wmav2': 'WMA v2 (wmav2)', 'pcm_s16be': 'PCM 大端 (pcm_s16be)' };
-      acodecSelect.innerHTML = `<option value="${forcedCodec}">${labels[forcedCodec] || forcedCodec}</option>`;
-      acodecSelect.value = forcedCodec;
-    } else if (fmt !== 'amv') {
+    const isAudio = AUDIO_FORMATS.includes(fmt);
+    const isImage = IMAGE_FORMATS.includes(fmt);
+
+    if (isImage) {
+      // 图片输出：展示完整编码器选项但隐藏视频设置（由 updateVideoSettingsVisibility 处理）
       vcodecSelect.innerHTML = originalVcodecOptions;
       acodecSelect.innerHTML = originalAcodecOptions;
+    } else if (isAudio) {
+      // 音频输出：展示完整编码器选项但隐藏视频设置
+      vcodecSelect.innerHTML = originalVcodecOptions;
+      acodecSelect.innerHTML = originalAcodecOptions;
+    } else {
+      const map = FORMAT_CODEC_MAP[fmt];
+      if (map) {
+        // 视频格式：只保留该格式支持的编码器选项
+        vcodecSelect.innerHTML = map.vcodecOptions.map(v => {
+          const labels = { 'libvpx-vp9': 'VP9 (libvpx-vp9)', 'libvpx': 'VP8 (libvpx)', 'libtheora': 'Theora (libtheora)' };
+          return `<option value="${v}">${labels[v] || v}</option>`;
+        }).join('');
+        vcodecSelect.value = map.vcodec;
+        acodecSelect.innerHTML = map.acodecOptions.map(a => {
+          const labels = { 'libopus': 'Opus (libopus)', 'libvorbis': 'Vorbis (libvorbis)' };
+          return `<option value="${a}">${labels[a] || a}</option>`;
+        }).join('');
+        acodecSelect.value = map.acodec;
+      } else if (AUDIO_FORMAT_CODEC_MAP[fmt]) {
+        // 音频格式：锁定为容器要求的编码器
+        vcodecSelect.innerHTML = originalVcodecOptions;
+        const forcedCodec = AUDIO_FORMAT_CODEC_MAP[fmt];
+        const labels = { 'wmav2': 'WMA v2 (wmav2)', 'pcm_s16be': 'PCM 大端 (pcm_s16be)' };
+        acodecSelect.innerHTML = `<option value="${forcedCodec}">${labels[forcedCodec] || forcedCodec}</option>`;
+        acodecSelect.value = forcedCodec;
+      } else if (fmt !== 'amv') {
+        vcodecSelect.innerHTML = originalVcodecOptions;
+        acodecSelect.innerHTML = originalAcodecOptions;
+      }
     }
+    updateVideoSettingsVisibility();
   }
 
   document.getElementById('output-format').addEventListener('change', () => {
@@ -1775,24 +1827,29 @@ export function initFFmpeg() {
 
   // === 流复制: 隐藏质量/码率/速度选项 (它们对 copy 无效) ===
   function updateCopyModeUI() {
+    const fmt = document.getElementById('output-format').value;
+    // 音频/图片输出时视频设置已由 updateVideoSettingsVisibility 隐藏，不在此重复控制
+    const isVideoOutput = !AUDIO_FORMATS.includes(fmt) && !IMAGE_FORMATS.includes(fmt);
+
     const vcodec = document.getElementById('video-codec').value;
     const acodec = document.getElementById('audio-codec').value;
 
-    // 流复制由编码器选项决定，与去隔行解耦
-    // 去隔行是输出时的"滤镜"，只影响重新编码时的滤镜链，不影响设置项的显隐
     const vCopy = vcodec === 'copy';
     const aCopy = acodec === 'copy';
 
-    document.getElementById('setting-vbitrate').hidden = vCopy;
-    document.getElementById('setting-quality').hidden = vCopy;
-    document.getElementById('setting-preset-speed').hidden = vCopy;
-    document.getElementById('setting-resolution').hidden = vCopy;
-    document.getElementById('setting-fps').hidden = vCopy;
+    // 只在视频输出模式下控制视频相关设置显隐
+    if (isVideoOutput) {
+      document.getElementById('setting-vbitrate').hidden = vCopy;
+      document.getElementById('setting-quality').hidden = vCopy;
+      document.getElementById('setting-preset-speed').hidden = vCopy;
+      document.getElementById('setting-resolution').hidden = vCopy;
+      document.getElementById('setting-fps').hidden = vCopy;
+    }
 
     document.getElementById('setting-abitrate').hidden = aCopy;
 
     const isAllCopy = vCopy && aCopy;
-    document.getElementById('copy-mode-note').hidden = !isAllCopy;
+    document.getElementById('copy-mode-note').hidden = isVideoOutput ? !isAllCopy : true;
 
     updateSettingsSummary();
   }
@@ -1828,6 +1885,19 @@ export function initFFmpeg() {
   document.getElementById('audio-codec').addEventListener('change', updateCopyModeUI);
   document.getElementById('output-format').addEventListener('change', updateSettingsSummary);
   document.getElementById('extract-format').addEventListener('change', updateExtractCopyMode);
+  // 裁剪模式切换时显示/隐藏编码器选择
+  document.querySelectorAll('input[name="trim-mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const isAccurate = document.querySelector('input[name="trim-mode"]:checked')?.value === 'accurate';
+      document.getElementById('setting-trim-vcodec').hidden = !isAccurate;
+      document.getElementById('setting-trim-acodec').hidden = !isAccurate;
+    });
+  });
+  // 初始化裁剪编码器显隐（默认 fast 模式隐藏）
+  const initTrimMode = document.querySelector('input[name="trim-mode"]:checked')?.value;
+  const initAccurate = initTrimMode === 'accurate';
+  document.getElementById('setting-trim-vcodec').hidden = !initAccurate;
+  document.getElementById('setting-trim-acodec').hidden = !initAccurate;
   // 去隔行切换不再影响设置区显隐（解耦）
   // 初始化
   updateCopyModeUI();
