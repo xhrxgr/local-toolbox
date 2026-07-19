@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => ({
         password: resolve(__dirname, 'tools/password/index.html'),
         unit: resolve(__dirname, 'tools/unit/index.html'),
         markdown: resolve(__dirname, 'tools/markdown/index.html'),
+        otpMigration: resolve(__dirname, 'tools/otp-migration/index.html'),
       },
     },
   },
