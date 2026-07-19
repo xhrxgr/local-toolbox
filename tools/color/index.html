@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="颜色工具 —— 色彩转换 / WCAG 对比度 / 取色器 / 渐变 / 调色板提取，全部本地运行" />
+  <title>颜色工具 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/color-DX1DV7vm.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/color-siTyunUv.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="convert">色彩转换</button>
+      <button class="mode-tab" data-mode="contrast">对比度</button>
+      <button class="mode-tab" data-mode="picker">取色器</button>
+      <button class="mode-tab" data-mode="gradient">渐变</button>
+      <button class="mode-tab" data-mode="palette">调色板</button>
+    </nav>
+
+    <!-- ========== 色彩转换 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-convert">
+      <div class="panel-desc">在 HEX / RGB / HSL / HSV 之间实时转换，支持取色器（EyeDropper API）。</div>
+
+      <div class="convert-main">
+        <div class="color-preview" id="convert-preview" title="当前颜色"></div>
+        <div class="convert-fields">
+          <div class="field-row">
+            <label class="field-label" for="convert-hex">HEX</label>
+            <input class="field-input field-input--hex" id="convert-hex" type="text" value="#6366f1" spellcheck="false" autocomplete="off" />
+            <button class="btn btn-secondary btn-small" id="btn-convert-picker" type="button" title="使用浏览器取色器">取色</button>
+          </div>
+          <span class="field-error" id="convert-error"></span>
+
+          <div class="field-group">
+            <span class="field-label">RGB</span>
+            <div class="field-trio">
+              <input class="field-input" id="convert-r" type="number" min="0" max="255" value="99" />
+              <input class="field-input" id="convert-g" type="number" min="0" max="255" value="102" />
+              <input class="field-input" id="convert-b" type="number" min="0" max="255" value="241" />
+            </div>
+            <button class="btn btn-secondary btn-small" id="btn-copy-rgb" type="button">复制</button>
+          </div>
+
+          <div class="field-group">
+            <span class="field-label">HSL</span>
+            <div class="field-trio">
+              <input class="field-input" id="convert-h" type="number" min="0" max="360" value="239" />
+              <input class="field-input" id="convert-s" type="number" min="0" max="100" value="84" />
+              <input class="field-input" id="convert-l" type="number" min="0" max="100" value="67" />
+            </div>
+            <button class="btn btn-secondary btn-small" id="btn-copy-hsl" type="button">复制</button>
+          </div>
+
+          <div class="field-group">
+            <span class="field-label">HSV</span>
+            <div class="field-trio">
+              <input class="field-input field-input--readonly" id="convert-hv-h" type="number" readonly />
+              <input class="field-input field-input--readonly" id="convert-hv-s" type="number" readonly />
+              <input class="field-input field-input--readonly" id="convert-hv-v" type="number" readonly />
+            </div>
+            <span class="field-hint">只读</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 对比度 ========== -->
+    <section class="mode-panel glass" id="panel-contrast">
+      <div class="panel-desc">基于 WCAG 2.1 计算前景色与背景色的对比度，判定 AA / AAA 合格性。</div>
+
+      <div class="contrast-inputs">
+        <div class="contrast-side">
+          <label class="field-label" for="contrast-fg">前景色（文字）</label>
+          <div class="contrast-input-row">
+            <input class="field-input field-input--hex" id="contrast-fg" type="text" value="#6366f1" spellcheck="false" autocomplete="off" />
+            <span class="color-chip" id="contrast-fg-preview"></span>
+          </div>
+        </div>
+        <div class="contrast-side">
+          <label class="field-label" for="contrast-bg">背景色</label>
+          <div class="contrast-input-row">
+            <input class="field-input field-input--hex" id="contrast-bg" type="text" value="#ffffff" spellcheck="false" autocomplete="off" />
+            <span class="color-chip" id="contrast-bg-preview"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="contrast-ratio-row">
+        <span class="contrast-ratio-label">对比度</span>
+        <span class="contrast-ratio-value" id="contrast-ratio">—</span>
+      </div>
+
+      <div class="contrast-preview glass-inset">
+        <div class="contrast-sample contrast-sample--large" id="contrast-preview-large">大号文字示例 AaBb 字号 24px</div>
+        <div class="contrast-sample contrast-sample--small" id="contrast-preview-small">小号文字示例 AaBb 字号 14px，正文阅读用</div>
+      </div>
+
+      <div class="wcag-badges">
+        <div class="wcag-badge" id="wcag-aa"><span class="wcag-badge__label">AA 正常文字 ≥ 4.5:1</span><span class="wcag-badge__mark">—</span></div>
+        <div class="wcag-badge" id="wcag-aa-large"><span class="wcag-badge__label">AA 大号文字 ≥ 3:1</span><span class="wcag-badge__mark">—</span></div>
+        <div class="wcag-badge" id="wcag-aaa"><span class="wcag-badge__label">AAA 正常文字 ≥ 7:1</span><span class="wcag-badge__mark">—</span></div>
+        <div class="wcag-badge" id="wcag-aaa-large"><span class="wcag-badge__label">AAA 大号文字 ≥ 4.5:1</span><span class="wcag-badge__mark">—</span></div>
+      </div>
+    </section>
+
+    <!-- ========== 取色器 ========== -->
+    <section class="mode-panel glass" id="panel-picker">
+      <div class="panel-desc">调用浏览器原生取色器（EyeDropper API）从屏幕任意位置拾取颜色。</div>
+
+      <div class="picker-center">
+        <button class="btn btn-primary btn-large" id="picker-start" type="button">启动取色器</button>
+        <p class="picker-unsupported" id="picker-unsupported" hidden>您的浏览器不支持 EyeDropper API，请使用 Chrome 95+ 或 Edge 95+。</p>
+      </div>
+
+      <div class="picker-result" id="picker-result" hidden>
+        <div class="color-preview color-preview--lg" id="picker-preview"></div>
+        <div class="picker-values">
+          <div class="picker-value-row">
+            <span class="field-label">HEX</span>
+            <code class="picker-text" id="picker-hex"></code>
+            <button class="btn btn-secondary btn-small" id="btn-copy-picker-hex" type="button">复制</button>
+          </div>
+          <div class="picker-value-row">
+            <span class="field-label">RGB</span>
+            <code class="picker-text" id="picker-rgb"></code>
+            <button class="btn btn-secondary btn-small" id="btn-copy-picker-rgb" type="button">复制</button>
+          </div>
+          <div class="picker-value-row">
+            <span class="field-label">HSL</span>
+            <code class="picker-text" id="picker-hsl"></code>
+            <button class="btn btn-secondary btn-small" id="btn-copy-picker-hsl" type="button">复制</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 渐变 ========== -->
+    <section class="mode-panel glass" id="panel-gradient">
+      <div class="panel-desc">生成线性渐变并输出 CSS 代码，可调整角度与起止颜色。</div>
+
+      <div class="gradient-inputs">
+        <div class="gradient-side">
+          <label class="field-label" for="gradient-start">起始色</label>
+          <div class="contrast-input-row">
+            <input class="field-input field-input--hex" id="gradient-start" type="text" value="#6366f1" spellcheck="false" autocomplete="off" />
+            <span class="color-chip" id="gradient-start-preview"></span>
+          </div>
+        </div>
+        <div class="gradient-side">
+          <label class="field-label" for="gradient-end">结束色</label>
+          <div class="contrast-input-row">
+            <input class="field-input field-input--hex" id="gradient-end" type="text" value="#22c55e" spellcheck="false" autocomplete="off" />
+            <span class="color-chip" id="gradient-end-preview"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="gradient-angle-row">
+        <label class="field-label" for="gradient-angle">角度</label>
+        <input class="gradient-angle-range" id="gradient-angle" type="range" min="0" max="360" value="90" />
+        <span class="gradient-angle-value" id="gradient-angle-value">90°</span>
+      </div>
+
+      <div class="gradient-preview" id="gradient-preview"></div>
+
+      <div class="gradient-code-row">
+        <code class="gradient-code" id="gradient-code"></code>
+        <button class="btn btn-secondary btn-small" id="btn-copy-gradient" type="button">复制</button>
+      </div>
+    </section>
+
+    <!-- ========== 调色板 ========== -->
+    <section class="mode-panel glass" id="panel-palette">
+      <div class="panel-desc">从图片中提取主色调（中位切分法），全部在浏览器本地处理，图片不上传。</div>
+
+      <div class="palette-controls">
+        <div class="palette-drop" id="palette-drop" tabindex="0">
+          <p class="palette-drop__text">拖入图片到此处，或点击选择文件</p>
+          <p class="palette-drop__hint">支持 PNG / JPG / WebP / GIF / BMP</p>
+          <input class="palette-file" id="palette-file" type="file" accept="image/*" />
+        </div>
+        <div class="palette-options">
+          <label class="field-label" for="palette-count">色块数量</label>
+          <select class="codec-select" id="palette-count">
+            <option value="6">6</option>
+            <option value="8" selected>8</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="palette-status" id="palette-status"></div>
+      <div class="palette-grid" id="palette-grid"></div>
+    </section>
+  </main>
+
+</body>
+</html>

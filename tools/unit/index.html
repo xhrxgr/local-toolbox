@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="单位转换器 —— 长度/质量/温度/数据量/时间/角度/速度 双向实时转换，全部本地运行" />
+  <title>单位转换 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/unit-XBIdakB-.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/unit-BEJycIYS.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 类别 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="length">长度</button>
+      <button class="mode-tab" data-mode="mass">质量</button>
+      <button class="mode-tab" data-mode="temperature">温度</button>
+      <button class="mode-tab" data-mode="data">数据量</button>
+      <button class="mode-tab" data-mode="time">时间</button>
+      <button class="mode-tab" data-mode="angle">角度</button>
+      <button class="mode-tab" data-mode="speed">速度</button>
+    </nav>
+
+    <!-- ========== 长度 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-length">
+      <div class="panel-desc">长度单位双向转换，基准单位为米（m）。支持公制、英制与航海单位，输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 质量 ========== -->
+    <section class="mode-panel glass" id="panel-mass">
+      <div class="panel-desc">质量单位双向转换，基准单位为克（g）。支持公制、英制与中国市制（斤），输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 温度 ========== -->
+    <section class="mode-panel glass" id="panel-temperature">
+      <div class="panel-desc">温度单位双向转换，支持摄氏度（℃）、华氏度（℉）、开尔文（K）。温度采用专门公式换算（非线性），输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 数据量 ========== -->
+    <section class="mode-panel glass" id="panel-data">
+      <div class="panel-desc">数据量单位双向转换，基准单位为字节（B）。区分十进制（KB/MB/GB…，1000 进制）与二进制（KiB/MiB/GiB…，1024 进制），输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 时间 ========== -->
+    <section class="mode-panel glass" id="panel-time">
+      <div class="panel-desc">时间单位双向转换，基准单位为秒（s）。支持纳秒到周的跨尺度换算，输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 角度 ========== -->
+    <section class="mode-panel glass" id="panel-angle">
+      <div class="panel-desc">角度单位双向转换，基准单位为度（°）。支持度、弧度（rad）、梯度（grad）、圈（turn），输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 速度 ========== -->
+    <section class="mode-panel glass" id="panel-speed">
+      <div class="panel-desc">速度单位双向转换，基准单位为米/秒（m/s）。支持米/秒、千米/时、英里/时、节，输入任一侧自动计算另一侧。</div>
+      <div class="unit-converter">
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="from" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="from"></select>
+        </div>
+        <button class="unit-swap" type="button" title="交换单位" aria-label="交换单位">⇄</button>
+        <div class="unit-side">
+          <input type="text" class="unit-input" data-direction="to" placeholder="输入数值" inputmode="decimal" autocomplete="off" />
+          <select class="codec-select unit-select" data-direction="to"></select>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

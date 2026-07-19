@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="正则测试器 —— 实时匹配/高亮/捕获组/替换预览，全部本地运行" />
+  <title>正则测试 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/regex-DBjPhx2Y.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/regex-C1XrNmRV.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- ========== 输入区 ========== -->
+    <section class="regex-input-panel glass">
+      <div class="panel-desc">输入正则表达式与标志位，实时匹配测试文本。支持捕获组、命名组与替换预览。</div>
+
+      <div class="regex-input-row">
+        <span class="regex-slash">/</span>
+        <input type="text" id="regex-pattern" class="regex-pattern-input" placeholder="输入正则表达式，如 \d+" autocomplete="off" spellcheck="false" />
+        <span class="regex-slash">/</span>
+        <span class="regex-flags-display" id="regex-flags-display">g</span>
+      </div>
+
+      <div class="regex-flags" id="regex-flags">
+        <label class="flag-chip"><input type="checkbox" value="g" checked /><span class="flag-letter">g</span><span class="flag-name">全局</span></label>
+        <label class="flag-chip"><input type="checkbox" value="i" /><span class="flag-letter">i</span><span class="flag-name">忽略大小写</span></label>
+        <label class="flag-chip"><input type="checkbox" value="m" /><span class="flag-letter">m</span><span class="flag-name">多行</span></label>
+        <label class="flag-chip"><input type="checkbox" value="s" /><span class="flag-letter">s</span><span class="flag-name">dotAll</span></label>
+        <label class="flag-chip"><input type="checkbox" value="u" /><span class="flag-letter">u</span><span class="flag-name">unicode</span></label>
+        <label class="flag-chip"><input type="checkbox" value="y" /><span class="flag-letter">y</span><span class="flag-name">sticky</span></label>
+        <label class="flag-chip"><input type="checkbox" value="d" /><span class="flag-letter">d</span><span class="flag-name">indices</span></label>
+      </div>
+
+      <div class="regex-preset-row">
+        <label class="codec-label" for="regex-preset">常用预设</label>
+        <select id="regex-preset" class="codec-select">
+          <option value="">选择常用预设…</option>
+          <option value="email">邮箱</option>
+          <option value="url">URL</option>
+          <option value="phone">手机号</option>
+          <option value="ipv4">IPv4 地址</option>
+          <option value="idcard">身份证号</option>
+          <option value="postal">邮编</option>
+          <option value="hexcolor">十六进制色值</option>
+          <option value="date">日期</option>
+        </select>
+      </div>
+
+      <div class="regex-error" id="regex-error"></div>
+
+      <div class="codec-row">
+        <label class="codec-label">测试文本</label>
+        <textarea id="regex-text" class="codec-input" placeholder="输入测试文本..." rows="6"></textarea>
+      </div>
+    </section>
+
+    <!-- ========== 结果统计 ========== -->
+    <div class="result-stats" id="result-count"></div>
+
+    <!-- ========== 结果 Tab ========== -->
+    <nav class="mode-tabs" id="result-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="highlight">高亮预览</button>
+      <button class="mode-tab" data-mode="list">匹配列表</button>
+      <button class="mode-tab" data-mode="replace">替换</button>
+    </nav>
+
+    <!-- 高亮预览 -->
+    <section class="mode-panel mode-panel--active glass" id="panel-highlight">
+      <div class="panel-desc">在原文中高亮显示所有匹配项，保留换行与空白。</div>
+      <div class="highlight-box" id="highlight-output"></div>
+    </section>
+
+    <!-- 匹配列表 -->
+    <section class="mode-panel glass" id="panel-list">
+      <div class="panel-desc">每个匹配的详细信息，包括序号、匹配文本、索引位置与捕获组（含命名组）。</div>
+      <div class="match-table-wrap" id="match-list-output"></div>
+    </section>
+
+    <!-- 替换 -->
+    <section class="mode-panel glass" id="panel-replace">
+      <div class="panel-desc">使用替换字符串替换匹配项，支持 $1、$2、$&amp;、$`、$'、$&lt;name&gt; 等特殊变量。</div>
+      <div class="codec-row">
+        <label class="codec-label">替换字符串</label>
+        <input type="text" id="replace-pattern" class="text-input" placeholder="例如 $1 或 [$&amp;]" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="codec-row">
+        <label class="codec-label">替换结果</label>
+        <textarea id="replace-output" class="codec-output" rows="5" readonly></textarea>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

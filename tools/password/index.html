@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="密码生成器 —— 随机密码 / 记忆口令，基于 crypto 安全随机数，本地运行" />
+  <title>密码生成 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/password-DvL2ezXg.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/password-X5v385dX.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="random">随机密码</button>
+      <button class="mode-tab" data-mode="diceware">记忆口令</button>
+    </nav>
+
+    <!-- ========== 随机密码 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-random">
+      <div class="panel-desc">使用 crypto.getRandomValues 安全随机数生成密码，全程本地运行，不会上传任何字符。</div>
+
+      <!-- 长度滑块 -->
+      <div class="field-row">
+        <label class="field-label" for="pw-length">密码长度</label>
+        <div class="slider-wrap">
+          <input type="range" class="slider" id="pw-length" min="4" max="64" value="16" />
+          <span class="slider-value" id="pw-length-value">16</span>
+        </div>
+      </div>
+
+      <!-- 字符集 -->
+      <div class="field-row">
+        <span class="field-label">字符集</span>
+        <div class="checkbox-group">
+          <label class="checkbox"><input type="checkbox" id="cs-upper" checked /><span>大写 A-Z</span></label>
+          <label class="checkbox"><input type="checkbox" id="cs-lower" checked /><span>小写 a-z</span></label>
+          <label class="checkbox"><input type="checkbox" id="cs-digit" checked /><span>数字 0-9</span></label>
+          <label class="checkbox"><input type="checkbox" id="cs-symbol" /><span>符号 !@#$…</span></label>
+        </div>
+      </div>
+
+      <!-- 排除选项 -->
+      <div class="field-row">
+        <span class="field-label">排除字符</span>
+        <div class="checkbox-group">
+          <label class="checkbox"><input type="checkbox" id="ex-similar" /><span>相似字符 (0 O 1 l I)</span></label>
+          <label class="checkbox"><input type="checkbox" id="ex-ambiguous" /><span>歧义符号 ({ } [ ] ( ) / \)</span></label>
+        </div>
+      </div>
+
+      <!-- 生成按钮 -->
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btn-generate">生成密码</button>
+        <span class="hint" id="random-hint"></span>
+      </div>
+
+      <!-- 结果显示 -->
+      <div class="result-box" id="random-result" title="点击选中文本"></div>
+
+      <!-- 强度评估 -->
+      <div class="strength-block">
+        <div class="strength-head">
+          <span class="strength-label">强度评估</span>
+          <span class="strength-text" id="strength-text">—</span>
+        </div>
+        <div class="strength-bar">
+          <div class="strength-bar__fill" id="strength-fill"></div>
+        </div>
+        <div class="strength-meta" id="strength-meta"></div>
+      </div>
+
+      <!-- 结果操作 -->
+      <div class="actions-row">
+        <button class="btn btn-secondary" id="btn-copy-random">复制密码</button>
+        <button class="btn btn-secondary" id="btn-regenerate">重新生成</button>
+      </div>
+
+      <!-- 批量生成 -->
+      <div class="batch-block">
+        <div class="batch-head">
+          <span class="field-label">批量生成</span>
+          <div class="batch-controls">
+            <label class="batch-count-label">数量
+              <input type="number" class="batch-count" id="batch-count" min="1" max="50" value="10" />
+            </label>
+            <button class="btn btn-secondary" id="btn-batch-generate">批量生成</button>
+            <button class="btn btn-secondary" id="btn-batch-clear">清空</button>
+          </div>
+        </div>
+        <div class="batch-list" id="batch-list"></div>
+      </div>
+    </section>
+
+    <!-- ========== 记忆口令 ========== -->
+    <section class="mode-panel glass" id="panel-diceware">
+      <div class="panel-desc">使用 diceware 方式从内置词表随机选取单词组合成口令，更易记忆。每个词约提供 7.6 bits 熵。</div>
+
+      <div class="field-row">
+        <label class="field-label" for="dw-count">单词数量</label>
+        <div class="slider-wrap">
+          <input type="range" class="slider" id="dw-count" min="4" max="8" value="5" />
+          <span class="slider-value" id="dw-count-value">5</span>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" for="dw-sep">分隔符</label>
+        <input type="text" class="sep-input" id="dw-sep" value="-" maxlength="2" placeholder="-" />
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-primary" id="btn-dw-generate">生成口令</button>
+      </div>
+
+      <div class="result-box" id="diceware-result" title="点击选中文本"></div>
+
+      <div class="entropy-block">
+        <span class="strength-label">估算熵</span>
+        <span class="entropy-value" id="dw-entropy">—</span>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-secondary" id="btn-copy-diceware">复制口令</button>
+        <button class="btn btn-secondary" id="btn-dw-regenerate">重新生成</button>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

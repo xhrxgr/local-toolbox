@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Markdown 预览工具 —— 实时渲染、代码高亮、目录跳转、导出 HTML，全部本地运行" />
+  <title>Markdown 预览 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/markdown-HZBN1bF9.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/markdown-VByf9rUA.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 顶部工具栏 -->
+    <div class="md-toolbar glass">
+      <div class="md-toolbar-left">
+        <button class="btn btn-secondary md-icon-btn" id="btn-toc" title="目录" aria-label="目录">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="4" x2="13" y2="4"></line>
+            <line x1="3" y1="8" x2="11" y2="8"></line>
+            <line x1="3" y1="12" x2="13" y2="12"></line>
+            <circle cx="14" cy="8" r="0.8" fill="currentColor" stroke="none"></circle>
+          </svg>
+          目录
+        </button>
+        <button class="btn btn-secondary" id="btn-export" title="导出为 HTML 文件">
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2v8"></path>
+            <path d="M5 7l3 3 3-3"></path>
+            <path d="M3 13h10"></path>
+          </svg>
+          导出 HTML
+        </button>
+        <!-- 目录浮层 -->
+        <div class="md-toc glass" id="md-toc" hidden>
+          <div class="md-toc-title">目录</div>
+          <div class="md-toc-list" id="md-toc-list"></div>
+        </div>
+      </div>
+      <div class="md-view-switch" id="view-switch" role="tablist" aria-label="视图模式">
+        <button class="view-btn" data-view="edit" role="tab">编辑</button>
+        <button class="view-btn view-btn--active" data-view="split" role="tab">分栏</button>
+        <button class="view-btn" data-view="preview" role="tab">预览</button>
+      </div>
+    </div>
+
+    <!-- 主体分栏 -->
+    <div class="md-layout glass" id="md-layout" data-view="split">
+      <!-- 编辑器 -->
+      <section class="md-pane md-pane--editor">
+        <div class="md-pane-label">
+          <span>编辑器</span>
+          <span class="md-pane-hint">Tab 缩进 · 实时渲染</span>
+        </div>
+        <div class="md-editor-wrap">
+          <div class="md-gutter" id="md-gutter" aria-hidden="true"></div>
+          <textarea
+            class="md-editor"
+            id="md-editor"
+            wrap="off"
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            placeholder="在此输入 Markdown..."
+          ></textarea>
+        </div>
+      </section>
+      <!-- 预览 -->
+      <section class="md-pane md-pane--preview">
+        <div class="md-pane-label">
+          <span>预览</span>
+          <span class="md-pane-hint">GFM · 代码高亮</span>
+        </div>
+        <article class="md-preview" id="md-preview"></article>
+      </section>
+    </div>
+  </main>
+
+</body>
+</html>

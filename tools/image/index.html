@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="图片处理工具 —— 压缩 / 裁剪 / 信息 / EXIF 读取，全部本地运行" />
+  <title>图片处理 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/image-MwwECOkd.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/image-CxegXFBc.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- ========== 文件拖放区 ========== -->
+    <section class="dropzone glass" id="dropzone">
+      <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" hidden />
+      <div class="dropzone__inner" id="dropzone-inner">
+        <svg class="dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <p class="dropzone__text">拖入图片到此处，或<span class="dropzone__link">点击选择</span></p>
+        <p class="dropzone__hint">支持 JPEG / PNG / WebP / GIF / BMP，文件不上传云端</p>
+      </div>
+      <div class="dropzone__info" id="dropzone-info" hidden>
+        <div class="file-info">
+          <svg class="file-info__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          <div class="file-info__body">
+            <div class="file-info__name" id="file-info-name"></div>
+            <div class="file-info__meta" id="file-info-meta"></div>
+          </div>
+          <button class="file-info__remove" id="file-info-remove" title="移除文件">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 模式 Tab ========== -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="compress">压缩</button>
+      <button class="mode-tab" data-mode="crop">裁剪</button>
+      <button class="mode-tab" data-mode="info">信息</button>
+    </nav>
+
+    <!-- ========== 压缩 Tab ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-compress">
+      <div class="panel-desc">调整质量、格式或目标大小压缩图片。质量参数仅对 JPEG / WebP 有效（PNG 为无损格式）。</div>
+
+      <div class="compress-controls">
+        <div class="control-row">
+          <label class="control-label" for="compress-format">输出格式</label>
+          <select class="codec-select" id="compress-format">
+            <option value="keep">保持原格式</option>
+            <option value="image/jpeg">JPEG</option>
+            <option value="image/png">PNG</option>
+            <option value="image/webp">WebP</option>
+          </select>
+        </div>
+
+        <div class="control-row" id="quality-row">
+          <label class="control-label" for="compress-quality">质量 <span class="control-value" id="quality-value">80</span></label>
+          <input type="range" class="quality-slider" id="compress-quality" min="1" max="100" value="80" />
+        </div>
+
+        <div class="control-row">
+          <label class="control-label" for="compress-target">目标大小（KB，可选）</label>
+          <div class="target-input-wrap">
+            <input type="number" class="target-input" id="compress-target" min="1" placeholder="如 200，留空则用质量滑块" />
+            <span class="target-unit">KB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="compress-actions">
+        <button class="btn btn-primary" id="btn-compress">开始压缩</button>
+      </div>
+
+      <div class="compress-result" id="compress-result" hidden>
+        <div class="result-summary" id="compress-summary"></div>
+        <div class="preview-compare">
+          <div class="preview-item">
+            <div class="preview-label">原图</div>
+            <div class="preview-box"><img id="preview-original" alt="原图预览" /></div>
+          </div>
+          <div class="preview-item">
+            <div class="preview-label">压缩后</div>
+            <div class="preview-box"><img id="preview-compressed" alt="压缩后预览" /></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-download-compress">下载压缩图片</button>
+      </div>
+    </section>
+
+    <!-- ========== 裁剪 Tab ========== -->
+    <section class="mode-panel glass" id="panel-crop">
+      <div class="panel-desc">在图片上拖动鼠标选择裁剪区域，可锁定宽高比。裁剪后可预览并下载。</div>
+
+      <div class="crop-controls">
+        <div class="control-row">
+          <label class="control-label" for="crop-ratio">宽高比</label>
+          <select class="codec-select" id="crop-ratio">
+            <option value="0">自由</option>
+            <option value="1">1:1</option>
+            <option value="1.3333">4:3</option>
+            <option value="1.7778">16:9</option>
+            <option value="0.75">3:4</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="crop-canvas-wrap" id="crop-canvas-wrap">
+        <canvas id="crop-canvas"></canvas>
+        <div class="crop-selection" id="crop-selection" hidden>
+          <span class="crop-handle crop-handle--nw"></span>
+          <span class="crop-handle crop-handle--ne"></span>
+          <span class="crop-handle crop-handle--sw"></span>
+          <span class="crop-handle crop-handle--se"></span>
+        </div>
+      </div>
+
+      <div class="crop-actions">
+        <button class="btn btn-primary" id="btn-crop" disabled>裁剪选区</button>
+      </div>
+
+      <div class="crop-result" id="crop-result" hidden>
+        <div class="preview-label">裁剪结果</div>
+        <div class="preview-box"><img id="preview-crop" alt="裁剪结果预览" /></div>
+        <button class="btn btn-primary" id="btn-download-crop">下载裁剪图片</button>
+      </div>
+    </section>
+
+    <!-- ========== 信息 Tab ========== -->
+    <section class="mode-panel glass" id="panel-info">
+      <div class="panel-desc">查看图片基本信息与 EXIF 元数据（仅 JPEG 含 EXIF）。</div>
+
+      <div class="info-section">
+        <h3 class="info-title">基本信息</h3>
+        <div class="info-grid" id="info-basic"></div>
+      </div>
+
+      <div class="info-section">
+        <h3 class="info-title">EXIF 信息</h3>
+        <div id="info-exif-wrap">
+          <table class="exif-table" id="info-exif" hidden>
+            <thead>
+              <tr><th>字段</th><th>值</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="exif-empty" id="info-exif-empty">无 EXIF 信息</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

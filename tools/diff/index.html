@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="文本对比工具 —— 逐行/逐字 diff + 并排/内联视图 + 导出 patch，全部本地运行" />
+  <title>文本对比 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/diff-PGuZIuo_.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/diff-C8JzhAcL.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 输入区 -->
+    <section class="glass diff-input-panel">
+      <div class="diff-input-grid">
+        <div class="diff-input-col">
+          <label class="diff-label" for="diff-left">原文</label>
+          <textarea id="diff-left" class="diff-textarea" placeholder="粘贴原文..." rows="10" spellcheck="false"></textarea>
+        </div>
+        <div class="diff-input-col">
+          <label class="diff-label" for="diff-right">修改后</label>
+          <textarea id="diff-right" class="diff-textarea" placeholder="粘贴修改后的文本..." rows="10" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="diff-hint">输入后自动对比 · Ctrl + Enter 立即对比</div>
+    </section>
+
+    <!-- 选项栏 -->
+    <section class="glass diff-options">
+      <div class="diff-option-group">
+        <span class="diff-option-label">视图</span>
+        <select id="diff-view" class="diff-select">
+          <option value="split">并排</option>
+          <option value="inline">内联</option>
+        </select>
+      </div>
+      <div class="diff-option-group">
+        <span class="diff-option-label">对比</span>
+        <select id="diff-mode" class="diff-select">
+          <option value="line">逐行</option>
+          <option value="char">逐字</option>
+        </select>
+      </div>
+      <label class="diff-checkbox"><input type="checkbox" id="diff-ignore-ws" /> 忽略空白</label>
+      <label class="diff-checkbox"><input type="checkbox" id="diff-ignore-case" /> 忽略大小写</label>
+      <div class="diff-options-spacer"></div>
+      <button class="btn btn-primary" id="btn-diff-compare">对比</button>
+      <button class="btn btn-secondary" id="btn-diff-export">导出 patch</button>
+      <button class="btn btn-secondary" id="btn-diff-swap">交换</button>
+      <button class="btn btn-secondary" id="btn-diff-clear">清空</button>
+    </section>
+
+    <!-- 大文本警告 / 提示 -->
+    <div class="diff-warning" id="diff-warning" hidden></div>
+
+    <!-- 统计栏 -->
+    <section class="glass diff-stats" id="diff-stats" hidden>
+      <span class="diff-stat diff-stat--add">+ <b id="stat-add">0</b> 新增</span>
+      <span class="diff-stat diff-stat--del">− <b id="stat-del">0</b> 删除</span>
+      <span class="diff-stat diff-stat--eq">= <b id="stat-eq">0</b> 相同</span>
+    </section>
+
+    <!-- 结果区 -->
+    <section class="glass diff-result" id="diff-result">
+      <div class="diff-empty" id="diff-empty">输入文本后自动对比，或点击「对比」按钮</div>
+      <div class="diff-view" id="diff-view-container"></div>
+    </section>
+  </main>
+
+</body>
+</html>
