@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
         unit: resolve(__dirname, 'tools/unit/index.html'),
         markdown: resolve(__dirname, 'tools/markdown/index.html'),
         otpMigration: resolve(__dirname, 'tools/otp-migration/index.html'),
+        document: resolve(__dirname, 'tools/document/index.html'),
       },
     },
   },

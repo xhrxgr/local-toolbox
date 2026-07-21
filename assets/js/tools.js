@@ -5,12 +5,12 @@
 const TOOLS = [
   {
     id: 'ffmpeg',
-    name: '音视频转换',
+    name: '多媒体转换',
     icon: 'film',
-    desc: '本地 FFmpeg 格式转换，文件不上传云端',
+    desc: '本地 FFmpeg 音视频图片格式转换，文件不上传云端',
     category: 'media',
     tags: ['本地处理', '隐私安全'],
-    aliases: ['ffmpeg', '视频转换', '音频转换', '格式转换', '转码', 'video', 'audio', 'convert', 'mp4', 'mp3', 'mkv', 'webm', '裁剪', '提取音频', '去隔行', 'amv'],
+    aliases: ['ffmpeg', '多媒体', '视频转换', '音频转换', '图片转换', '格式转换', '转码', 'video', 'audio', 'image', 'convert', 'mp4', 'mp3', 'mkv', 'webm', '裁剪', '提取音频', '提取帧', '抽帧', '去隔行', 'amv'],
     path: '/tools/ffmpeg/',
     available: true,
   },
@@ -223,6 +223,17 @@ const TOOLS = [
     path: '/tools/otp-migration/',
     available: true,
   },
+  {
+    id: 'document',
+    name: '文档转换',
+    icon: 'document',
+    desc: 'PDF/Word/Excel/CSV/Markdown/HTML 本地互转，文件不上传云端',
+    category: 'document',
+    tags: ['本地处理', 'PDF/Word/Excel'],
+    aliases: ['文档转换', '文档', 'pdf', 'word', 'docx', 'excel', 'xlsx', 'csv', '表格', 'markdown', 'md', 'html', '转pdf', 'pdf转图片', 'pdf合并', 'pdf拆分', 'pdf旋转', 'pdf提取', 'word转html', 'word转pdf', 'md转word', 'excel转csv', 'excel转json', 'csv转json', 'json转csv', 'csv转excel', 'md转html', 'html转md', 'md转pdf', 'html转pdf', 'document', 'document conversion'],
+    path: '/tools/document/',
+    available: true,
+  },
 ];
 
 /**
@@ -250,6 +261,7 @@ const ICONS = {
   unit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="10" y1="6" x2="10" y2="18"/><line x1="14" y1="6" x2="14" y2="18"/><line x1="18" y1="6" x2="18" y2="18"/></svg>`,
   markdown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15V9l3 3 3-3v6 M17 9v6 M17 15l-2-2 M17 15l2-2"/></svg>`,
   totp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/><path d="M12 11v3"/></svg>`,
+  document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>`,
 };
 
 /**
@@ -330,6 +342,7 @@ const PINYIN_INITIALS = {
   '测': 'c', '速': 's', '诊': 'z', '断': 'd', '查': 'c', '询': 'x',
   '批': 'p', '量': 'l', '处': 'c', '理': 'l', '安': 'a', '全': 'q',
   '隐': 'y', '私': 's', '本': 'b', '地': 'd', '运': 'y', '行': 'x',
+  '多': 'd', '媒': 'm', '体': 't',
   '毫': 'h', '秒': 'm', '精': 'j', '度': 'd', '多': 'd', '区': 'q',
   '国': 'g', '际': 'j', '标': 'b', '准': 'z', '链': 'l', '接': 'j',
   '生': 's', '成': 'c', '识': 's', '别': 'b', '扫': 's',
@@ -675,6 +688,7 @@ const CATEGORY_LABELS = {
   network: '网络',
   encoding: '编码',
   dev: '开发',
+  document: '文档',
   util: '实用',
 };
 
