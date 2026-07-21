@@ -1,7 +1,7 @@
 /**
- * FFmpeg 音视频转换工具
+ * FFmpeg 多媒体转换工具
  * 浏览器本地处理，文件不上传云端
- * 支持：格式转换 / 提取音频 / 视频裁剪
+ * 支持：格式转换 / 图片转换 / 视频转换（含抽帧） / 音频转换 / 提取音频 / 视频裁剪
  */
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
@@ -528,6 +528,9 @@ async function runSingleTask(item, onProgress) {
 async function executeMode(mode, file, onStage) {
   // 把三个 do* 函数包装一下，让它们支持阶段化进度 + 中断
   if (mode === 'convert') return await executeConvert(file, onStage);
+  if (mode === 'image-convert') return await executeImageConvert(file, onStage);
+  if (mode === 'video-convert') return await executeVideoConvert(file, onStage);
+  if (mode === 'audio-convert') return await executeAudioConvert(file, onStage);
   if (mode === 'extract') return await executeExtract(file, onStage);
   if (mode === 'trim') return await executeTrim(file, onStage);
   throw new Error('未知模式: ' + mode);
@@ -714,6 +717,291 @@ async function executeConvert(file, onStage) {
       ? 'AMV 编码器不可用：当前 FFmpeg.wasm 构建未包含 AMV 编码支持，无法输出 AMV 格式'
       : `输出文件为空，转码失败（目标格式 ${outputFormat} 可能不被当前 FFmpeg 内核支持）`;
     throw new Error(hint);
+  }
+
+  try { await ffmpeg.deleteFile(inputName); } catch {}
+  try { await ffmpeg.deleteFile(outputName); } catch {}
+
+  onStage(Stage.DONE, '完成', 100);
+  return { cancelled: false, blob, format: outputFormat };
+}
+
+/* ========== 图片转换（简化模式） ========== */
+// 图片质量预设：JPG 用 -q:v（2=高质量，10=低质量），WebP 用 -quality（0-100）
+const IMAGE_QUALITY_PRESETS = {
+  high:   { jpg_q: '2',  webp_q: '85' },
+  medium: { jpg_q: '5',  webp_q: '75' },
+  low:    { jpg_q: '10', webp_q: '60' },
+};
+
+async function executeImageConvert(file, onStage) {
+  const outputFormat = document.getElementById('image-convert-format').value;
+  const qualityKey = document.getElementById('image-convert-quality').value || 'high';
+  const q = IMAGE_QUALITY_PRESETS[qualityKey] || IMAGE_QUALITY_PRESETS.high;
+
+  onStage(Stage.LOAD_FFMPEG, '检查 FFmpeg 内核...', 5);
+  await loadFFmpeg();
+
+  const inputExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+  const inputName = `imgc_input_${Date.now()}.${inputExt}`;
+  const outputName = getOutputName(outputFormat, file.name);
+
+  onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+  const args = ['-i', inputName, '-threads', '0'];
+  if (outputFormat === 'jpg') args.push('-q:v', q.jpg_q);
+  else if (outputFormat === 'png') args.push('-compression_level', '6');
+  else if (outputFormat === 'webp') args.push('-quality', q.webp_q);
+  // BMP/TIFF 使用默认编码参数
+  args.push('-frames:v', '1', '-update', '1', outputName);
+
+  onStage(Stage.CONVERT, `正在转换 → ${outputFormat.toUpperCase()}`, 50);
+  try {
+    await ffmpeg.exec(args);
+  } catch (err) {
+    if (taskQueue.abortRequested) return { cancelled: true };
+    throw err;
+  }
+
+  onStage(Stage.READ_RESULT, '正在读取结果...', 96);
+  const data = await ffmpeg.readFile(outputName);
+  const blob = new Blob([data.buffer], { type: getMimeType(outputFormat) });
+
+  if (blob.size === 0) {
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
+    throw new Error(`图片转换失败：输出为空（目标格式 ${outputFormat} 可能不被支持）`);
+  }
+
+  try { await ffmpeg.deleteFile(inputName); } catch {}
+  try { await ffmpeg.deleteFile(outputName); } catch {}
+
+  onStage(Stage.DONE, '完成', 100);
+  return { cancelled: false, blob, format: outputFormat };
+}
+
+/* ========== 视频转换（简化模式 + 抽帧） ========== */
+// 视频质量预设（CRF）：低=28 / 中=23 / 高=18
+const VIDEO_QUALITY_PRESETS = {
+  low:    { crf: '28' },
+  medium: { crf: '23' },
+  high:   { crf: '18' },
+};
+
+// 视频→编码器自动映射（容器决定编码器）
+const VIDEO_FORMAT_CODEC = {
+  mp4:  { vcodec: 'libx264',    acodec: 'aac' },
+  webm: { vcodec: 'libvpx-vp9', acodec: 'libopus' },
+  mkv:  { vcodec: 'libx264',    acodec: 'aac' },
+  mov:  { vcodec: 'libx264',    acodec: 'aac' },
+  avi:  { vcodec: 'mpeg4',      acodec: 'libmp3lame' },
+  gif:  { vcodec: 'gif',        acodec: null },
+};
+
+async function executeVideoConvert(file, onStage) {
+  const submode = document.querySelector('input[name="video-convert-submode"]:checked')?.value || 'convert';
+
+  if (submode === 'frame') {
+    return await executeVideoFrameExtract(file, onStage);
+  }
+  return await executeVideoFormatConvert(file, onStage);
+}
+
+async function executeVideoFormatConvert(file, onStage) {
+  const outputFormat = document.getElementById('video-convert-format').value;
+  const qualityBtn = document.querySelector('.quality-preset[data-vc-quality].quality-preset--active');
+  const qualityKey = qualityBtn?.dataset.vcQuality || 'medium';
+  const q = VIDEO_QUALITY_PRESETS[qualityKey] || VIDEO_QUALITY_PRESETS.medium;
+  const codec = VIDEO_FORMAT_CODEC[outputFormat] || VIDEO_FORMAT_CODEC.mp4;
+
+  onStage(Stage.LOAD_FFMPEG, '检查 FFmpeg 内核...', 5);
+  await loadFFmpeg();
+
+  const inputExt = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+  const inputName = `vidc_input_${Date.now()}.${inputExt}`;
+  const outputName = getOutputName(outputFormat, file.name);
+
+  onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+  const args = ['-i', inputName, '-threads', '0'];
+  if (outputFormat === 'gif') {
+    // GIF 特殊处理：不输出音频，强制 gif 编码器
+    args.push('-an', '-c:v', 'gif');
+  } else {
+    args.push('-c:v', codec.vcodec, '-preset', 'veryfast', '-crf', q.crf);
+    if (codec.acodec) {
+      args.push('-c:a', codec.acodec);
+    } else {
+      args.push('-an');
+    }
+  }
+  args.push(outputName);
+
+  // 进度回调
+  const progressHandler = ({ progress }) => {
+    if (!isFinite(progress)) return;
+    const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
+    onStage(Stage.CONVERT, `正在转换 ${file.name}...`, pct);
+  };
+  ffmpeg.on('progress', progressHandler);
+
+  onStage(Stage.CONVERT, `开始转换 → ${outputFormat.toUpperCase()}`, 10);
+  try {
+    await ffmpeg.exec(args);
+  } catch (err) {
+    if (taskQueue.abortRequested) return { cancelled: true };
+    throw err;
+  } finally {
+    ffmpeg.off('progress', progressHandler);
+  }
+
+  onStage(Stage.READ_RESULT, '正在读取结果...', 96);
+  const data = await ffmpeg.readFile(outputName);
+  const blob = new Blob([data.buffer], { type: getMimeType(outputFormat) });
+
+  if (blob.size === 0) {
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
+    throw new Error(`视频转换失败：输出为空（目标格式 ${outputFormat} 可能不被支持）`);
+  }
+
+  try { await ffmpeg.deleteFile(inputName); } catch {}
+  try { await ffmpeg.deleteFile(outputName); } catch {}
+
+  onStage(Stage.DONE, '完成', 100);
+  return { cancelled: false, blob, format: outputFormat };
+}
+
+async function executeVideoFrameExtract(file, onStage) {
+  const timestampInput = document.getElementById('frame-timestamp').value;
+  const outputFormat = document.getElementById('frame-output-format').value;
+  const seekTime = parseTime(timestampInput);
+
+  if (seekTime === null || isNaN(seekTime) || seekTime < 0) {
+    throw new Error('抽帧时间点无效：请输入 HH:MM:SS 或秒数');
+  }
+
+  onStage(Stage.LOAD_FFMPEG, '检查 FFmpeg 内核...', 5);
+  await loadFFmpeg();
+
+  const inputExt = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+  const inputName = `vidf_input_${Date.now()}.${inputExt}`;
+  const ext = FORMAT_EXT[outputFormat] || outputFormat;
+  // 文件名带时间戳便于多文件批量抽帧后区分
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const safeTime = String(seekTime).replace(/[.:]/g, '-');
+  const outputName = `${baseName}_frame_${safeTime}.${ext}`;
+
+  onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+  // -ss 在 -i 之前 = 快速 seek（关键帧对齐）；-ss 在 -i 后 = 精准 seek
+  // 单帧抽取用 -ss 后置 + -frames:v 1 精准定位
+  const args = [
+    '-ss', String(seekTime),
+    '-i', inputName,
+    '-frames:v', '1',
+    '-threads', '0',
+    '-q:v', '2',  // 默认高质量
+    outputName,
+  ];
+
+  onStage(Stage.CONVERT, `正在抽取 ${formatTimeStr(seekTime)} 处的帧...`, 50);
+  try {
+    await ffmpeg.exec(args);
+  } catch (err) {
+    if (taskQueue.abortRequested) return { cancelled: true };
+    throw err;
+  }
+
+  onStage(Stage.READ_RESULT, '正在读取结果...', 96);
+  const data = await ffmpeg.readFile(outputName);
+  const blob = new Blob([data.buffer], { type: getMimeType(outputFormat) });
+
+  if (blob.size === 0) {
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
+    throw new Error(`抽帧失败：输出为空（时间点 ${formatTimeStr(seekTime)} 可能超出视频时长）`);
+  }
+
+  try { await ffmpeg.deleteFile(inputName); } catch {}
+  try { await ffmpeg.deleteFile(outputName); } catch {}
+
+  onStage(Stage.DONE, '完成', 100);
+  return { cancelled: false, blob, format: outputFormat };
+}
+
+// 把秒数格式化为 HH:MM:SS 字符串（用于日志显示）
+function formatTimeStr(seconds) {
+  if (!isFinite(seconds)) return '00:00:00';
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+/* ========== 音频转换（简化模式） ========== */
+// 音频格式→编码器映射
+const AUDIO_CONVERT_CODEC = {
+  mp3: 'libmp3lame',
+  aac: 'aac',
+  wav: 'pcm_s16le',
+  flac: 'flac',
+  ogg: 'libvorbis',
+  opus: 'libopus',
+  m4a: 'aac',
+};
+
+async function executeAudioConvert(file, onStage) {
+  const outputFormat = document.getElementById('audio-convert-format').value;
+  const bitrate = document.getElementById('audio-convert-bitrate').value;
+  const codec = AUDIO_CONVERT_CODEC[outputFormat] || outputFormat;
+  const isLossless = ['wav', 'flac'].includes(outputFormat);
+
+  onStage(Stage.LOAD_FFMPEG, '检查 FFmpeg 内核...', 5);
+  await loadFFmpeg();
+
+  const inputExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+  const inputName = `audc_input_${Date.now()}.${inputExt}`;
+  const outputName = getOutputName(outputFormat, file.name);
+
+  onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
+  await ffmpeg.writeFile(inputName, await fetchFile(file));
+
+  const args = ['-i', inputName, '-vn', '-threads', '0', '-c:a', codec];
+  // 码率仅对有损格式生效；选择"无损"时对有损格式忽略
+  if (!isLossless && bitrate !== 'lossless') {
+    args.push('-b:a', bitrate);
+  }
+
+  const progressHandler = ({ progress }) => {
+    if (!isFinite(progress)) return;
+    const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
+    onStage(Stage.CONVERT, `正在转换 ${file.name}...`, pct);
+  };
+  ffmpeg.on('progress', progressHandler);
+
+  onStage(Stage.CONVERT, `开始转换 → ${outputFormat.toUpperCase()}`, 10);
+  try {
+    await ffmpeg.exec(args);
+  } catch (err) {
+    if (taskQueue.abortRequested) return { cancelled: true };
+    throw err;
+  } finally {
+    ffmpeg.off('progress', progressHandler);
+  }
+
+  onStage(Stage.READ_RESULT, '正在读取结果...', 96);
+  const data = await ffmpeg.readFile(outputName);
+  const blob = new Blob([data.buffer], { type: getMimeType(outputFormat) });
+
+  if (blob.size === 0) {
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
+    throw new Error(`音频转换失败：输出为空（目标格式 ${outputFormat} 可能不被支持）`);
   }
 
   try { await ffmpeg.deleteFile(inputName); } catch {}
@@ -1006,6 +1294,9 @@ function switchMode(mode) {
   document.querySelector(`.mode-tab[data-mode="${mode}"]`).classList.add('mode-tab--active');
 
   document.getElementById('settings-convert').hidden = mode !== 'convert';
+  document.getElementById('settings-image-convert').hidden = mode !== 'image-convert';
+  document.getElementById('settings-video-convert').hidden = mode !== 'video-convert';
+  document.getElementById('settings-audio-convert').hidden = mode !== 'audio-convert';
   document.getElementById('settings-extract-audio').hidden = mode !== 'extract-audio';
   document.getElementById('settings-trim').hidden = mode !== 'trim';
 
@@ -1912,18 +2203,44 @@ export function initFFmpeg() {
   });
 
   // === 质量选择 ===
-  document.querySelectorAll('.quality-preset').forEach((btn) => {
+  // 格式转换 tab 的质量按钮（data-quality）
+  document.querySelectorAll('.quality-preset[data-quality]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.quality-preset').forEach((b) => b.classList.remove('quality-preset--active'));
+      document.querySelectorAll('.quality-preset[data-quality]').forEach((b) => b.classList.remove('quality-preset--active'));
       btn.classList.add('quality-preset--active');
       selectedQuality = btn.dataset.quality;
+    });
+  });
+  // 视频转换 tab 的质量按钮（data-vc-quality，独立分组避免互相干扰）
+  document.querySelectorAll('.quality-preset[data-vc-quality]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.quality-preset[data-vc-quality]').forEach((b) => b.classList.remove('quality-preset--active'));
+      btn.classList.add('quality-preset--active');
+    });
+  });
+
+  // === 视频转换：子模式切换（格式转换 vs 抽帧）===
+  document.querySelectorAll('input[name="video-convert-submode"]').forEach((r) => {
+    r.addEventListener('change', () => {
+      const sub = document.querySelector('input[name="video-convert-submode"]:checked')?.value || 'convert';
+      const fmtSettings = document.getElementById('video-convert-fmt-settings');
+      const frameSettings = document.getElementById('video-convert-frame-settings');
+      if (fmtSettings) fmtSettings.hidden = sub !== 'convert';
+      if (frameSettings) frameSettings.hidden = sub !== 'frame';
     });
   });
 
   // === 开始转换 ===
   document.getElementById('btn-convert').addEventListener('click', () => {
     if (!inputFile) return;
-    const modeMap = { 'convert': 'convert', 'extract-audio': 'extract', 'trim': 'trim' };
+    const modeMap = {
+      'convert': 'convert',
+      'image-convert': 'image-convert',
+      'video-convert': 'video-convert',
+      'audio-convert': 'audio-convert',
+      'extract-audio': 'extract',
+      'trim': 'trim',
+    };
     const mode = modeMap[currentMode] || 'convert';
     // 收集所有上传文件作为任务
     taskQueue.items = files.map(f => ({ file: f, mode, status: 'pending', progress: 0 }));

@@ -166,17 +166,20 @@
 
 .mode-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-xs);
 }
 
 .mode-tab {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 80px;
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-secondary);
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .mode-tab:hover {
