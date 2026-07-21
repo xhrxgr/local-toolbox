@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="加解密工具 —— AES 加解密（Web Crypto API）+ 古典密码（凯撒/ROT13/ROT47/维吉尼亚/Atbash/XOR/仿射）+ 编码（Base64/Base32/Hex/摩斯/二进制/URL/HTML），全部本地运行" />
+  <title>加解密 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/crypto-LQym8pBZ.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/crypto-BgoW7gBa.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="aes">AES 加解密</button>
+      <button class="mode-tab" data-mode="classical">古典密码</button>
+      <button class="mode-tab" data-mode="encoding">编码</button>
+    </nav>
+
+    <!-- ========== AES 加解密 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-aes">
+      <div class="panel-desc">AES 加解密，使用浏览器原生 Web Crypto API，支持 AES-GCM（含认证，推荐）与 AES-CBC。密钥可由密码经 PBKDF2 派生（10 万次迭代，SHA-256），或直接输入 hex 密钥。全部本地运行，密钥不离开浏览器。</div>
+
+      <!-- 算法 + 模式 -->
+      <div class="aes-controls">
+        <div class="codec-row">
+          <span class="codec-label">算法</span>
+          <select class="codec-select" id="aes-algo">
+            <option value="AES-GCM" selected>AES-GCM（推荐，含认证）</option>
+            <option value="AES-CBC">AES-CBC</option>
+          </select>
+        </div>
+        <div class="codec-row">
+          <span class="codec-label">模式</span>
+          <div class="seg-group">
+            <label class="seg"><input type="radio" name="aes-mode" value="encrypt" checked /><span>加密</span></label>
+            <label class="seg"><input type="radio" name="aes-mode" value="decrypt" /><span>解密</span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 密钥派生方式 -->
+      <div class="codec-row">
+        <span class="codec-label">密钥派生方式</span>
+        <div class="seg-group">
+          <label class="seg"><input type="radio" name="aes-kdf" value="pbkdf2" checked /><span>PBKDF2 密码派生（推荐）</span></label>
+          <label class="seg"><input type="radio" name="aes-kdf" value="direct" /><span>直接密钥（hex）</span></label>
+        </div>
+      </div>
+
+      <!-- PBKDF2 字段 -->
+      <div id="aes-pbkdf2-fields" class="aes-kdf-fields">
+        <div class="codec-row">
+          <label class="codec-label" for="aes-password">密码</label>
+          <input type="text" class="codec-text" id="aes-password" placeholder="输入密码（任意字符）" autocomplete="off" />
+        </div>
+        <div class="codec-row">
+          <label class="codec-label" for="aes-salt">Salt（hex，留空自动生成 16 字节）</label>
+          <div class="aes-salt-row">
+            <input type="text" class="codec-text" id="aes-salt" placeholder="留空则每次加密自动生成随机 salt" autocomplete="off" />
+            <button class="btn btn-secondary" id="aes-gen-salt" type="button">生成 Salt</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 直接密钥字段 -->
+      <div id="aes-direct-fields" class="aes-kdf-fields" hidden>
+        <div class="codec-row">
+          <label class="codec-label" for="aes-key-hex">密钥（hex，32 字节 = 64 字符）</label>
+          <input type="text" class="codec-text" id="aes-key-hex" placeholder="例如：00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff" autocomplete="off" />
+        </div>
+      </div>
+
+      <!-- 输入 -->
+      <div class="codec-row">
+        <label class="codec-label" id="aes-input-label" for="aes-input">明文输入</label>
+        <textarea class="codec-input" id="aes-input" placeholder="输入要加密的文本（Ctrl+Enter 执行）" rows="5"></textarea>
+      </div>
+
+      <div class="hash-dropzone" id="aes-dropzone" tabindex="0">
+        <svg class="hash-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div class="hash-dropzone__text">
+          <span class="hash-dropzone__primary" id="aes-dropzone-primary">或拖入文件作为输入（任意类型）</span>
+          <span class="hash-dropzone__secondary" id="aes-file-name">点击选择文件</span>
+        </div>
+        <input type="file" id="aes-file" hidden />
+      </div>
+
+      <!-- 格式选项 -->
+      <div class="aes-controls">
+        <div class="codec-row" id="aes-out-format-row">
+          <span class="codec-label">输出格式</span>
+          <div class="seg-group">
+            <label class="seg"><input type="radio" name="aes-out-format" value="base64" checked /><span>Base64</span></label>
+            <label class="seg"><input type="radio" name="aes-out-format" value="hex" /><span>Hex</span></label>
+          </div>
+        </div>
+        <div class="codec-row" id="aes-in-format-row" hidden>
+          <span class="codec-label">输入格式</span>
+          <div class="seg-group">
+            <label class="seg"><input type="radio" name="aes-in-format" value="base64" checked /><span>Base64</span></label>
+            <label class="seg"><input type="radio" name="aes-in-format" value="hex" /><span>Hex</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-aes-run">执行</button>
+        <button class="btn btn-secondary" id="btn-aes-clear">清空</button>
+        <button class="btn btn-secondary" id="btn-aes-download" hidden>下载结果</button>
+      </div>
+
+      <!-- 结果 -->
+      <div class="aes-result" id="aes-result" hidden>
+        <div class="hash-result__row">
+          <label class="hash-result__label">结果</label>
+          <textarea class="hash-result__value" id="aes-output" readonly rows="3"></textarea>
+          <button class="meta-btn" id="btn-copy-aes">复制</button>
+        </div>
+        <div class="hash-result__meta" id="aes-meta"></div>
+      </div>
+    </section>
+
+    <!-- ========== 古典密码 ========== -->
+    <section class="mode-panel glass" id="panel-classical">
+      <div class="panel-desc">古典密码，支持凯撒 / ROT13 / ROT47 / 维吉尼亚 / Atbash / XOR / 仿射。ROT13、ROT47、Atbash、XOR 为对称算法，加密解密按钮等效。</div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="classical-algo">算法</label>
+        <select class="codec-select" id="classical-algo">
+          <option value="caesar" selected>凯撒密码（Caesar）</option>
+          <option value="rot13">ROT13</option>
+          <option value="rot47">ROT47</option>
+          <option value="vigenere">维吉尼亚密码（Vigenère）</option>
+          <option value="atbash">Atbash（埃特巴什码）</option>
+          <option value="xor">XOR</option>
+          <option value="affine">仿射密码（Affine）</option>
+        </select>
+      </div>
+
+      <!-- 选项区（按算法动态显隐） -->
+      <div class="classical-options" id="classical-options">
+        <div class="codec-row classical-opt" data-algo="caesar">
+          <label class="codec-label" for="caesar-shift">位移（1-25）</label>
+          <select class="codec-select" id="caesar-shift"></select>
+        </div>
+        <div class="codec-row classical-opt" data-algo="vigenere" hidden>
+          <label class="codec-label" for="vigenere-key">密钥（仅字母）</label>
+          <input type="text" class="codec-text" id="vigenere-key" placeholder="例如：KEY" autocomplete="off" />
+        </div>
+        <div class="codec-row classical-opt" data-algo="xor" hidden>
+          <label class="codec-label" for="xor-key">密钥（任意字符串）</label>
+          <input type="text" class="codec-text" id="xor-key" placeholder="例如：secret" autocomplete="off" />
+        </div>
+        <div class="codec-row classical-opt" data-algo="affine" hidden>
+          <label class="codec-label">系数 a / b（a 需与 26 互质：1,3,5,7,9,11,15,17,19,21,23,25）</label>
+          <div class="affine-row">
+            <input type="number" class="codec-text" id="affine-a" placeholder="a" value="5" min="1" max="25" />
+            <input type="number" class="codec-text" id="affine-b" placeholder="b" value="8" min="0" max="25" />
+          </div>
+        </div>
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="classical-input">输入</label>
+        <textarea class="codec-input" id="classical-input" placeholder="输入文本" rows="5"></textarea>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-classical-encrypt">加密</button>
+        <button class="btn btn-primary" id="btn-classical-decrypt">解密</button>
+        <button class="btn btn-secondary" id="btn-classical-clear">清空</button>
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="classical-output">输出</label>
+        <div class="classical-output-row">
+          <textarea class="hash-result__value" id="classical-output" readonly rows="3"></textarea>
+          <button class="meta-btn" id="btn-copy-classical">复制</button>
+        </div>
+      </div>
+      <div class="error-msg" id="classical-error" hidden></div>
+    </section>
+
+    <!-- ========== 编码 ========== -->
+    <section class="mode-panel glass" id="panel-encoding">
+      <div class="panel-desc">编码工具（非加密），支持 Base64 / Base32 / Hex / 摩斯电码 / 二进制 / URL / HTML 实体。Base64 与 Hex 使用 UTF-8 安全处理。</div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="encoding-type">编码类型</label>
+        <select class="codec-select" id="encoding-type">
+          <option value="base64" selected>Base64</option>
+          <option value="base32">Base32（RFC 4648）</option>
+          <option value="hex">Hex（十六进制）</option>
+          <option value="morse">摩斯电码（Morse）</option>
+          <option value="binary">二进制（每字符 8 位，空格分隔）</option>
+          <option value="url">URL 编码</option>
+          <option value="html">HTML 实体编码</option>
+        </select>
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="encoding-input">输入</label>
+        <textarea class="codec-input" id="encoding-input" placeholder="输入文本" rows="5"></textarea>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-encode">编码</button>
+        <button class="btn btn-primary" id="btn-decode">解码</button>
+        <button class="btn btn-secondary" id="btn-encoding-clear">清空</button>
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="encoding-output">输出</label>
+        <div class="classical-output-row">
+          <textarea class="hash-result__value" id="encoding-output" readonly rows="3"></textarea>
+          <button class="meta-btn" id="btn-copy-encoding">复制</button>
+        </div>
+      </div>
+      <div class="error-msg" id="encoding-error" hidden></div>
+    </section>
+  </main>
+
+</body>
+</html>

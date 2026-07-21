@@ -1,5 +1,5 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/jspdf.es.min-BTTu_YlR.js","assets/rolldown-runtime-aKtaBQYM.js","assets/preload-helper-CHq0b4Vy.js","assets/typeof-B5XbjTb1.js","assets/html2canvas-DwCAe7Se.js"])))=>i.map(i=>d[i]);
-import{i as e}from"./rolldown-runtime-aKtaBQYM.js";import{t}from"./preload-helper-CHq0b4Vy.js";function n(e){return e.replace(/\.[^.]+$/,``)}async function r(n,r){let[{default:i},{default:a}]=await Promise.all([t(()=>import(`./jspdf.es.min-BTTu_YlR.js`),__vite__mapDeps([0,1,2,3])),t(()=>import(`./html2canvas-DwCAe7Se.js`).then(t=>e(t.default)),__vite__mapDeps([4,1]))]),o=document.createElement(`div`);o.style.cssText=`
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/jspdf.es.min-cO4mL_4A.js","assets/rolldown-runtime-DAXXjFlN.js","assets/preload-helper-CHq0b4Vy.js","assets/typeof-B5XbjTb1.js","assets/html2canvas-CLVA0Ark.js"])))=>i.map(i=>d[i]);
+import{o as e}from"./rolldown-runtime-DAXXjFlN.js";import{t}from"./preload-helper-CHq0b4Vy.js";function n(e){return e.replace(/\.[^.]+$/,``)}async function r(n,r){let[{default:i},{default:a}]=await Promise.all([t(()=>import(`./jspdf.es.min-cO4mL_4A.js`),__vite__mapDeps([0,1,2,3])),t(()=>import(`./html2canvas-CLVA0Ark.js`).then(t=>e(t.default)),__vite__mapDeps([4,1]))]),o=document.createElement(`div`);o.style.cssText=`
     position: fixed; left: -9999px; top: 0; width: 794px; padding: 32px;
     background: #ffffff; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.6; font-size: 14px;

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SVG 优化器 —— 去除冗余 XML 声明/注释/编辑器命名空间/默认值属性/空元素并压缩空白，纯字符串处理，全部本地运行" />
+  <title>SVG 优化器 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/svg-Pr6kGO2o.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/svg-Wa53SiO5.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- ========== 输入与选项 ========== -->
+    <section class="glass svg-panel">
+      <div class="panel-desc">SVG 优化器，去除冗余 XML 声明、DOCTYPE、注释、编辑器命名空间、metadata、空元素并压缩空白。纯字符串/正则处理，不依赖 DOMParser，全部本地运行。</div>
+
+      <!-- 拖放区 -->
+      <div class="hash-dropzone" id="svg-dropzone" tabindex="0">
+        <svg class="hash-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div class="hash-dropzone__text">
+          <span class="hash-dropzone__primary">拖入 .svg 文件</span>
+          <span class="hash-dropzone__secondary" id="svg-file-name">或点击此处选择文件</span>
+        </div>
+        <input type="file" id="svg-file" accept=".svg,image/svg+xml" hidden />
+      </div>
+
+      <!-- 文本输入 -->
+      <div class="codec-row">
+        <label class="codec-label" for="svg-input">SVG 源码</label>
+        <textarea class="codec-input" id="svg-input" placeholder="粘贴 SVG 源码，或拖入 .svg 文件（Ctrl+Enter 优化）" rows="8"></textarea>
+      </div>
+
+      <!-- 优化选项 -->
+      <div class="codec-row">
+        <span class="codec-label">优化选项</span>
+        <div class="svg-options" id="svg-options">
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeXmlDecl" checked /><span>去除 XML 声明</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeDoctype" checked /><span>去除 DOCTYPE</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeComments" checked /><span>去除注释</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeEditorNs" checked /><span>去除编辑器命名空间</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeMetadata" checked /><span>去除 metadata 元素</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeEmptyDesc" checked /><span>去除空 title/desc</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="collapseWhitespace" checked /><span>压缩空白</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeDefaultAttrs" checked /><span>去除默认值属性</span></label>
+          <label class="hmac-toggle"><input type="checkbox" data-opt="removeEmptyGroups" checked /><span>移除空 g 元素</span></label>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-svg-optimize">优化</button>
+        <button class="btn btn-secondary" id="btn-svg-copy">复制结果</button>
+        <button class="btn btn-secondary" id="btn-svg-download">下载 .svg</button>
+        <button class="btn btn-secondary" id="btn-svg-reset">还原</button>
+      </div>
+
+      <!-- 统计信息 -->
+      <div class="svg-stats" id="svg-stats" hidden>
+        <div class="svg-stat">
+          <span class="svg-stat__label">原始大小</span>
+          <span class="svg-stat__value" id="stat-original">0 B</span>
+        </div>
+        <div class="svg-stat">
+          <span class="svg-stat__label">优化后大小</span>
+          <span class="svg-stat__value" id="stat-optimized">0 B</span>
+        </div>
+        <div class="svg-stat svg-stat--saved">
+          <span class="svg-stat__label">减少</span>
+          <span class="svg-stat__value" id="stat-saved">0 B（0%）</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 预览对比 ========== -->
+    <section class="glass svg-panel">
+      <div class="panel-desc">预览对比（棋盘格背景表示透明区域）</div>
+      <div class="svg-preview-grid">
+        <div class="svg-preview-box">
+          <div class="svg-preview-label">原始预览</div>
+          <div class="svg-preview-canvas" id="preview-original">
+            <div class="svg-preview-empty">暂无内容</div>
+          </div>
+        </div>
+        <div class="svg-preview-box">
+          <div class="svg-preview-label">优化后预览</div>
+          <div class="svg-preview-canvas" id="preview-optimized">
+            <div class="svg-preview-empty">暂无内容</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

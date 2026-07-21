@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Unicode 查看器 —— 字符分析 / 码点查询 / 字符块浏览，全部本地运行" />
+  <title>Unicode 查看器 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/unicode-B3Q8f2lX.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/unicode-BrqtvOEa.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="analyze">字符分析</button>
+      <button class="mode-tab" data-mode="codepoint">码点查询</button>
+      <button class="mode-tab" data-mode="browse">字符块浏览</button>
+    </nav>
+
+    <!-- ========== 字符分析 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-analyze">
+      <div class="panel-desc">逐字符分析文本，显示码点 / UTF-8 / UTF-16 / 分类 / 块归属，正确处理代理对（输入后防抖 120ms 自动分析）。</div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="analyze-input">输入文本</label>
+        <textarea class="codec-input codec-input--tall" id="analyze-input" placeholder="输入要分析的文本（实时分析）" rows="6"></textarea>
+      </div>
+
+      <div class="analyze-stats" id="analyze-stats" hidden>
+        <div class="stat-item">
+          <span class="stat-label">字符数</span>
+          <span class="stat-value" id="stat-chars">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">UTF-8 字节</span>
+          <span class="stat-value" id="stat-utf8">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">UTF-16 单元</span>
+          <span class="stat-value" id="stat-utf16">0</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="char-table">
+          <thead>
+            <tr>
+              <th>字符</th>
+              <th>码点</th>
+              <th>UTF-8</th>
+              <th>UTF-16</th>
+              <th>分类</th>
+              <th>块</th>
+            </tr>
+          </thead>
+          <tbody id="analyze-tbody"></tbody>
+        </table>
+        <div class="empty-hint" id="analyze-empty">输入文本后将显示逐字符分析（最多显示前 2000 个字符）</div>
+      </div>
+    </section>
+
+    <!-- ========== 码点查询 ========== -->
+    <section class="mode-panel glass" id="panel-codepoint">
+      <div class="panel-desc">输入码点查询字符详情，支持 U+4E2D / 0x4E2D / 20013 / 单字符 多种格式。</div>
+
+      <div class="query-row">
+        <input type="text" class="codec-input codec-input--inline" id="cp-input" placeholder="U+4E2D / 0x4E2D / 20013 / 中" />
+        <button class="btn btn-primary" id="btn-cp-query">查询</button>
+      </div>
+
+      <div class="meta-error" id="cp-error" hidden></div>
+
+      <div class="cp-result" id="cp-result" hidden>
+        <div class="cp-preview" id="cp-preview">?</div>
+        <div class="cp-info">
+          <div class="info-row">
+            <span class="info-label">码点</span>
+            <code class="info-value" id="info-cp"></code>
+            <button class="meta-btn" data-copy="cp">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">UTF-8</span>
+            <code class="info-value" id="info-utf8"></code>
+            <button class="meta-btn" data-copy="utf8">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">UTF-16</span>
+            <code class="info-value" id="info-utf16"></code>
+            <button class="meta-btn" data-copy="utf16">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">UTF-32</span>
+            <code class="info-value" id="info-utf32"></code>
+            <button class="meta-btn" data-copy="utf32">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">HTML 实体</span>
+            <code class="info-value" id="info-html-entity"></code>
+            <button class="meta-btn" data-copy="html-entity">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">CSS 转义</span>
+            <code class="info-value" id="info-css-escape"></code>
+            <button class="meta-btn" data-copy="css-escape">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">JS 转义</span>
+            <code class="info-value" id="info-js-escape"></code>
+            <button class="meta-btn" data-copy="js-escape">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">URL 编码</span>
+            <code class="info-value" id="info-url-encode"></code>
+            <button class="meta-btn" data-copy="url-encode">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">JSON 转义</span>
+            <code class="info-value" id="info-json-escape"></code>
+            <button class="meta-btn" data-copy="json-escape">复制</button>
+          </div>
+          <div class="info-row">
+            <span class="info-label">字符分类</span>
+            <code class="info-value" id="info-classify"></code>
+          </div>
+          <div class="info-row">
+            <span class="info-label">是否代理对</span>
+            <code class="info-value" id="info-surrogate"></code>
+          </div>
+          <div class="info-row">
+            <span class="info-label">块归属</span>
+            <code class="info-value" id="info-block"></code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 字符块浏览 ========== -->
+    <section class="mode-panel glass" id="panel-browse">
+      <div class="panel-desc">点击 Unicode 块浏览字符网格，点击字符复制到剪贴板。块超过 256 字符时分页显示。</div>
+
+      <div class="block-list" id="block-list"></div>
+
+      <div class="block-info" id="block-info"></div>
+
+      <div class="block-grid" id="block-grid"></div>
+
+      <div class="block-pagination" id="block-pagination" hidden>
+        <button class="btn btn-secondary" id="btn-prev-page">上一页</button>
+        <span id="page-info"></span>
+        <button class="btn btn-secondary" id="btn-next-page">下一页</button>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>
