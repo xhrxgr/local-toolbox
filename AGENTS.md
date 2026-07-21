@@ -35,12 +35,12 @@
 └── package.json
 ```
 
-## 工具列表（22 个）
-- **媒体 (media)**：ffmpeg（多媒体转换）、image（图片处理）
+## 工具列表（29 个）
+- **媒体 (media)**：ffmpeg（多媒体转换）、image（图片处理）、svg（SVG 优化器）、ocr（OCR 图片识字）
 - **时间 (time)**：countdown、stopwatch、timestamp、worldclock
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
-- **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）
-- **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown
+- **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）
+- **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown、text（文本工具）、chmod（权限计算器）、sqlcron（SQL/CRON）、unicode（Unicode 查看器）、crypto（加解密）
 - **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
@@ -291,6 +291,106 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - **颜色**：HEX/RGB/HSL/HSV + WCAG 对比度 + EyeDropper + 中位切分调色板
 - **密码**：crypto.getRandomValues + 拒绝采样 + diceware
 - **单位转换**：7 类单位 + 温度特殊处理 + 双向实时
+
+## 文本工具功能（tools/text/）
+### 26 种操作（4 类）
+- **统计**：字符数 / 字符数（无空格）/ 单词数 / 行数 / 非空行 / 字节数（UTF-8）
+- **大小写**：UPPER / lower / Title Case / Sentence / camelCase / snake_case / kebab-case
+- **去重排序**：去重行 / 去重行+排序 / 升序 / 降序 / 按长度排序
+- **翻转**：整行翻转 / 全文字符翻转 / 行序翻转
+- **Tab/空格**：Tab→空格 / 空格→Tab
+- **替换**：字符串替换 / 正则替换（支持 /pattern/flags 语法）
+- **批量添加**：加前缀 / 加后缀 / 加行号
+
+## 进制转换工具功能（tools/radix/）
+- 2/8/10/16 进制互转：BigInt 大整数支持
+- Base32（RFC 4648）/ Base58（Bitcoin）/ Base62 / Base64 互转（自实现字母表）
+- UTF-8 文本 ↔ Hex 字符串互转
+- 实时联动：input + source 选择触发 convert
+- 双击输出框复制
+
+## Unix 权限计算器功能（tools/chmod/）
+- 数字（3/4 位）↔ 符号（10 位）双向转换
+- 特殊位：setuid(4000) / setgid(2000) / sticky(1000)
+- 特殊位与 x 位交互：setuid+x='s' / setuid 无 x='S' / sticky+x='t' / sticky 无 x='T'
+- 反查：输入数字自动设置复选框
+- 默认 755（owner rwx / group r-x / other r-x）
+- 命令预览 `chmod NNN file` + 解释说明
+- 常见权限参考表
+
+## SQL/CRON 工具功能（tools/sqlcron/）
+### SQL 格式化（dynamic import sql-formatter）
+- 10 种方言：Standard SQL / MySQL / PostgreSQL / SQLite / Oracle / T-SQL / DB2 / MariaDB / Spark / BigQuery
+- 美化 / 压缩（minify）
+- Ctrl+Enter 执行
+
+### CRON 解释（dynamic import cronstrue）
+- 支持 5 段（分时日月周）或 6 段（含秒）表达式
+- 解析 `* / - ,` 语法
+- 输出可读描述（中文）
+- 计算未来 10 次运行时间
+- 8 个预设：每 5 分钟 / 每小时 / 每天 0 点 / 每周一 / 每月 1 号 / 每年 / 工作日 9 点 / 每 30 秒
+- 自实现 computeNextRuns 状态机（parseField 解析字段）
+
+## Unicode 查看器功能（tools/unicode/）
+### 3 个 Tab
+- **字符分析**：textarea 输入 → 防抖 120ms → 逐字符表格（字符 / 码点 / UTF-8 / UTF-16 / 分类 / 块），`for (const ch of str)` 按码点迭代正确处理代理对
+- **码点查询**：支持 U+XXXX / 0xXXXX / 十进制 / 单字符 多种输入格式，显示 12 行详细信息（码点 / UTF-8/16/32 / HTML/CSS/JS/URL/JSON 转义 / 分类 / 块归属）
+- **字符块浏览**：24 个常用 Unicode 块（Basic Latin / CJK / Hiragana / Katakana / Hangul / Arabic / Hebrew / Thai / Emoji / Emoticons / etc），16 列网格，点击字符复制，超 256 字符分页
+
+### 实现要点
+- 字符分类用 Unicode 属性转义：`\p{L}` `\p{N}` `\p{P}` `\p{S}` `\p{Z}` + u flag
+- 不可见字符用占位符（`␣` `↵` `⇥` `⏎` `·`）
+- 限制 2000 行避免渲染卡顿
+
+## 加解密工具功能（tools/crypto/）
+### Tab 1: AES 加解密（Web Crypto API）
+- 算法：AES-GCM（含认证，IV 12 字节）/ AES-CBC（IV 16 字节）
+- 密钥派生：PBKDF2（10 万次，SHA-256）密码派生 + 自动生成 salt / 直接 hex 密钥（32 字节）
+- 输出格式：salt(16) + iv + ciphertext，Base64 或 Hex
+- 输入：文本或文件（任意类型），下载结果文件
+
+### Tab 2: 古典密码
+- 凯撒密码（位移 1-25）/ ROT13 / ROT47 / 维吉尼亚（密钥）/ Atbash / XOR（UTF-8 字节级）/ 仿射（含模逆校验）
+- 选项区按算法动态显隐
+
+### Tab 3: 编码（非加密）
+- Base64（UTF-8 安全）/ Base32（RFC 4648 自实现）/ Hex / 摩斯电码（ITU 标准字母表自实现）/ 二进制（每字符 8 位）/ URL / HTML 实体
+
+## SVG 优化器功能（tools/svg/）
+### 9 个优化选项（默认全勾）
+- 去除 XML 声明 / DOCTYPE / 注释
+- 去除编辑器命名空间属性（inkscape / sodipodi / illustrator / sketch）
+- 去除 `<metadata>` 元素 / 空 `<title>` `<desc>` 元素
+- 压缩空白（去换行、合并空格）
+- 去除默认值属性（stroke="none" / fill="black" / stroke-width="1" 等）
+- 移除空 `<g>` 元素（do-while 循环处理嵌套）
+
+### UI
+- 拖放区 + textarea 双输入联动
+- 左右并排预览（棋盘格透明背景，深色模式自动调整颜色）
+- 统计：原始大小 / 优化后大小 / 减少（字节 + 百分比）
+- 复制结果 / 下载 .svg / 还原
+
+### 实现要点
+- 纯字符串/正则处理，不依赖 DOMParser，无第三方库
+- 预览用 `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}` 处理 UTF-8
+
+## OCR 图片识字功能（tools/ocr/）
+### 核心链路
+拖放/选择/粘贴图片 → dynamic import tesseract.js → createWorker(langs, oem, logger) → worker.recognize(file) → 显示文本 + 置信度
+
+### 选项
+- 语言：中英（chi_sim+eng，默认）/ 仅英文 / 仅中文 / 简繁+英文
+- OEM：LSTM_ONLY / TESSERACT_ONLY / TESSERACT_LSTM_COMBINED
+
+### 特点
+- tesseract.js 用 dynamic import 减小首屏体积
+- 训练数据从 CDN 自动下载（unpkg）
+- 全局 paste 事件监听剪贴板图片
+- 进度条显示阶段：加载内核 → 加载语言数据 → 识别中
+- 取消：worker.terminate()
+- 下载 .txt 带 UTF-8 BOM 防乱码
 
 ## 关键设计决策
 - 新增工具流程：`tools/` 下建目录 → 写 4 文件 → `TOOLS[]` 注册（含 aliases）→ `vite.config.js` 加入口
