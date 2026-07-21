@@ -30,6 +30,8 @@ const OPERATIONS = {
   'word-to-text':  { tab: 'word',   label: 'Word → 文本',       inputType: 'file', accept: '.docx',               multiple: false, outputType: 'text' },
   'word-to-pdf':   { tab: 'word',   label: 'Word → PDF',        inputType: 'file', accept: '.docx',               multiple: false, outputType: 'file', fileExt: 'pdf' },
   'md-to-word':    { tab: 'word',   label: 'Markdown → Word',   inputType: 'text', accept: null,                  multiple: false, outputType: 'file', fileExt: 'docx' },
+  'html-to-word':  { tab: 'word',   label: 'HTML → Word',       inputType: 'text', accept: null,                  multiple: false, outputType: 'file', fileExt: 'docx' },
+  'txt-to-word':   { tab: 'word',   label: 'TXT → Word',        inputType: 'text', accept: null,                  multiple: false, outputType: 'file', fileExt: 'docx' },
   // Excel / CSV
   'excel-to-csv':  { tab: 'excel',  label: 'Excel → CSV',       inputType: 'file', accept: '.xlsx,.xls',          multiple: false, outputType: 'text' },
   'excel-to-json': { tab: 'excel',  label: 'Excel → JSON',      inputType: 'file', accept: '.xlsx,.xls',          multiple: false, outputType: 'text' },
@@ -41,6 +43,13 @@ const OPERATIONS = {
   'html-to-md':    { tab: 'mdhtml', label: 'HTML → Markdown',   inputType: 'text', accept: null,                  multiple: false, outputType: 'text' },
   'md-to-pdf':     { tab: 'mdhtml', label: 'Markdown → PDF',    inputType: 'text', accept: null,                  multiple: false, outputType: 'file', fileExt: 'pdf' },
   'html-to-pdf':   { tab: 'mdhtml', label: 'HTML → PDF',        inputType: 'text', accept: null,                  multiple: false, outputType: 'file', fileExt: 'pdf' },
+  'txt-to-pdf':    { tab: 'mdhtml', label: 'TXT → PDF',         inputType: 'text', accept: null,                  multiple: false, outputType: 'file', fileExt: 'pdf' },
+  // RTF
+  'rtf-to-text':   { tab: 'rtf',    label: 'RTF → 文本',        inputType: 'file', accept: '.rtf',                multiple: false, outputType: 'text' },
+  'rtf-to-html':   { tab: 'rtf',    label: 'RTF → HTML',        inputType: 'file', accept: '.rtf',                multiple: false, outputType: 'text' },
+  // EPUB
+  'epub-to-text':  { tab: 'epub',   label: 'EPUB → 文本',       inputType: 'file', accept: '.epub',               multiple: false, outputType: 'text' },
+  'epub-to-html':  { tab: 'epub',   label: 'EPUB → HTML',       inputType: 'file', accept: '.epub',               multiple: false, outputType: 'text' },
 };
 
 /* ========== 动态加载各 Tab 模块（按需减小首屏体积） ========== */
@@ -49,6 +58,8 @@ const TAB_MODULE_LOADERS = {
   word:   () => import('./handlers/word.js'),
   excel:  () => import('./handlers/excel.js'),
   mdhtml: () => import('./handlers/mdhtml.js'),
+  rtf:    () => import('./handlers/rtf.js'),
+  epub:   () => import('./handlers/epub.js'),
 };
 
 /* ========== 获取当前操作 ========== */
@@ -186,6 +197,8 @@ function updateUIForOp() {
     textInputSection.hidden = false;
     const labels = {
       'md-to-word': 'Markdown 内容',
+      'html-to-word': 'HTML 内容',
+      'txt-to-word': 'TXT 文本内容',
       'csv-to-json': 'CSV 内容',
       'json-to-csv': 'JSON 内容（数组对象）',
       'csv-to-excel': 'CSV 内容',
@@ -193,6 +206,7 @@ function updateUIForOp() {
       'html-to-md': 'HTML 内容',
       'md-to-pdf': 'Markdown 内容',
       'html-to-pdf': 'HTML 内容',
+      'txt-to-pdf': 'TXT 文本内容',
     };
     textInputLabel.textContent = labels[opId] || '输入内容';
   }

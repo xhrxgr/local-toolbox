@@ -41,7 +41,7 @@
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
 - **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）
 - **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown
-- **文档 (document)**：document（PDF/Word/Excel/MD/HTML 本地互转）
+- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
 ## 首页搜索栏（核心功能）
@@ -128,20 +128,32 @@
 - 拖放/多选 + 文件列表，单个删除/清空，大文件警告
 - 队列处理 + 中断 + 单个下载/放弃，"下载全部"200ms 间隔
 
-## 文档转换工具功能（tools/document/，2026-07-21 新增）
+## 文档转换工具功能（tools/document/，2026-07-21 新增，2026-07-22 扩展）
 ### 设计原则
 - 全部本地处理，文件不上传云端
-- 4 个 Tab：PDF / Word / Excel-CSV / MD-HTML
+- 6 个 Tab：PDF / Word / Excel-CSV / MD-HTML-TXT / RTF / EPUB
 - 复用首页毛玻璃风格
+
+### 模块化架构（2026-07-22 重构）
+按 Tab 拆分 dynamic import，首屏只加载主入口 12-13KB，用户点击哪个 Tab 才动态加载哪个库：
+- `app.js`：主入口，UI 协调 + `TAB_MODULE_LOADERS` 表 + `buildContext()` 传递 ctx
+- `handlers/utils.js`：共享工具（`getBaseName` + `htmlToPdfBlob`，后者动态导入 jspdf + html2canvas）
+- `handlers/pdf.js`：pdfjs-dist + pdf-lib（940KB chunk）
+- `handlers/word.js`：mammoth + docx + marked（846KB chunk）
+- `handlers/excel.js`：xlsx（423KB chunk）
+- `handlers/mdhtml.js`：marked + turndown + htmlToPdfBlob（12KB chunk）
+- `handlers/rtf.js`：自实现 RTF 解析器（5KB chunk，零依赖）
+- `handlers/epub.js`：jszip + DOMParser 手动解析 EPUB（99KB chunk）
 
 ### 依赖库
 - `pdf-lib`：PDF 操作（合并/拆分/旋转/图片→PDF）
 - `pdfjs-dist`：PDF 渲染（PDF→图片/文本），worker 通过 `?url` 导入
 - `mammoth`：Word→HTML/文本
-- `docx`：生成 Word（Markdown→Word）
+- `docx`：生成 Word（Markdown/HTML/TXT → Word）
 - `xlsx` (SheetJS)：Excel 读写（→CSV/JSON）
 - `jspdf` + `html2canvas`：HTML→PDF（截图分页嵌入）
-- `turndown`：HTML→Markdown
+- `marked` + `turndown`：MD/HTML 互转
+- `jszip`：EPUB 解压（手动解析 OPF + spine + XHTML，避免引入 epubjs 200KB+）
 
 ### PDF Tab（7 种操作）
 - PDF → 图片：pdfjs 2x 渲染每页到 canvas → PNG/JPG blob
@@ -152,11 +164,13 @@
 - PDF 旋转：pdf-lib `setRotation(degrees)`
 - PDF 提取：按页码列表（如 `1, 3, 5-8`）抽取合并
 
-### Word Tab（4 种操作）
+### Word Tab（6 种操作）
 - Word(.docx) → HTML：mammoth.convertToHtml
 - Word → 纯文本：mammoth.extractRawText
 - Word → PDF：mammoth → HTML → htmlToPdfBlob
-- Markdown → Word：marked → HTML → 自定义 DOM 遍历器转 docx Paragraph/TextRun（支持 strong/em/code/a/br）
+- Markdown → Word：marked → HTML → domNodeToDocxParagraph 转换器
+- HTML → Word：DOMParser 解析 → htmlToDocxParagraphs 通用工具（自动包裹完整 HTML）
+- TXT → Word：按空行分段，单行内换行用 TextRun `{ break: 1 }`
 
 ### Excel/CSV Tab（5 种操作）
 - Excel(.xlsx/.xls) → CSV：SheetJS `sheet_to_csv`，可选工作表索引
@@ -165,17 +179,42 @@
 - JSON → CSV：提取所有键做表头 + 逐行输出
 - CSV → Excel：SheetJS `book_new` + `aoa_to_sheet`
 
-### Markdown/HTML Tab（4 种操作）
+### Markdown/HTML/TXT Tab（5 种操作）
 - Markdown → HTML：marked（GFM）
 - HTML → Markdown：turndown（atx 标题 / fenced 代码块）
 - Markdown → PDF：marked → htmlToPdfBlob
 - HTML → PDF：htmlToPdfBlob
+- TXT → PDF：包成 `<pre>` 风格 HTML → htmlToPdfBlob（保留换行空格）
+
+### RTF Tab（2 种操作，自实现解析器）
+- RTF → 文本：状态机解析 RTF 控制字，提取段落 + 文本
+- RTF → HTML：解析后输出 `<p>` 段落 + `<strong>/<em>/<u>` 内联格式
+
+RTF Parser 支持的控制字：
+- `\par \line \tab \page`：段落/换行/制表/分页
+- `\b \i \ul \ulnone`：粗体/斜体/下划线
+- `\\ \{ \} \'XX \uN`：转义字符 + 十六进制字节 + Unicode
+- `\fonttbl \colortbl \info \stylesheet \*\xxx \pict`：跳过目标组
+- `\plain`：重置格式
+
+### EPUB Tab（2 种操作，jszip + DOMParser 手动解析）
+- EPUB → 文本：解压 → 解析 OPF manifest/spine → 按阅读顺序提取每章 body.textContent → 用 `---` 分隔
+- EPUB → HTML：拼接所有章节 body.innerHTML，用 `<hr>` 分隔，包装为完整 HTML 文档（含基础样式）
+
+EPUB 解析链路：
+```
+EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
+→ OPF 解析 manifest（id→href）+ spine（idref 顺序）
+→ 按 spine 顺序读 XHTML，DOMParser 解析 application/xhtml+xml
+→ 失败时降级为 text/html 解析
+```
 
 ### 通用工具函数
 - `htmlToPdfBlob(html, filename)`：临时 div 内嵌样式 → html2canvas 截图 → jsPDF A4 分页嵌入（JPEG 0.95 质量）
 - `parsePageRanges(input)`：解析 `1-3, 5, 7-9` → `[[0,2],[4,4],[6,8]]`（0-based）
 - `parsePageList(input)`：解析 `1, 3, 5-8` → `[0,2,4,5,6,7]`（0-based 去重）
 - `domNodeToDocxParagraph(el)` / `parseInlineRuns(el)`：DOM → docx Paragraph
+- `htmlToDocxParagraphs(html)`：HTML → docx Paragraph[]（处理 ul/ol 展开为多段）
 
 ### 输入/输出模式
 - `inputType: 'file'`：显示文件上传区，accept 由 OPERATIONS 表控制
@@ -184,7 +223,7 @@
 - `outputType: 'file'`：结果列表 + 单个下载按钮，多文件显示"下载全部"（200ms 间隔）
 
 ### UI 特点
-- 4 个 Tab 切换时清空结果区
+- 6 个 Tab 切换时清空结果区
 - 操作类型 select 切换时按 `inputType` 显隐文件区/文本区
 - PDF 操作选项（图片格式/旋转角度/拆分区间/提取页码）按 opId 动态显隐
 - Excel 操作显示工作表索引输入

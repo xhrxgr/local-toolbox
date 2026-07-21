@@ -53,8 +53,75 @@ export async function mdToWord(ctx) {
   const html = marked.parse(text);
 
   setProgress('生成 Word 文档...', '', 40);
+  const paragraphs = htmlToDocxParagraphs(html);
+
+  const docxDoc = new Document({
+    sections: [{ properties: {}, children: paragraphs }],
+  });
+
+  setProgress('打包 .docx...', '', 80);
+  const blob = await Packer.toBlob(docxDoc);
+  setProgress('完成', '', 100);
+  return [{ blob, filename: 'markdown_export.docx' }];
+}
+
+/* ========== HTML → Word ========== */
+export async function htmlToWord(ctx) {
+  const { text, setProgress } = ctx;
+  setProgress('解析 HTML...', '', 20);
+  // 自动包裹为完整 HTML 文档以便 DOMParser 解析
+  const wrappedHtml = /<html[\s>]/i.test(text)
+    ? text
+    : `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${text}</body></html>`;
+  const paragraphs = htmlToDocxParagraphs(wrappedHtml);
+  if (paragraphs.length === 0) paragraphs.push(new Paragraph({ text: '' }));
+
+  setProgress('生成 Word 文档...', '', 60);
+  const docxDoc = new Document({
+    sections: [{ properties: {}, children: paragraphs }],
+  });
+
+  setProgress('打包 .docx...', '', 85);
+  const blob = await Packer.toBlob(docxDoc);
+  setProgress('完成', '', 100);
+  return [{ blob, filename: 'html_export.docx' }];
+}
+
+/* ========== TXT → Word ========== */
+export async function txtToWord(ctx) {
+  const { text, setProgress } = ctx;
+  setProgress('解析文本...', '', 20);
+  // 按空行分段（连续两个换行视为段落分隔）
+  const lines = text.replace(/\r\n/g, '\n').split(/\n\n+/);
+  const paragraphs = lines.map(block => {
+    const content = block.trim();
+    if (!content) return null;
+    // 单行内换行 → TextRun break
+    const sublines = content.split('\n');
+    const runs = [];
+    sublines.forEach((line, idx) => {
+      if (idx > 0) runs.push(new TextRun({ break: 1 }));
+      runs.push(new TextRun(line));
+    });
+    return new Paragraph({ children: runs });
+  }).filter(Boolean);
+  if (paragraphs.length === 0) paragraphs.push(new Paragraph({ text: '' }));
+
+  setProgress('生成 Word 文档...', '', 60);
+  const docxDoc = new Document({
+    sections: [{ properties: {}, children: paragraphs }],
+  });
+
+  setProgress('打包 .docx...', '', 85);
+  const blob = await Packer.toBlob(docxDoc);
+  setProgress('完成', '', 100);
+  return [{ blob, filename: 'text_export.docx' }];
+}
+
+/* ========== HTML → docx Paragraph[] 通用工具 ========== */
+function htmlToDocxParagraphs(html) {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(`<body>${html}</body>`, 'text/html');
+  const doc = parser.parseFromString(html, 'text/html');
   const body = doc.body;
   const paragraphs = [];
 
@@ -74,15 +141,7 @@ export async function mdToWord(ctx) {
     }
   }
   if (paragraphs.length === 0) paragraphs.push(new Paragraph({ text: '' }));
-
-  const docxDoc = new Document({
-    sections: [{ properties: {}, children: paragraphs }],
-  });
-
-  setProgress('打包 .docx...', '', 80);
-  const blob = await Packer.toBlob(docxDoc);
-  setProgress('完成', '', 100);
-  return [{ blob, filename: 'markdown_export.docx' }];
+  return paragraphs;
 }
 
 /* ========== DOM → docx Paragraph 转换器 ========== */
@@ -154,4 +213,6 @@ export const HANDLERS = {
   'word-to-text': wordToText,
   'word-to-pdf':  wordToPdf,
   'md-to-word':   mdToWord,
+  'html-to-word': htmlToWord,
+  'txt-to-word':  txtToWord,
 };

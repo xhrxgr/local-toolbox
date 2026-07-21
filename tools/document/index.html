@@ -19,7 +19,9 @@
         <button class="mode-tab mode-tab--active" data-tab="pdf">PDF</button>
         <button class="mode-tab" data-tab="word">Word</button>
         <button class="mode-tab" data-tab="excel">Excel / CSV</button>
-        <button class="mode-tab" data-tab="mdhtml">MD / HTML</button>
+        <button class="mode-tab" data-tab="mdhtml">MD / HTML / TXT</button>
+        <button class="mode-tab" data-tab="rtf">RTF</button>
+        <button class="mode-tab" data-tab="epub">EPUB</button>
       </div>
     </section>
 
@@ -75,6 +77,8 @@
             <option value="word-to-text">Word → 纯文本</option>
             <option value="word-to-pdf">Word → PDF（经 HTML）</option>
             <option value="md-to-word">Markdown → Word</option>
+            <option value="html-to-word">HTML → Word</option>
+            <option value="txt-to-word">TXT → Word</option>
           </select>
         </div>
       </div>
@@ -109,6 +113,31 @@
             <option value="html-to-md">HTML → Markdown</option>
             <option value="md-to-pdf">Markdown → PDF</option>
             <option value="html-to-pdf">HTML → PDF</option>
+            <option value="txt-to-pdf">TXT → PDF</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="rtf" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="rtf-op">操作类型</label>
+          <select class="setting__select" id="rtf-op">
+            <option value="rtf-to-text">RTF → 文本</option>
+            <option value="rtf-to-html">RTF → HTML</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="epub" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="epub-op">操作类型</label>
+          <select class="setting__select" id="epub-op">
+            <option value="epub-to-text">EPUB → 文本</option>
+            <option value="epub-to-html">EPUB → HTML</option>
           </select>
         </div>
       </div>
