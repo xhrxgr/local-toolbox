@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Unix 权限计算器 —— chmod 数字/符号双向转换，文件类型参考，全部本地处理" />
+  <title>权限计算器 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/chmod-B_B7k6My.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/chmod-CVFfvxDV.css">
+</head>
+<body>
+  <main class="tool-container">
+    <section class="mode-panel glass mode-panel--active">
+      <div class="panel-desc">Unix 文件权限计算器：勾选 r/w/x 自动生成数字（如 755）与符号（如 rwxr-xr-x）格式，支持 setuid/setgid/sticky 特殊位。</div>
+
+      <!-- 数字输入反查 -->
+      <div class="chmod-controls">
+        <div class="codec-row">
+          <label class="codec-label" for="chmod-num-input">数字模式输入（如 755 / 4755）</label>
+          <div class="chmod-num-row">
+            <input type="text" class="text-input" id="chmod-num-input" placeholder="755" maxlength="4" />
+            <button class="btn btn-primary" id="btn-from-num">从数字反查</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 特殊位 -->
+      <div class="chmod-special">
+        <div class="chmod-special__title">特殊位</div>
+        <div class="seg-group">
+          <label class="seg"><input type="checkbox" id="spec-setuid" data-bit="4000" /><span>setuid (4)</span></label>
+          <label class="seg"><input type="checkbox" id="spec-setgid" data-bit="2000" /><span>setgid (2)</span></label>
+          <label class="seg"><input type="checkbox" id="spec-sticky" data-bit="1000" /><span>sticky (1)</span></label>
+        </div>
+      </div>
+
+      <!-- 权限矩阵 -->
+      <div class="chmod-matrix">
+        <div class="chmod-matrix__header">
+          <div></div>
+          <div>读 (r)</div>
+          <div>写 (w)</div>
+          <div>执行 (x)</div>
+        </div>
+        <div class="chmod-row">
+          <div class="chmod-row__label">所有者 (Owner)</div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="owner" data-bit="4" checked /><span>r</span></label></div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="owner" data-bit="2" checked /><span>w</span></label></div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="owner" data-bit="1" checked /><span>x</span></label></div>
+        </div>
+        <div class="chmod-row">
+          <div class="chmod-row__label">用户组 (Group)</div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="group" data-bit="4" checked /><span>r</span></label></div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="group" data-bit="2" /><span>w</span></label></div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="group" data-bit="1" checked /><span>x</span></label></div>
+        </div>
+        <div class="chmod-row">
+          <div class="chmod-row__label">其他人 (Other)</div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="other" data-bit="4" checked /><span>r</span></label></div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="other" data-bit="2" /><span>w</span></label></div>
+          <div class="chmod-cell"><label class="chk"><input type="checkbox" data-class="other" data-bit="1" checked /><span>x</span></label></div>
+        </div>
+      </div>
+
+      <!-- 结果输出 -->
+      <div class="chmod-results">
+        <div class="chmod-result-card">
+          <span class="chmod-result-card__label">数字格式</span>
+          <code class="chmod-result-card__value" id="chmod-num">755</code>
+          <button class="meta-btn" id="btn-copy-num">复制</button>
+        </div>
+        <div class="chmod-result-card">
+          <span class="chmod-result-card__label">符号格式</span>
+          <code class="chmod-result-card__value" id="chmod-sym">rwxr-xr-x</code>
+          <button class="meta-btn" id="btn-copy-sym">复制</button>
+        </div>
+        <div class="chmod-result-card chmod-result-card--full">
+          <span class="chmod-result-card__label">命令</span>
+          <code class="chmod-result-card__value" id="chmod-cmd">chmod 755 file</code>
+          <button class="meta-btn" id="btn-copy-cmd">复制</button>
+        </div>
+      </div>
+
+      <!-- 命令说明 -->
+      <div class="chmod-explain" id="chmod-explain"></div>
+
+      <!-- 常见权限参考 -->
+      <details class="chmod-reference">
+        <summary>常见权限参考</summary>
+        <table class="chmod-table">
+          <thead><tr><th>数字</th><th>符号</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>000</td><td>----------</td><td>无权限</td></tr>
+            <tr><td>400</td><td>r--------</td><td>仅所有者可读</td></tr>
+            <tr><td>444</td><td>r--r--r--</td><td>所有人可读</td></tr>
+            <tr><td>600</td><td>rw-------</td><td>仅所有者可读写（私钥文件）</td></tr>
+            <tr><td>644</td><td>rw-r--r--</td><td>常规文件默认</td></tr>
+            <tr><td>664</td><td>rw-rw-r--</td><td>共享文件</td></tr>
+            <tr><td>666</td><td>rw-rw-rw-</td><td>所有人可读写</td></tr>
+            <tr><td>700</td><td>rwx------</td><td>仅所有者可读写执行（~/.ssh）</td></tr>
+            <tr><td>755</td><td>rwxr-xr-x</td><td>可执行文件/目录默认</td></tr>
+            <tr><td>777</td><td>rwxrwxrwx</td><td>所有人可读写执行（危险）</td></tr>
+            <tr><td>4755</td><td>rwsr-xr-x</td><td>setuid（如 passwd 命令）</td></tr>
+            <tr><td>2755</td><td>rwxr-sr-x</td><td>setgid（共享目录）</td></tr>
+            <tr><td>1755</td><td>rwxr-xr-t</td><td>sticky（如 /tmp）</td></tr>
+          </tbody>
+        </table>
+      </details>
+    </section>
+  </main>
+
+</body>
+</html>

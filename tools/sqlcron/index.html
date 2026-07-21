@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SQL 美化/压缩 + CRON 表达式生成与解释器，全部本地处理" />
+  <title>SQL/CRON - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/sqlcron-DpXFvzbI.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-aKtaBQYM.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/sqlcron-IV1-oClf.css">
+</head>
+<body>
+  <main class="tool-container">
+    <!-- 模式 Tab -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab mode-tab--active" data-mode="sql">SQL 格式化</button>
+      <button class="mode-tab" data-mode="cron">CRON 解释</button>
+    </nav>
+
+    <!-- ========== SQL 格式化 ========== -->
+    <section class="mode-panel mode-panel--active glass" id="panel-sql">
+      <div class="panel-desc">SQL 美化与压缩，支持 MySQL / PostgreSQL / Oracle / SQLite 等多种方言，可选 Tab/空格缩进。</div>
+
+      <div class="sql-controls">
+        <div class="codec-row">
+          <label class="codec-label" for="sql-dialect">方言</label>
+          <select class="codec-select" id="sql-dialect">
+            <option value="sql">Standard SQL</option>
+            <option value="mysql" selected>MySQL</option>
+            <option value="postgresql">PostgreSQL</option>
+            <option value="oracle">Oracle</option>
+            <option value="sqlite">SQLite</option>
+            <option value="mariadb">MariaDB</option>
+            <option value="bigquery">BigQuery</option>
+            <option value="redshift">Redshift</option>
+            <option value="snowflake">Snowflake</option>
+            <option value="tsql">T-SQL (SQL Server)</option>
+          </select>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label" for="sql-indent">缩进</label>
+          <select class="codec-select" id="sql-indent">
+            <option value="2" selected>2 空格</option>
+            <option value="4">4 空格</option>
+            <option value="tab">Tab</option>
+          </select>
+        </div>
+        <label class="hmac-toggle">
+          <input type="checkbox" id="sql-uppercase" checked />
+          <span>关键字大写</span>
+        </label>
+        <label class="hmac-toggle">
+          <input type="checkbox" id="sql-minify" />
+          <span>压缩（一行）</span>
+        </label>
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="sql-input">SQL 输入</label>
+        <textarea class="codec-input" id="sql-input" placeholder="SELECT * FROM users WHERE id = 1" rows="6"></textarea>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-sql-format">格式化</button>
+        <button class="btn btn-secondary" id="btn-sql-clear">清空</button>
+        <button class="btn btn-secondary" id="btn-sql-copy">复制结果</button>
+      </div>
+
+      <div class="codec-row">
+        <label class="codec-label">结果</label>
+        <textarea class="codec-input" id="sql-output" rows="10" readonly></textarea>
+      </div>
+
+      <div class="sql-meta" id="sql-meta"></div>
+    </section>
+
+    <!-- ========== CRON 解释 ========== -->
+    <section class="mode-panel glass" id="panel-cron" hidden>
+      <div class="panel-desc">CRON 表达式生成与解释器：输入 5 段或 6 段（含秒）的 CRON 表达式，自动生成人类可读描述与未来 10 次运行时间。</div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="cron-input">CRON 表达式</label>
+        <div class="cron-input-row">
+          <input type="text" class="text-input cron-input" id="cron-input" placeholder="*/5 * * * *  （5 段）或 0 */5 * * * * （6 段含秒）" />
+          <button class="btn btn-primary" id="btn-cron-explain">解释</button>
+        </div>
+      </div>
+
+      <!-- 预设 -->
+      <div class="cron-presets">
+        <span class="cron-presets__label">常用预设：</span>
+        <button class="preset-btn" data-cron="*/5 * * * *">每 5 分钟</button>
+        <button class="preset-btn" data-cron="0 * * * *">每小时</button>
+        <button class="preset-btn" data-cron="0 0 * * *">每天 0 点</button>
+        <button class="preset-btn" data-cron="0 0 * * 1">每周一 0 点</button>
+        <button class="preset-btn" data-cron="0 0 1 * *">每月 1 号 0 点</button>
+        <button class="preset-btn" data-cron="0 0 1 1 *">每年 1 月 1 日 0 点</button>
+        <button class="preset-btn" data-cron="0 9 * * 1-5">工作日 9 点</button>
+        <button class="preset-btn" data-cron="*/30 * * * * *">每 30 秒（含秒）</button>
+      </div>
+
+      <!-- 描述 -->
+      <div class="cron-desc" id="cron-desc" hidden>
+        <div class="cron-desc__label">人类可读描述</div>
+        <div class="cron-desc__value" id="cron-desc-value"></div>
+      </div>
+
+      <!-- 字段解释 -->
+      <div class="cron-fields" id="cron-fields" hidden>
+        <div class="cron-field">
+          <span class="cron-field__name">分 (Minute)</span>
+          <code class="cron-field__value" id="field-minute">*</code>
+        </div>
+        <div class="cron-field">
+          <span class="cron-field__name">时 (Hour)</span>
+          <code class="cron-field__value" id="field-hour">*</code>
+        </div>
+        <div class="cron-field">
+          <span class="cron-field__name">日 (Day)</span>
+          <code class="cron-field__value" id="field-day">*</code>
+        </div>
+        <div class="cron-field">
+          <span class="cron-field__name">月 (Month)</span>
+          <code class="cron-field__value" id="field-month">*</code>
+        </div>
+        <div class="cron-field">
+          <span class="cron-field__name">周 (Weekday)</span>
+          <code class="cron-field__value" id="field-weekday">*</code>
+        </div>
+        <div class="cron-field cron-field--seconds" id="field-seconds-wrap" hidden>
+          <span class="cron-field__name">秒 (Seconds)</span>
+          <code class="cron-field__value" id="field-seconds">*</code>
+        </div>
+      </div>
+
+      <!-- 未来运行时间 -->
+      <div class="cron-next" id="cron-next" hidden>
+        <div class="cron-next__label">未来 10 次运行时间（本地时区）</div>
+        <ul class="cron-next__list" id="cron-next-list"></ul>
+      </div>
+
+      <div class="sql-meta" id="cron-meta"></div>
+
+      <!-- 语法参考 -->
+      <details class="cron-reference">
+        <summary>CRON 语法参考</summary>
+        <table class="chmod-table">
+          <thead><tr><th>字段</th><th>允许值</th><th>特殊字符</th></tr></thead>
+          <tbody>
+            <tr><td>秒（可选）</td><td>0-59</td><td>* / , -</td></tr>
+            <tr><td>分</td><td>0-59</td><td>* / , -</td></tr>
+            <tr><td>时</td><td>0-23</td><td>* / , -</td></tr>
+            <tr><td>日</td><td>1-31</td><td>* / , - ? L</td></tr>
+            <tr><td>月</td><td>1-12 或 JAN-DEC</td><td>* / , -</td></tr>
+            <tr><td>周</td><td>0-6 或 SUN-SAT</td><td>* / , - ? L #</td></tr>
+          </tbody>
+        </table>
+        <p class="cron-reference__note">特殊字符：<code>*</code> 任意值 · <code>/</code> 步进 · <code>,</code> 列表 · <code>-</code> 范围 · <code>?</code> 不指定（日/周互斥）· <code>L</code> 最后 · <code>#</code> 第几个</p>
+      </details>
+    </section>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="文本工具集 —— 统计/大小写/去重/排序/翻转/替换/Tab空格转换，全部本地处理" />
+  <title>文本工具 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/text-S9KoE14A.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/text-Cf-P9ZY0.css">
+</head>
+<body>
+  <main class="tool-container">
+    <section class="mode-panel glass mode-panel--active">
+      <div class="panel-desc">综合文本处理：统计字数/行数、大小写转换、去重、排序、翻转、字符串替换、Tab↔空格互转。全部本地处理。</div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="text-input">输入文本</label>
+        <textarea class="codec-input" id="text-input" placeholder="粘贴或输入文本..." rows="8"></textarea>
+      </div>
+
+      <div class="text-controls">
+        <label class="codec-label" for="text-op">操作</label>
+        <select class="codec-select" id="text-op">
+          <optgroup label="统计">
+            <option value="stats">字数/行数统计</option>
+          </optgroup>
+          <optgroup label="大小写">
+            <option value="upper">全部大写</option>
+            <option value="lower">全部小写</option>
+            <option value="title">首字母大写（每词）</option>
+            <option value="sentence">句首大写</option>
+            <option value="camel">驼峰命名 camelCase</option>
+            <option value="snake">下划线命名 snake_case</option>
+            <option value="kebab">短横线命名 kebab-case</option>
+          </optgroup>
+          <optgroup label="去重/排序">
+            <option value="dedup-line">去重行（保留首次出现）</option>
+            <option value="dedup-line-sort">去重行并排序</option>
+            <option value="sort-asc">行排序（升序）</option>
+            <option value="sort-desc">行排序（降序）</option>
+            <option value="sort-len">按行长度排序（升序）</option>
+            <option value="reverse-line">反转每行字符</option>
+            <option value="reverse-all">反转整段文本</option>
+            <option value="reverse-line-order">反转行顺序</option>
+            <option value="remove-empty">删除空行</option>
+            <option value="trim-line">去除每行首尾空格</option>
+          </optgroup>
+          <optgroup label="Tab/空格">
+            <option value="tab-to-space">Tab → 4 空格</option>
+            <option value="space-to-tab">4 空格 → Tab</option>
+          </optgroup>
+          <optgroup label="替换">
+            <option value="replace">字符串替换</option>
+            <option value="replace-regex">正则替换</option>
+          </optgroup>
+          <optgroup label="其他">
+            <option value="add-prefix">每行加前缀</option>
+            <option value="add-suffix">每行加后缀</option>
+            <option value="add-line-num">每行加行号</option>
+            <option value="remove-duplicate-chars">去除连续重复字符</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- 替换参数 -->
+      <div class="text-controls text-controls--replace" id="replace-options" hidden>
+        <div class="codec-row">
+          <label class="codec-label" for="replace-from">查找</label>
+          <input type="text" class="text-input" id="replace-from" placeholder="查找内容" />
+        </div>
+        <div class="codec-row">
+          <label class="codec-label" for="replace-to">替换为</label>
+          <input type="text" class="text-input" id="replace-to" placeholder="替换为（留空即删除）" />
+        </div>
+        <label class="hmac-toggle">
+          <input type="checkbox" id="replace-global" checked />
+          <span>全部替换</span>
+        </label>
+        <label class="hmac-toggle" id="replace-ci-wrap">
+          <input type="checkbox" id="replace-ci" />
+          <span>忽略大小写</span>
+        </label>
+      </div>
+
+      <!-- 前后缀参数 -->
+      <div class="text-controls text-controls--prefix" id="prefix-options" hidden>
+        <div class="codec-row">
+          <label class="codec-label" for="prefix-text">前缀文本</label>
+          <input type="text" class="text-input" id="prefix-text" placeholder="如：- 或 * 或 > " />
+        </div>
+      </div>
+      <div class="text-controls text-controls--suffix" id="suffix-options" hidden>
+        <div class="codec-row">
+          <label class="codec-label" for="suffix-text">后缀文本</label>
+          <input type="text" class="text-input" id="suffix-text" placeholder="如：, 或 ; 或 </" />
+        </div>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-run">执行</button>
+        <button class="btn btn-secondary" id="btn-swap">用结果替换输入</button>
+        <button class="btn btn-secondary" id="btn-clear">清空</button>
+      </div>
+
+      <!-- 统计结果 -->
+      <div class="text-stats" id="text-stats" hidden>
+        <div class="stat-card"><span class="stat-card__label">字符数</span><span class="stat-card__value" id="stat-chars">0</span></div>
+        <div class="stat-card"><span class="stat-card__label">字符数（无空格）</span><span class="stat-card__value" id="stat-chars-nospace">0</span></div>
+        <div class="stat-card"><span class="stat-card__label">单词数</span><span class="stat-card__value" id="stat-words">0</span></div>
+        <div class="stat-card"><span class="stat-card__label">行数</span><span class="stat-card__value" id="stat-lines">0</span></div>
+        <div class="stat-card"><span class="stat-card__label">非空行</span><span class="stat-card__value" id="stat-nonempty">0</span></div>
+        <div class="stat-card"><span class="stat-card__label">字节数（UTF-8）</span><span class="stat-card__value" id="stat-bytes">0</span></div>
+      </div>
+
+      <!-- 输出 -->
+      <div class="codec-row">
+        <label class="codec-label">输出</label>
+        <textarea class="codec-input" id="text-output" placeholder="处理结果..." rows="8" readonly></textarea>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-secondary" id="btn-copy">复制输出</button>
+        <span class="text-meta" id="text-meta"></span>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

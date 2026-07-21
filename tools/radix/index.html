@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="进制/编码转换器 —— 2/8/10/16 进制 + Base32/58/62/64 互转，全部本地处理" />
+  <title>进制转换 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/radix-CRmNht9N.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/radix-B5qB639k.css">
+</head>
+<body>
+  <main class="tool-container">
+    <section class="mode-panel glass mode-panel--active">
+      <div class="panel-desc">进制与编码互转：支持 2/8/10/16 进制，以及 Base32 / Base58 / Base62 / Base64。一次性显示所有目标格式，自动联动。</div>
+
+      <div class="codec-row">
+        <label class="codec-label" for="radix-input">输入值</label>
+        <textarea class="codec-input" id="radix-input" placeholder="输入数值或字符串..." rows="3"></textarea>
+      </div>
+
+      <div class="radix-controls">
+        <div class="codec-row">
+          <label class="codec-label" for="radix-source">输入类型</label>
+          <select class="codec-select" id="radix-source">
+            <optgroup label="数值（按进制解析）">
+              <option value="2">二进制 (Base2)</option>
+              <option value="8">八进制 (Base8)</option>
+              <option value="10" selected>十进制 (Base10)</option>
+              <option value="16">十六进制 (Base16)</option>
+            </optgroup>
+            <optgroup label="编码字符串">
+              <option value="text">UTF-8 文本</option>
+              <option value="base32">Base32</option>
+              <option value="base58">Base58</option>
+              <option value="base62">Base62</option>
+              <option value="base64">Base64</option>
+              <option value="hex-str">Hex 字符串（如 48656c6c6f）</option>
+          </optgroup>
+          </select>
+        </div>
+        <label class="hmac-toggle">
+          <input type="checkbox" id="radix-treat-as-num" />
+          <span>数值模式（仅当输入是大整数时勾选；不勾选时按字节序列处理）</span>
+        </label>
+      </div>
+
+      <div class="codec-actions">
+        <button class="btn btn-primary" id="btn-convert">转换</button>
+        <button class="btn btn-secondary" id="btn-clear">清空</button>
+        <span class="text-meta" id="radix-meta"></span>
+      </div>
+
+      <!-- 数值结果 -->
+      <div class="radix-results" id="radix-num-results">
+        <div class="codec-row">
+          <label class="codec-label">二进制 (Base2)</label>
+          <textarea class="codec-input radix-output" id="out-base2" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">八进制 (Base8)</label>
+          <textarea class="codec-input radix-output" id="out-base8" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">十进制 (Base10)</label>
+          <textarea class="codec-input radix-output" id="out-base10" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">十六进制 (Base16)</label>
+          <textarea class="codec-input radix-output" id="out-base16" rows="2" readonly></textarea>
+        </div>
+      </div>
+
+      <!-- 编码结果 -->
+      <div class="radix-results">
+        <div class="codec-row">
+          <label class="codec-label">UTF-8 文本</label>
+          <textarea class="codec-input radix-output" id="out-text" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">Hex 字符串</label>
+          <textarea class="codec-input radix-output" id="out-hexstr" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">Base32</label>
+          <textarea class="codec-input radix-output" id="out-base32" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">Base58</label>
+          <textarea class="codec-input radix-output" id="out-base58" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">Base62</label>
+          <textarea class="codec-input radix-output" id="out-base62" rows="2" readonly></textarea>
+        </div>
+        <div class="codec-row">
+          <label class="codec-label">Base64</label>
+          <textarea class="codec-input radix-output" id="out-base64" rows="2" readonly></textarea>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>
