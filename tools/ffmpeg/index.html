@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="音视频格式转换 —— 浏览器本地处理，文件不上传云端" />
-  <title>音视频转换 - 网页工具箱</title>
+  <meta name="description" content="多媒体格式转换 —— 浏览器本地处理音视频图片，文件不上传云端" />
+  <title>多媒体转换 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/ffmpeg-C8GpiTA2.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/ffmpeg-B5nAoz7Y.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/ffmpeg-efpfmSaD.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/ffmpeg-6rqlz085.css">
 </head>
 <body>
   <main class="ffmpeg-container">
@@ -22,7 +22,7 @@
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <p class="upload-text">选择或拖入媒体文件</p>
-        <p class="upload-hint" id="upload-hint">支持多选 · MP4 / MOV / MKV / MTS / WebM / MP3 / WAV / FLAC 等</p>
+        <p class="upload-hint" id="upload-hint">支持多选 · MP4 / MOV / MKV / MTS / WebM / MP3 / WAV / FLAC / JPG / PNG 等</p>
         <input type="file" id="file-input" class="file-input-hidden" multiple />
       </div>
       <!-- 文件列表 -->
@@ -97,6 +97,9 @@
     <section class="mode-section glass">
       <div class="mode-tabs" id="mode-tabs">
         <button class="mode-tab mode-tab--active" data-mode="convert">格式转换</button>
+        <button class="mode-tab" data-mode="image-convert">图片转换</button>
+        <button class="mode-tab" data-mode="video-convert">视频转换</button>
+        <button class="mode-tab" data-mode="audio-convert">音频转换</button>
         <button class="mode-tab" data-mode="extract-audio">音频提取</button>
         <button class="mode-tab" data-mode="trim">视频剪辑</button>
       </div>
@@ -329,6 +332,194 @@
         </svg>
         <span>直通模式仅做容器封装，不重新编码。如需重编码请选择具体编码器。</span>
       </p>
+      </div>
+    </section>
+
+    <!-- ========== 图片转换设置（简化） ========== -->
+    <section class="settings-section glass settings-section--expanded" id="settings-image-convert" hidden>
+      <div class="settings-header" data-toggle="settings-image-convert-body">
+        <div class="settings-header__title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <span>图片转换参数</span>
+          <span class="settings-header__hint">单纯图片格式互转</span>
+        </div>
+        <svg class="settings-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+      <div class="settings-body" id="settings-image-convert-body">
+        <div class="setting">
+          <label class="setting__label" for="image-convert-format">输出格式</label>
+          <select class="setting__select" id="image-convert-format">
+            <option value="jpg">JPG（有损 · 通用）</option>
+            <option value="png">PNG（无损 · 通用）</option>
+            <option value="webp">WebP（现代 · 高压缩）</option>
+            <option value="bmp">BMP（无损 · 体积大）</option>
+            <option value="tiff">TIFF（无损 · 印刷）</option>
+          </select>
+        </div>
+        <div class="setting" id="setting-image-quality">
+          <label class="setting__label" for="image-convert-quality">质量</label>
+          <select class="setting__select" id="image-convert-quality">
+            <option value="high">高（JPG q=2 / WebP q=85）</option>
+            <option value="medium">中（JPG q=5 / WebP q=75）</option>
+            <option value="low">低（JPG q=10 / WebP q=60）</option>
+          </select>
+          <p class="setting__hint">仅对有损格式（JPG/WebP）生效；PNG/BMP/TIFF 始终无损</p>
+        </div>
+        <p class="copy-mode-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span>简化模式：仅做格式封装与重编码，不调整分辨率/裁剪。如需更多控制请用「格式转换」。</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- ========== 视频转换设置（简化 + 抽帧） ========== -->
+    <section class="settings-section glass settings-section--expanded" id="settings-video-convert" hidden>
+      <div class="settings-header" data-toggle="settings-video-convert-body">
+        <div class="settings-header__title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+          <span>视频转换参数</span>
+          <span class="settings-header__hint">视频格式互转 / 抽取单帧</span>
+        </div>
+        <svg class="settings-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+      <div class="settings-body" id="settings-video-convert-body">
+        <div class="setting">
+          <label class="setting__label">处理模式</label>
+          <div class="trim-mode-row">
+            <label class="radio-label">
+              <input type="radio" name="video-convert-submode" value="convert" checked />
+              <span>视频格式转换</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="video-convert-submode" value="frame" />
+              <span>抽取指定帧为图片</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 视频格式转换子设置 -->
+        <div id="video-convert-fmt-settings">
+          <div class="setting">
+            <label class="setting__label" for="video-convert-format">输出格式</label>
+            <select class="setting__select" id="video-convert-format">
+              <option value="mp4">MP4（H.264 · 兼容性最好）</option>
+              <option value="webm">WebM（VP9 · 现代）</option>
+              <option value="mkv">MKV（封装灵活）</option>
+              <option value="mov">MOV（Apple）</option>
+              <option value="avi">AVI（旧格式）</option>
+              <option value="gif">GIF（动图）</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label class="setting__label">质量预设</label>
+            <div class="quality-presets">
+              <button class="quality-preset" data-vc-quality="low">
+                <span class="quality-preset__name">低</span>
+                <span class="quality-preset__hint">CRF 28 · 体积小</span>
+              </button>
+              <button class="quality-preset quality-preset--active" data-vc-quality="medium">
+                <span class="quality-preset__name">中</span>
+                <span class="quality-preset__hint">CRF 23 · 均衡</span>
+              </button>
+              <button class="quality-preset" data-vc-quality="high">
+                <span class="quality-preset__name">高</span>
+                <span class="quality-preset__hint">CRF 18 · 接近原画质</span>
+              </button>
+            </div>
+            <p class="setting__hint">视频编码器自动按容器选择（MP4/MOV→H.264，WebM→VP9，GIF→gif）</p>
+          </div>
+        </div>
+
+        <!-- 抽帧子设置 -->
+        <div id="video-convert-frame-settings" hidden>
+          <div class="setting">
+            <label class="setting__label" for="frame-timestamp">抽帧时间点</label>
+            <input type="text" class="setting__input" id="frame-timestamp" placeholder="00:00:05 或 5.5（秒）" value="00:00:00" />
+            <p class="setting__hint">支持 HH:MM:SS 或秒数（可带小数）。每输入一个时间点对一个视频抽帧</p>
+          </div>
+          <div class="setting">
+            <label class="setting__label" for="frame-output-format">输出图片格式</label>
+            <select class="setting__select" id="frame-output-format">
+              <option value="jpg">JPG（体积小）</option>
+              <option value="png">PNG（无损）</option>
+              <option value="webp">WebP（现代）</option>
+            </select>
+          </div>
+          <p class="copy-mode-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>使用 -ss 精准定位 + -frames:v 1 抽取单帧。多文件时按相同时间点批量处理。</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 音频转换设置（简化） ========== -->
+    <section class="settings-section glass settings-section--expanded" id="settings-audio-convert" hidden>
+      <div class="settings-header" data-toggle="settings-audio-convert-body">
+        <div class="settings-header__title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/>
+            <circle cx="6" cy="18" r="3"/>
+            <circle cx="18" cy="16" r="3"/>
+          </svg>
+          <span>音频转换参数</span>
+          <span class="settings-header__hint">单纯音频格式互转</span>
+        </div>
+        <svg class="settings-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+      <div class="settings-body" id="settings-audio-convert-body">
+        <div class="setting">
+          <label class="setting__label" for="audio-convert-format">输出格式</label>
+          <select class="setting__select" id="audio-convert-format">
+            <option value="mp3">MP3（通用 · 有损）</option>
+            <option value="aac">AAC（通用 · 有损）</option>
+            <option value="wav">WAV（PCM 无损）</option>
+            <option value="flac">FLAC（无损压缩）</option>
+            <option value="ogg">OGG（Vorbis）</option>
+            <option value="opus">Opus（现代 · 高效）</option>
+            <option value="m4a">M4A（AAC 容器）</option>
+          </select>
+        </div>
+        <div class="setting" id="setting-audio-convert-bitrate">
+          <label class="setting__label" for="audio-convert-bitrate">码率</label>
+          <select class="setting__select" id="audio-convert-bitrate">
+            <option value="128k">128 kbps</option>
+            <option value="192k" selected>192 kbps</option>
+            <option value="256k">256 kbps</option>
+            <option value="320k">320 kbps</option>
+            <option value="lossless">无损（仅 WAV/FLAC 有效）</option>
+          </select>
+          <p class="setting__hint">码率仅对有损格式生效；WAV/FLAC 始终无损</p>
+        </div>
+        <p class="copy-mode-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span>简化模式：仅做格式封装与重编码。如需调整采样率/声道等请用「格式转换」。</span>
+        </p>
       </div>
     </section>
 

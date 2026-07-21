@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="文档转换工具 —— PDF/Word/Excel/Markdown/HTML 本地互转，文件不上传云端" />
+  <title>文档转换 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/document-CL2w-3bQ.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/document-k3Z0D_KS.css">
+</head>
+<body>
+  <main class="doc-container">
+    <!-- 操作分类 Tab -->
+    <section class="mode-section glass">
+      <div class="mode-tabs" id="mode-tabs">
+        <button class="mode-tab mode-tab--active" data-tab="pdf">PDF</button>
+        <button class="mode-tab" data-tab="word">Word</button>
+        <button class="mode-tab" data-tab="excel">Excel / CSV</button>
+        <button class="mode-tab" data-tab="mdhtml">MD / HTML / TXT</button>
+        <button class="mode-tab" data-tab="rtf">RTF</button>
+        <button class="mode-tab" data-tab="epub">EPUB</button>
+      </div>
+    </section>
+
+    <!-- 每个 Tab 的操作面板 -->
+    <section class="tab-panel tab-panel--active" data-panel="pdf">
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="pdf-op">操作类型</label>
+          <select class="setting__select" id="pdf-op">
+            <option value="pdf-to-image">PDF → 图片（每页一张）</option>
+            <option value="image-to-pdf">图片 → PDF（多图合并）</option>
+            <option value="pdf-to-text">PDF → 文本</option>
+            <option value="pdf-merge">PDF 合并</option>
+            <option value="pdf-split">PDF 拆分（按页码区间）</option>
+            <option value="pdf-rotate">PDF 旋转</option>
+            <option value="pdf-extract">PDF 提取指定页</option>
+          </select>
+        </div>
+        <div class="setting" id="pdf-image-format-setting" hidden>
+          <label class="setting__label" for="pdf-image-format">输出图片格式</label>
+          <select class="setting__select" id="pdf-image-format">
+            <option value="png">PNG（无损）</option>
+            <option value="jpg">JPG（体积小）</option>
+          </select>
+        </div>
+        <div class="setting" id="pdf-rotate-setting" hidden>
+          <label class="setting__label" for="pdf-rotate-angle">旋转角度</label>
+          <select class="setting__select" id="pdf-rotate-angle">
+            <option value="90">顺时针 90°</option>
+            <option value="180">180°</option>
+            <option value="270">逆时针 90°</option>
+          </select>
+        </div>
+        <div class="setting" id="pdf-split-setting" hidden>
+          <label class="setting__label" for="pdf-split-ranges">拆分区间</label>
+          <input type="text" class="setting__input" id="pdf-split-ranges" placeholder="如：1-3, 4-6, 7-9（每个区间输出一个 PDF）" />
+          <p class="setting__hint">用逗号分隔多个区间，每个区间生成一个 PDF。页码从 1 开始。</p>
+        </div>
+        <div class="setting" id="pdf-extract-setting" hidden>
+          <label class="setting__label" for="pdf-extract-pages">提取页码</label>
+          <input type="text" class="setting__input" id="pdf-extract-pages" placeholder="如：1, 3, 5-8" />
+          <p class="setting__hint">逗号分隔单页或区间，页码从 1 开始</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="word" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="word-op">操作类型</label>
+          <select class="setting__select" id="word-op">
+            <option value="word-to-html">Word → HTML</option>
+            <option value="word-to-text">Word → 纯文本</option>
+            <option value="word-to-pdf">Word → PDF（经 HTML）</option>
+            <option value="md-to-word">Markdown → Word</option>
+            <option value="html-to-word">HTML → Word</option>
+            <option value="txt-to-word">TXT → Word</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="excel" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="excel-op">操作类型</label>
+          <select class="setting__select" id="excel-op">
+            <option value="excel-to-csv">Excel → CSV</option>
+            <option value="excel-to-json">Excel → JSON</option>
+            <option value="csv-to-json">CSV → JSON</option>
+            <option value="json-to-csv">JSON → CSV</option>
+            <option value="csv-to-excel">CSV → Excel</option>
+          </select>
+        </div>
+        <div class="setting" id="excel-sheet-setting" hidden>
+          <label class="setting__label" for="excel-sheet">工作表索引</label>
+          <input type="number" class="setting__input" id="excel-sheet" value="0" min="0" />
+          <p class="setting__hint">从 0 开始，默认读取第一个工作表</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="mdhtml" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="mdhtml-op">操作类型</label>
+          <select class="setting__select" id="mdhtml-op">
+            <option value="md-to-html">Markdown → HTML</option>
+            <option value="html-to-md">HTML → Markdown</option>
+            <option value="md-to-pdf">Markdown → PDF</option>
+            <option value="html-to-pdf">HTML → PDF</option>
+            <option value="txt-to-pdf">TXT → PDF</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="rtf" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="rtf-op">操作类型</label>
+          <select class="setting__select" id="rtf-op">
+            <option value="rtf-to-text">RTF → 文本</option>
+            <option value="rtf-to-html">RTF → HTML</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-panel="epub" hidden>
+      <div class="op-section glass">
+        <div class="setting">
+          <label class="setting__label" for="epub-op">操作类型</label>
+          <select class="setting__select" id="epub-op">
+            <option value="epub-to-text">EPUB → 文本</option>
+            <option value="epub-to-html">EPUB → HTML</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 文件上传区（动态显示） -->
+    <section class="upload-section glass" id="upload-section">
+      <div class="upload-area" id="upload-area">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p class="upload-text" id="upload-text">选择或拖入文件</p>
+        <p class="upload-hint" id="upload-hint">支持多选</p>
+        <input type="file" id="file-input" class="file-input-hidden" multiple />
+      </div>
+      <div class="file-list" id="file-list" hidden>
+        <div class="file-list__header">
+          <span class="file-list__count" id="file-list-count">0 个文件</span>
+          <button class="btn btn-sm btn-clear-all" id="btn-clear-all">清空全部</button>
+        </div>
+        <div class="file-list__items" id="file-list-items"></div>
+      </div>
+    </section>
+
+    <!-- 文本输入区（动态显示） -->
+    <section class="text-input-section glass" id="text-input-section" hidden>
+      <div class="setting">
+        <label class="setting__label" for="text-input" id="text-input-label">输入内容</label>
+        <textarea class="text-input" id="text-input" placeholder="在此粘贴内容..." spellcheck="false"></textarea>
+      </div>
+    </section>
+
+    <!-- 转换按钮 -->
+    <button class="btn btn-primary btn-convert" id="btn-convert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+        <polyline points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      开始转换
+    </button>
+
+    <!-- 进度区 -->
+    <section class="progress-section glass" id="progress-section" hidden>
+      <div class="progress-stage__header">
+        <span class="progress-stage__title" id="progress-stage-title">处理中...</span>
+        <span class="progress-stage__pct" id="progress-stage-pct"></span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-bar__fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-stage__status" id="progress-stage-status"></div>
+    </section>
+
+    <!-- 结果区：文本输出 -->
+    <section class="result-section glass" id="text-result-section" hidden>
+      <div class="result-header">
+        <h3>转换结果</h3>
+        <div class="result-actions">
+          <button class="btn btn-sm btn-secondary" id="btn-copy-result">复制</button>
+          <button class="btn btn-sm btn-secondary" id="btn-download-text" hidden>下载为文件</button>
+        </div>
+      </div>
+      <pre class="text-result" id="text-result"></pre>
+    </section>
+
+    <!-- 结果区：文件下载 -->
+    <section class="result-section glass" id="file-result-section" hidden>
+      <div class="result-header">
+        <h3>处理完成</h3>
+        <p class="result-stats" id="result-stats"></p>
+      </div>
+      <ul class="result-list" id="result-list"></ul>
+      <div class="result-actions" id="result-actions">
+        <button class="btn btn-primary" id="btn-download-all" hidden>下载全部</button>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>
