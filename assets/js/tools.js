@@ -278,6 +278,50 @@ const TOOLS = [
     path: '/tools/sqlcron/',
     available: true,
   },
+  {
+    id: 'unicode',
+    name: 'Unicode 查看器',
+    icon: 'unicode',
+    desc: '字符分析、码点查询、字符块浏览，处理代理对',
+    category: 'dev',
+    tags: ['本地处理', '字符分析'],
+    aliases: ['unicode', '码点', '字符', '字符分析', 'codepoint', 'utf-8', 'utf-16', '代理对', 'emoji', '字符块', '字符编码', '字符查询', 'u+', '转义', 'unicode查看器'],
+    path: '/tools/unicode/',
+    available: true,
+  },
+  {
+    id: 'crypto',
+    name: '加解密工具',
+    icon: 'crypto',
+    desc: 'AES 加解密 + 古典密码（凯撒/维吉尼亚/XOR）+ 编码（Base32/摩斯）',
+    category: 'dev',
+    tags: ['本地处理', 'Web Crypto'],
+    aliases: ['加密', '解密', '加解密', 'crypto', 'aes', 'aes-gcm', 'aes-cbc', 'pbkdf2', '凯撒', 'caesar', 'rot13', 'rot47', '维吉尼亚', 'vigenere', 'atbash', 'xor', '仿射', 'affine', '摩斯', 'morse', 'base32', '古典密码', '密码学'],
+    path: '/tools/crypto/',
+    available: true,
+  },
+  {
+    id: 'svg',
+    name: 'SVG 优化器',
+    icon: 'svg',
+    desc: '压缩 SVG 体积，去除注释/命名空间/默认值，预览对比',
+    category: 'media',
+    tags: ['本地处理', 'SVG 压缩'],
+    aliases: ['svg', 'svg优化', 'svg压缩', 'svg optimizer', '压缩svg', '去除命名空间', 'inkscape', 'sodipodi', '矢量图', '矢量图压缩', 'svg minify', 'svg clean'],
+    path: '/tools/svg/',
+    available: true,
+  },
+  {
+    id: 'ocr',
+    name: 'OCR 图片识字',
+    icon: 'ocr',
+    desc: '本地 OCR 识别图片文字，支持中英文，基于 tesseract.js',
+    category: 'media',
+    tags: ['本地处理', '中英文识别'],
+    aliases: ['ocr', '图片识字', '文字识别', '图片转文字', 'tesseract', '图片识别', '识别文字', '图像识别', '图片提取文字', '中英文ocr', '文字提取'],
+    path: '/tools/ocr/',
+    available: true,
+  },
 ];
 
 /**
@@ -310,6 +354,10 @@ const ICONS = {
   radix: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z M14 14h6v6h-6z M10 7h4 M14 17h-4"/></svg>`,
   chmod: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/><path d="M12 11v3"/></svg>`,
   sqlcron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>`,
+  unicode: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h2v8 M9 12h2 M9 16h2"/><circle cx="16" cy="9" r="1.5" fill="currentColor"/><circle cx="16" cy="15" r="1.5" fill="currentColor"/></svg>`,
+  crypto: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3z"/><path d="M9 12l2 2 4-4"/></svg>`,
+  svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/><polyline points="2 15.5 12 8.5 22 15.5"/><line x1="12" y1="2" x2="12" y2="8.5"/></svg>`,
+  ocr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="18" x2="15" y2="18"/><line x1="6" y1="9" x2="6" y2="15"/><line x1="18" y1="9" x2="18" y2="15"/></svg>`,
 };
 
 /**
