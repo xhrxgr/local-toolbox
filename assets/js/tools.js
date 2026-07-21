@@ -234,6 +234,50 @@ const TOOLS = [
     path: '/tools/document/',
     available: true,
   },
+  {
+    id: 'text',
+    name: '文本工具',
+    icon: 'text',
+    desc: '字数统计、大小写转换、去重、排序、翻转、替换、Tab/空格互转',
+    category: 'dev',
+    tags: ['本地处理', '多操作'],
+    aliases: ['文本工具', '文本', '字数统计', '字符数', '大小写转换', '去重', '去空行', '排序', '翻转', '替换', '正则替换', 'tab转空格', '空格转tab', '加前缀', '加后缀', '加行号', 'camelcase', 'snake_case', 'kebab-case', 'text'],
+    path: '/tools/text/',
+    available: true,
+  },
+  {
+    id: 'radix',
+    name: '进制转换',
+    icon: 'radix',
+    desc: '2/8/10/16 进制 + Base32/58/62/64 互转，实时联动',
+    category: 'encoding',
+    tags: ['本地处理', '多格式'],
+    aliases: ['进制转换', '进制', '二进制', '八进制', '十进制', '十六进制', 'base32', 'base58', 'base62', 'base64', 'hex', 'hex字符串', '字节', 'radix', '数制'],
+    path: '/tools/radix/',
+    available: true,
+  },
+  {
+    id: 'chmod',
+    name: '权限计算器',
+    icon: 'chmod',
+    desc: 'Unix chmod 数字/符号双向转换，含 setuid/setgid/sticky 特殊位',
+    category: 'dev',
+    tags: ['本地处理', 'Unix/Linux'],
+    aliases: ['chmod', '权限计算器', '权限', 'unix权限', 'linux权限', 'rwx', '文件权限', 'setuid', 'setgid', 'sticky', '755', '644', '777', '数字转符号', '符号转数字'],
+    path: '/tools/chmod/',
+    available: true,
+  },
+  {
+    id: 'sqlcron',
+    name: 'SQL/CRON',
+    icon: 'sqlcron',
+    desc: 'SQL 美化/压缩 + CRON 表达式解释与下次运行时间计算',
+    category: 'dev',
+    tags: ['本地处理', '多方言'],
+    aliases: ['sql', 'sql格式化', 'sql美化', 'sql压缩', 'cron', 'cron表达式', 'cron解释', '定时任务', '计划任务', 'sql formatter', 'cronstrue', '下次运行时间', 'mysql', 'postgresql', 'sqlite', 'oracle'],
+    path: '/tools/sqlcron/',
+    available: true,
+  },
 ];
 
 /**
@@ -262,6 +306,10 @@ const ICONS = {
   markdown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15V9l3 3 3-3v6 M17 9v6 M17 15l-2-2 M17 15l2-2"/></svg>`,
   totp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/><path d="M12 11v3"/></svg>`,
   document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>`,
+  text: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>`,
+  radix: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z M14 14h6v6h-6z M10 7h4 M14 17h-4"/></svg>`,
+  chmod: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/><path d="M12 11v3"/></svg>`,
+  sqlcron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>`,
 };
 
 /**
