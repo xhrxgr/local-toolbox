@@ -10,7 +10,7 @@ mse-test.png
 Thumbs.db
 
 # AI 助手内部文档（不公开）
-AGENTS.md
+# AGENTS.md 已纳入 git 跟踪（用户 2026-07-21 起改为公开保留跨对话上下文）
 conversation_summary.md
 .screenshots/
 sw.png
