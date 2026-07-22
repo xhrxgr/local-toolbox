@@ -1,7 +1,7 @@
 /**
  * FFmpeg 多媒体转换工具
  * 浏览器本地处理，文件不上传云端
- * 支持：格式转换 / 图片转换 / 视频转换（含抽帧） / 音频转换 / 提取音频 / 视频裁剪
+ * 支持：图片转换 / 视频转换（含抽帧） / 音频转换 / 提取音频 / 视频剪辑 / 高级转换
  */
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
@@ -11,7 +11,7 @@ let loadingSectionVisible = false;
 let files = [];                // 所有文件
 let selectedIndex = -1;        // 当前选中的文件索引
 let inputFile = null;          // 兼容旧代码：当前选中的文件
-let currentMode = 'convert';
+let currentMode = 'image-convert';
 let selectedQuality = 'high';
 
 /* ========== 质量预设 (CRF) ========== */
@@ -387,7 +387,7 @@ function getMimeType(format) {
   return `video/${format}`;
 }
 
-/* ========== 格式转换 ========== */
+/* ========== 高级转换 ========== */
 /* ========== 任务队列 + 阶段化进度控制 ========== */
 const Stage = {
   IDLE: 'idle',
@@ -2203,7 +2203,7 @@ export function initFFmpeg() {
   });
 
   // === 质量选择 ===
-  // 格式转换 tab 的质量按钮（data-quality）
+  // 高级转换 tab 的质量按钮（data-quality）
   document.querySelectorAll('.quality-preset[data-quality]').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.quality-preset[data-quality]').forEach((b) => b.classList.remove('quality-preset--active'));

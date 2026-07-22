@@ -10,7 +10,7 @@ const TOOLS = [
     desc: '本地 FFmpeg 音视频图片格式转换，文件不上传云端',
     category: 'media',
     tags: ['本地处理', '隐私安全'],
-    aliases: ['ffmpeg', '多媒体', '视频转换', '音频转换', '图片转换', '格式转换', '转码', 'video', 'audio', 'image', 'convert', 'mp4', 'mp3', 'mkv', 'webm', '裁剪', '提取音频', '提取帧', '抽帧', '去隔行', 'amv'],
+    aliases: ['ffmpeg', '多媒体', '视频转换', '音频转换', '图片转换', '格式转换', '高级转换', '转码', 'video', 'audio', 'image', 'convert', 'mp4', 'mp3', 'mkv', 'webm', '裁剪', '提取音频', '提取帧', '抽帧', '去隔行', 'amv'],
     path: '/tools/ffmpeg/',
     available: true,
   },
