@@ -61,6 +61,15 @@ location / {
 
 > 注意：COEP `require-corp` 仅对 `/tools/ffmpeg` 路径设置。网络工具需要跨域 fetch（DoH / IP 查询 / 测速目标），全局设置 COEP 会导致这些请求被阻塞。
 
+### GitHub Pages（静态托管）
+
+GitHub Pages 无法配置 COOP/COEP 响应头，FFmpeg 页面通过 `coi-serviceworker`（`public/tools/ffmpeg/coi-serviceworker.js`）在同源内补发这两个头来实现跨源隔离：
+
+- 页面 `<head>` 加载 `coi-serviceworker.js`（Vite 构建时自动改写为带 `base` 的绝对路径）
+- SW 默认 scope 为其所在目录 `/tools/ffmpeg/`，只影响 FFmpeg 页，不影响网络工具等其他页面
+- **首次访问**页面会自动刷新一次以启用隔离（注册 SW 后 reload，之后 `SharedArrayBuffer` 可用）
+- 开发模式无需 SW：`vite.config.js` 的 `conditional-coep` 插件已为 `/tools/ffmpeg` 配置好 COOP/COEP
+
 ## 项目结构
 
 ```

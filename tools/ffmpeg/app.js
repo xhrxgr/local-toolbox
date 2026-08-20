@@ -167,12 +167,33 @@ async function fetchCoreFile(file) {
   throw new Error(`加载 ${file.name} 失败: ${lastErr?.message || '所有 CDN 源均不可用'}`);
 }
 
+// SharedArrayBuffer 需要跨源隔离。GitHub Pages 无法配置 COOP/COEP 响应头，
+// 本页通过 coi-serviceworker 在同源内补发这两个头来实现隔离；首次访问会自动刷新一次以启用。
+// 若用户刚打开页面就点转换、SW 尚未接管，这里会先等待隔离生效再继续，避免误报错误。
+function waitForCrossOriginIsolation(timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('当前环境不支持 SharedArrayBuffer（FFmpeg 多线程必需）。首次访问会自动刷新一次以启用隔离，若反复重试仍失败，请使用本地 npm run dev 或自托管服务器（需配置 COOP/COEP 响应头）运行此工具。'));
+    }, timeoutMs);
+    const check = () => {
+      if (self.crossOriginIsolated) {
+        clearTimeout(timer);
+        resolve();
+      } else {
+        setTimeout(check, 200);
+      }
+    };
+    check();
+  });
+}
+
 async function loadFFmpeg() {
   if (ffmpeg) return ffmpeg;
 
-  // GitHub Pages 等静态托管不支持 COOP/COEP 头，SharedArrayBuffer 不可用
+  // GitHub Pages 等静态托管无法配置 COOP/COEP 头，本页用 coi-serviceworker 实现跨源隔离；
+  // 若 SW 尚未接管（首次访问的自动刷新间隙），先等待隔离生效再继续。
   if (!self.crossOriginIsolated) {
-    throw new Error('当前环境不支持 SharedArrayBuffer（FFmpeg 多线程必需）。请使用本地 npm run dev 或自托管服务器（需配置 COOP/COEP 响应头）运行此工具。');
+    await waitForCrossOriginIsolation();
   }
 
   const loadingSection = document.getElementById('loading-section');
