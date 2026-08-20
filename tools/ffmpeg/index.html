@@ -6,6 +6,8 @@
   <meta name="description" content="多媒体格式转换 —— 浏览器本地处理音视频图片，文件不上传云端" />
   <title>多媒体转换 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <!-- 与 dev 服务器一致使用 require-corp（credentialless 在 Chrome 下会拦掉 FFmpeg 的 module worker） -->
+  <script>window.coi = { coepCredentialless: () => false };</script>
   <script src="/local-toolbox/tools/ffmpeg/coi-serviceworker.js"></script>
   <script type="module" crossorigin src="/local-toolbox/assets/ffmpeg-DR__BxgB.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
