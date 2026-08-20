@@ -47,7 +47,8 @@ npm run preview  # 预览构建产物
 `npm run build` 产出 `dist/`，托管到任意静态服务器即可。Nginx 示例：
 
 ```nginx
-# FFmpeg.wasm 多线程需要 SharedArrayBuffer，必须启用 COOP/COEP
+# 当前使用单线程 FFmpeg 内核（@ffmpeg/core 不依赖 SharedArrayBuffer），无需 COOP/COEP。
+# 若改用多线程内核(@ffmpeg/core-mt)，则必须为 /tools/ffmpeg/ 开启 COOP/COEP。
 location /tools/ffmpeg/ {
   add_header Cross-Origin-Opener-Policy "same-origin";
   add_header Cross-Origin-Embedder-Policy "require-corp";
@@ -63,12 +64,7 @@ location / {
 
 ### GitHub Pages（静态托管）
 
-GitHub Pages 无法配置 COOP/COEP 响应头，FFmpeg 页面通过 `coi-serviceworker`（`public/tools/ffmpeg/coi-serviceworker.js`）在同源内补发这两个头来实现跨源隔离：
-
-- 页面 `<head>` 加载 `coi-serviceworker.js`（Vite 构建时自动改写为带 `base` 的绝对路径）
-- SW 默认 scope 为其所在目录 `/tools/ffmpeg/`，只影响 FFmpeg 页，不影响网络工具等其他页面
-- **首次访问**页面会自动刷新一次以启用隔离（注册 SW 后 reload，之后 `SharedArrayBuffer` 可用）
-- 开发模式无需 SW：`vite.config.js` 的 `conditional-coep` 插件已为 `/tools/ffmpeg` 配置好 COOP/COEP
+当前依赖单线程内核，无需任何特殊处理，构建产物直接推送到 `gh-pages` 分支即可使用。COOP/COEP 不可配置也不会导致报错（单线程内核不使用 SharedArrayBuffer）。若将来改为多线程内核（`@ffmpeg/core-mt`），才需要考虑配置跨源隔离，之前使用的 `coi-serviceworker` 方案已被移除（固定服务头到 worker 响应上反而会导致 Chrome 拒绝加载内核）。
 
 ## 项目结构
 
