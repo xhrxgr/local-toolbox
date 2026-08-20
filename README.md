@@ -64,7 +64,7 @@ location / {
 
 ### GitHub Pages（静态托管）
 
-当前依赖单线程内核，无需任何特殊处理，构建产物直接推送到 `gh-pages` 分支即可使用。COOP/COEP 不可配置也不会导致报错（单线程内核不使用 SharedArrayBuffer）。若将来改为多线程内核（`@ffmpeg/core-mt`），才需要考虑配置跨源隔离，之前使用的 `coi-serviceworker` 方案已被移除（固定服务头到 worker 响应上反而会导致 Chrome 拒绝加载内核）。
+当前依赖单线程内核，无需任何特殊处理，构建产物直接推送到 `gh-pages` 分支即可使用。COOP/COEP 不可配置也不会导致报错（单线程内核不使用 SharedArrayBuffer）。若将来改为多线程内核（`@ffmpeg/core-mt`），才需要考虑配置跨源隔离。`tools/ffmpeg/coi-serviceworker.js` 现为兼容性清理脚本：历史上的访客浏览器可能残留旧版隔离 SW，放在相同路径可让浏览器自动替换并注销旧 SW、清理其缓存（构建产物仍会包含此文件）。
 
 ## 项目结构
 
