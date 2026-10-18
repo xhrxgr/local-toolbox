@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
+  <title>扫描文档 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-3PSfJftN.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-BKf-hsPp.css">
+</head>
+<body>
+  <main class="scan-app">
+    <!-- 顶栏 -->
+    <header class="scan-header glass">
+      <div class="scan-header__title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <path d="M9 13l2 2 4-4"/>
+        </svg>
+        <h1>扫描文档</h1>
+        <span class="scan-header__sub">图片 → 文档 · 本地处理</span>
+      </div>
+      <div class="scan-header__actions">
+        <button class="btn btn-sm btn-secondary" id="btn-import" type="button">导入图片</button>
+        <button class="btn btn-sm btn-clear-all" id="btn-clear" type="button">清空</button>
+        <input type="file" id="file-input" accept="image/*" multiple hidden />
+      </div>
+    </header>
+
+    <div class="scan-body">
+      <!-- 左侧：页面列表 -->
+      <aside class="scan-pages glass" id="scan-pages">
+        <div class="scan-pages__head">
+          <span class="scan-pages__count" id="page-count">0 页</span>
+          <span class="scan-pages__tip">拖拽调整顺序</span>
+        </div>
+        <div class="scan-pages__list" id="page-list"></div>
+        <div class="scan-drop" id="scan-drop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>拖入图片</p>
+          <p class="scan-drop__hint">或点击「导入图片」，支持 Ctrl+V 粘贴</p>
+        </div>
+      </aside>
+
+      <!-- 右侧：编辑区 -->
+      <section class="scan-editor">
+        <div class="scan-toolbar glass" id="scan-toolbar">
+          <div class="scan-toolbar__group" role="group" aria-label="文档效果">
+            <span class="scan-toolbar__label">效果</span>
+            <div class="segmented" id="filter-segmented">
+              <button class="segmented__btn segmented__btn--active" data-filter="original" type="button">原图</button>
+              <button class="segmented__btn" data-filter="bw" type="button">黑白</button>
+              <button class="segmented__btn" data-filter="enhance" type="button">增强</button>
+            </div>
+          </div>
+          <div class="scan-toolbar__group" role="group" aria-label="旋转">
+            <span class="scan-toolbar__label">旋转</span>
+            <button class="btn btn-sm btn-secondary" id="btn-rotate-left" type="button" title="左转 90 度">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+              </svg>
+            </button>
+            <button class="btn btn-sm btn-secondary" id="btn-rotate-right" type="button" title="右转 90 度">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
+          </div>
+          <div class="scan-toolbar__group" role="group" aria-label="四角裁剪">
+            <span class="scan-toolbar__label">四角</span>
+            <button class="btn btn-sm btn-secondary" id="btn-detect" type="button">自动识别</button>
+            <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button">重置</button>
+          </div>
+          <label class="scan-toolbar__check">
+            <input type="checkbox" id="chk-live-preview" checked />
+            <span>实时矫正预览</span>
+          </label>
+        </div>
+
+        <div class="scan-canvas-wrap glass" id="canvas-wrap">
+          <canvas id="scan-canvas" hidden></canvas>
+          <svg class="corner-layer" id="corner-layer" hidden></svg>
+          <div class="scan-empty" id="editor-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M9 3v18" stroke-dasharray="2 2"/>
+            </svg>
+            <p>导入图片后在此编辑</p>
+            <p class="scan-empty__hint">自动识别文档四角 · 黑白 / 增强滤镜 · 曲面矫正 · 合并导出 PDF</p>
+          </div>
+          <div class="scan-busy" id="scan-busy" hidden><span class="scan-busy__spinner"></span><span id="scan-busy-text">处理中...</span></div>
+          <div class="warp-preview" id="warp-preview" hidden>
+            <span class="warp-preview__label">矫正效果</span>
+            <img id="warp-preview-img" alt="曲面矫正效果预览" />
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 底部导出栏 -->
+    <footer class="scan-footer glass">
+      <div class="scan-footer__info" id="export-info">共 0 页</div>
+      <div class="scan-footer__actions">
+        <button class="btn btn-secondary" id="btn-export-one" type="button" disabled>导出当前页图片</button>
+        <button class="btn btn-primary" id="btn-export-pdf" type="button" disabled>合并导出 PDF</button>
+      </div>
+    </footer>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+  </main>
+
+</body>
+</html>
