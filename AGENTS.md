@@ -35,13 +35,13 @@
 └── package.json
 ```
 
-## 工具列表（29 个）
+## 工具列表（30 个）
 - **媒体 (media)**：ffmpeg（多媒体转换）、image（图片处理）、svg（SVG 优化器）、ocr（OCR 图片识字）
 - **时间 (time)**：countdown、stopwatch、timestamp、worldclock
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
 - **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）
 - **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown、text（文本工具）、chmod（权限计算器）、sqlcron（SQL/CRON）、unicode（Unicode 查看器）、crypto（加解密）
-- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）
+- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
 ## 首页搜索栏（核心功能）
@@ -130,22 +130,32 @@
 - 拖放/多选 + 文件列表，单个删除/清空，大文件警告
 - 队列处理 + 中断 + 单个下载/放弃，"下载全部"200ms 间隔
 
-## 文档转换工具功能（tools/document/，2026-07-21 新增，2026-07-22 扩展）
+## 文档转换工具功能（tools/document/，2026-07-21 新增，2026-07-22 扩展，2026-10-18 重构）
 ### 设计原则
 - 全部本地处理，文件不上传云端
 - 6 个 Tab：PDF / Word / Excel-CSV / MD-HTML-TXT / RTF / EPUB
 - 复用首页毛玻璃风格
+- 单一职责拆分：配置 / 加载表 / UI 行为 / 转换处理各自独立成模块，`app.js` 只做协调
 
-### 模块化架构（2026-07-22 重构）
-按 Tab 拆分 dynamic import，首屏只加载主入口 12-13KB，用户点击哪个 Tab 才动态加载哪个库：
-- `app.js`：主入口，UI 协调 + `TAB_MODULE_LOADERS` 表 + `buildContext()` 传递 ctx
-- `handlers/utils.js`：共享工具（`getBaseName` + `htmlToPdfBlob`，后者动态导入 jspdf + html2canvas）
+### 模块化架构（2026-10-18 重构：UI 行为拆分为 ui/ 模块）
+按 Tab 拆分 dynamic import，首屏只加载主入口约 24KB（gzip 7.5KB），用户点击哪个 Tab 才动态加载哪个重库：
+- `app.js`：协调层。Tab / 操作切换、UI 显隐编排、转换流程控制（防重入）、结果分发、事件绑定
+- `operations.js`：操作配置表（OPERATIONS + 文案表 + 阈值，纯配置无逻辑）
+- `tab-loaders.js`：`TAB_MODULE_LOADERS` 各 Tab 处理模块动态加载表
+- `handlers/utils.js`：共享纯函数（`getBaseName` / `escapeHtml` / `formatFileSize` / `getFileKind` / `htmlToPdfBlob`）
 - `handlers/pdf.js`：pdfjs-dist + pdf-lib（940KB chunk）
 - `handlers/word.js`：mammoth + docx + marked（846KB chunk）
 - `handlers/excel.js`：xlsx（423KB chunk）
 - `handlers/mdhtml.js`：marked + turndown + htmlToPdfBlob（12KB chunk）
 - `handlers/rtf.js`：自实现 RTF 解析器（5KB chunk，零依赖）
 - `handlers/epub.js`：jszip + DOMParser 手动解析 EPUB（99KB chunk）
+- `ui/toast.js`：Toast 通知（success / warning / error / info，替代 alert）
+- `ui/download.js`：单文件下载 + 多文件 JSZip 打包
+- `ui/clipboard.js`：复制（Clipboard API + execCommand 降级）
+- `ui/file-list.js`：文件集合状态 + 列表渲染 + 拖拽排序（多选操作）
+- `ui/preview.js`：HTML 类结果的「源码 / 预览」切换（sandbox iframe 渲染）
+- `ui/paste.js`：粘贴支持（文件类操作粘图片/文件，文本类操作粘纯文本）
+- `ui/metadata.js`：Excel 工作表下拉刷新、PDF 页数提示刷新（依赖文件内容，异步读，失败静默）
 
 ### 依赖库
 - `pdf-lib`：PDF 操作（合并/拆分/旋转/图片→PDF）
@@ -175,14 +185,14 @@
 - TXT → Word：按空行分段，单行内换行用 TextRun `{ break: 1 }`
 
 ### Excel/CSV Tab（5 种操作）
-- Excel(.xlsx/.xls) → CSV：SheetJS `sheet_to_csv`，可选工作表索引
-- Excel → JSON：SheetJS `sheet_to_json`
-- CSV → JSON：自实现解析（支持引号转义）
-- JSON → CSV：提取所有键做表头 + 逐行输出
-- CSV → Excel：SheetJS `book_new` + `aoa_to_sheet`
+- Excel(.xlsx/.xls) → CSV：SheetJS `sheet_to_csv`，可选工作表（下拉显示 sheet 名）+ 分隔符（逗号/分号/Tab）
+- Excel → JSON：SheetJS `sheet_to_json`，工作表下拉选择
+- CSV → JSON：SheetJS `XLSX.read(string)` 解析（支持引号转义）
+- JSON → CSV：SheetJS `json_to_sheet` + `sheet_to_csv`，分隔符可选
+- CSV → Excel：SheetJS `book_new` + 追加 sheet
 
 ### Markdown/HTML/TXT Tab（5 种操作）
-- Markdown → HTML：marked（GFM）
+- Markdown → HTML：marked（GFM），可选「封装完整 HTML 文档（含基础样式）」
 - HTML → Markdown：turndown（atx 标题 / fenced 代码块）
 - Markdown → PDF：marked → htmlToPdfBlob
 - HTML → PDF：htmlToPdfBlob
@@ -201,7 +211,7 @@ RTF Parser 支持的控制字：
 
 ### EPUB Tab（2 种操作，jszip + DOMParser 手动解析）
 - EPUB → 文本：解压 → 解析 OPF manifest/spine → 按阅读顺序提取每章 body.textContent → 用 `---` 分隔
-- EPUB → HTML：拼接所有章节 body.innerHTML，用 `<hr>` 分隔，包装为完整 HTML 文档（含基础样式）
+- EPUB → HTML：拼接所有章节 body.innerHTML，用 `<hr>` 分隔，包装为完整 HTML 文档（含基础样式）；图片转 base64 data URI 内嵌，导出后不失效
 
 EPUB 解析链路：
 ```
@@ -209,6 +219,7 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 → OPF 解析 manifest（id→href）+ spine（idref 顺序）
 → 按 spine 顺序读 XHTML，DOMParser 解析 application/xhtml+xml
 → 失败时降级为 text/html 解析
+→ HTML 模式：img[src] 相对路径 → zip 内读取 → base64 data URI 替换（支持 ../ 与 %XX 解码）
 ```
 
 ### 通用工具函数
@@ -219,17 +230,55 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - `htmlToDocxParagraphs(html)`：HTML → docx Paragraph[]（处理 ul/ol 展开为多段）
 
 ### 输入/输出模式
-- `inputType: 'file'`：显示文件上传区，accept 由 OPERATIONS 表控制
-- `inputType: 'text'`：显示 textarea，标签按操作类型动态切换
-- `outputType: 'text'`：结果展示在 `<pre class="text-result">` + 复制按钮 + 可选下载
-- `outputType: 'file'`：结果列表 + 单个下载按钮，多文件显示"下载全部"（200ms 间隔）
+- `inputType: 'file'`：显示文件上传区，accept 由 OPERATIONS 表控制；支持拖放、多选（可拖拽排序）、Ctrl+V 粘贴文件
+- `inputType: 'text'`：显示 textarea，标签按操作类型动态切换；支持直接粘贴、「从文件导入」上传文本文件
+- `outputType: 'text'`：结果展示在 `<pre class="text-result">` + 复制按钮 + 可选下载；HTML 类结果额外提供「源码 / 预览」切换
+- `outputType: 'file'`：结果列表 + 单个下载按钮，多文件显示「下载全部」（200ms 间隔）与「打包为 ZIP」
 
 ### UI 特点
 - 6 个 Tab 切换时清空结果区
 - 操作类型 select 切换时按 `inputType` 显隐文件区/文本区
-- PDF 操作选项（图片格式/旋转角度/拆分区间/提取页码）按 opId 动态显隐
-- Excel 操作显示工作表索引输入
+- PDF 操作选项（图片格式/旋转角度/拆分区间/提取页码）按 opId 动态显隐；PDF 操作提示行显示源文件页数
+- Excel 操作：选择文件后自动读取工作表名称填充下拉框
+- Toast 通知系统（`ui/toast.js`）：成功 / 警告 / 错误 / 信息，替代原生 alert
+- 转换防重入：`isConverting` 标志 + 按钮 disabled + loading 态，禁止并发提交
+- 大文件（> 80MB）添加时弹出警告 Toast
+- 文件类型标签（PDF/DOC/XLS/...）替代 emoji 图标
+- Excel 操作显示工作表下拉（自动读取 sheet 名）
 - 进度条显示当前阶段 + 百分比 + 状态文本
+
+## 扫描文档工具功能（tools/scandoc/，2026-10-19 新增）
+### 定位
+图片 → 文档的扫描编辑器（类扫描全能王）：批量导入图片，逐页滤镜/曲面矫正/四角裁剪，单图导出或按序合并 PDF。与 document 工具（格式互转）互补，独立入口。
+
+### 为什么独立成工具
+- 状态模型不同：document 是单次无状态转换；scandoc 是「页面集合 + 每页独立编辑状态（滤镜/旋转/四角）」的多页编辑器
+- 交互形态不同：画布编辑 + 四角拖拽，而非「选操作→上传→转换」线性流
+
+### 模块架构（单一职责拆分）
+- `app.js`：协调层。页面选中、工具栏状态、导入导出流程、事件绑定
+- `state.js`：页面集合状态（pages[] 增删/排序/更新 + 订阅通知）
+- `render.js`：渲染管线（旋转 → 滤镜 → 透视矫正 → 尺寸限制），编辑器/缩略图/导出共用，保证所见即所得
+- `filters.js`：三种滤镜（原图 / 黑白 Otsu 阈值 / 增强对比度拉伸）
+- `warp.js`：透视变换（4 对点解 Homography → 网格 24×24 三角形 affine 纹理映射）
+- `detect.js`：自动四角检测（灰度→高斯模糊→Sobel→Otsu 二值化→3×膨胀→最大连通域→凸包→最小外接矩形种子→沿四边带 PCA 直线拟合求精→相邻直线求交）
+- `corners-ui.js`：SVG 四角覆盖层（4 手柄 pointer 拖拽，显示坐标与原图相对坐标互转）
+- `exporter.js`：单页 PNG 导出 + pdf-lib 多页合并 PDF（页面尺寸跟随图片，最长边限 2200）
+- `lib/imgutils.js`：灰度 / Otsu / 高斯模糊 / Sobel（detect 与 filters 共用）
+- `lib/toast.js`、`lib/download.js`：自包含小模块（与 document 工具对应模块一致，遵循项目「每工具自包含」惯例）
+
+### 关键实现说明
+- 角点存储为**原图相对坐标**（0-1，TL/TR/BR/BL 序）；旋转时角点不变，渲染时经 `cornersToRotated` 映射到旋转后画布，`rotatedToCorners` 逆向转换拖拽输入
+- SVG 元素无 `.hidden` IDL 属性（HTMLElement 才有），显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
+- SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类（`.corner-poly` / `.corner-handle`）
+- PDF 页面顺序 = 导入顺序（新页追加末尾），列表拖拽排序；导出按当前数组顺序
+- 导入时自动检测四角，失败回退默认整图四角（内缩 2%），用户可手动拖拽调整
+- 转换防重入 + 忙碌遮罩 + Toast 反馈，与 document 工具一致
+
+### 踩过的坑（2026-10-19 调试记录）
+- 连通域坐标反推宽度用 `Math.sqrt(length)` 只对正方形图有效，必须显式传 w/h
+- 3× 膨胀会把文档内部文字边缘连成「梳形」blob，四角极值点落在人工痕迹上；解法是最小外接矩形给种子 + 原始边缘图直线拟合求精
+- `setBusy` 里调用 `syncToolbar(getSelected())` 时无选中页会 NPE（`page.filter`），需判空
 
 ## TOTP 迁移工具功能
 ### 核心

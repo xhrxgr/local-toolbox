@@ -6,16 +6,38 @@
 
 ## 工具列表
 
-| 工具 | 说明 |
-| --- | --- |
-| FFmpeg 音视频处理 | 浏览器端 FFmpeg.wasm，支持格式转换 / 提取音频 / 视频裁剪，多文件队列，5 阶段进度 |
-| 倒计时 | SVG 圆环进度，毫秒精度，Web Audio 蜂鸣，超时计数，刷新恢复 |
-| 秒表 | 毫秒精度，计次记录，最快 / 最慢高亮，CSV 导出 |
-| 时间戳 | Unix 秒 / 毫秒互转，单位自适应，一键复制 |
-| 世界时间 | 多时区实时显示，动态偏移（兼容夏令时），点击全屏查看 |
-| 网络工具 | HTTP ping / 连接诊断 / 网速测试 / DoH 查询 / 公网 IP 与出口对比 |
-| 编码转换 | Base64 / URL / ASCII / Unicode，UTF-8 安全，全部本地运行 |
-| 证书解析 | 纯前端 ASN.1 DER 解析器，支持 PEM / Hex / Base64，Web Crypto 指纹 |
+| 分类 | 工具 | 说明 |
+| --- | --- | --- |
+| 媒体 | FFmpeg 音视频处理 | 浏览器端 FFmpeg.wasm，格式转换 / 提取音频 / 视频裁剪，多文件队列，5 阶段进度 |
+| 媒体 | 图片处理 | 图片压缩 / 格式转换 / 尺寸调整 / 裁剪旋转 |
+| 媒体 | SVG 优化器 | SVG 代码压缩、清理冗余属性 |
+| 媒体 | OCR 图片识字 | Tesseract.js 本地识别图中文字，支持多语言 |
+| 时间 | 倒计时 | SVG 圆环进度，毫秒精度，Web Audio 蜂鸣，超时计数，刷新恢复 |
+| 时间 | 秒表 | 毫秒精度，计次记录，最快 / 最慢高亮，CSV 导出 |
+| 时间 | 时间戳 | Unix 秒 / 毫秒互转，单位自适应，一键复制 |
+| 时间 | 世界时间 | 多时区实时显示，动态偏移（兼容夏令时），点击全屏查看 |
+| 网络 | 网络工具 | HTTP ping / 连接诊断 / 网速测试 / DoH 查询 / 公网 IP 与出口对比 |
+| 网络 | 证书解析 | 纯前端 ASN.1 DER 解析器，支持 PEM / Hex / Base64，Web Crypto 指纹 |
+| 编码 | 编码转换 | Base64 / URL / ASCII / Unicode，UTF-8 安全，全部本地运行 |
+| 编码 | 进制转换 | 2/8/10/16 进制及自定义进制互转，实时校验 |
+| 开发 | JSON 工具 | 格式化 / 压缩 / 校验 / 转义 / 树形视图 |
+| 开发 | 正则测试器 | 实时匹配高亮，分组捕获，常用正则库 |
+| 开发 | JWT 解析 | Header / Payload / Signature 拆解，签名校验 |
+| 开发 | 哈希计算 | MD5 / SHA-1 / SHA-256 / SHA-512，UUID 生成 |
+| 开发 | 文本对比 | 双栏 diff，行级 / 字符级高亮 |
+| 开发 | Markdown 编辑器 | 实时预览，GFM，导出 HTML / PDF |
+| 开发 | 文本工具集 | 字数统计、大小写转换、去重、排序、替换等 |
+| 开发 | 权限计算器 | chmod 符号 / 八进制互转，可视化权限位 |
+| 开发 | SQL / CRON | SQL 格式化，CRON 表达式解析与下次执行时间 |
+| 开发 | Unicode 查看器 | 字符码点 / 编码 / 名称查询，字符可视化 |
+| 开发 | 加解密 | AES / DES / RC4 / Rabbit，哈希，编码转换 |
+| 文档 | 文档转换 | PDF/Word/Excel/CSV/Markdown/HTML/TXT/RTF/EPUB 本地互转，6 Tab |
+| 文档 | 扫描文档 | 图片转文档：批量导入、黑白/增强滤镜、曲面矫正、四角裁剪、按序合并 PDF |
+| 实用 | 二维码 | 生成 / 识别（jsqr），自定义颜色与容错级别 |
+| 实用 | 颜色转换 | HEX / RGB / HSL / HSV 互转，调色板，对比度检测 |
+| 实用 | 密码生成 | 随机密码 / 密码短语，强度评估 |
+| 实用 | 单位换算 | 长度 / 重量 / 温度 / 面积 / 体积 / 速度等 |
+| 实用 | OTP 迁移 | Google Authenticator 二维码导出解析，生成 otpauth 链接 |
 
 ## 特性
 
@@ -75,13 +97,35 @@ location / {
 │   └── js/                 # common（主题/头部） + tools（工具注册表）
 ├── tools/
 │   ├── ffmpeg/             # 音视频处理
+│   ├── image/              # 图片处理
+│   ├── svg/                # SVG 优化器
+│   ├── ocr/                # OCR 图片识字
 │   ├── countdown/          # 倒计时
 │   ├── stopwatch/          # 秒表
 │   ├── timestamp/          # 时间戳
 │   ├── worldclock/         # 世界时间
 │   ├── network/            # 网络工具
+│   ├── cert/               # 证书解析
 │   ├── encoding/           # 编码转换
-│   └── cert/               # 证书解析
+│   ├── radix/              # 进制转换
+│   ├── json/               # JSON 工具
+│   ├── regex/              # 正则测试器
+│   ├── jwt/                # JWT 解析
+│   ├── hash/               # 哈希计算 / UUID
+│   ├── diff/               # 文本对比
+│   ├── markdown/           # Markdown 编辑器
+│   ├── text/               # 文本工具集
+│   ├── chmod/              # 权限计算器
+│   ├── sqlcron/            # SQL / CRON
+│   ├── unicode/            # Unicode 查看器
+│   ├── crypto/             # 加解密
+│   ├── document/           # 文档转换（app.js + operations.js + tab-loaders.js + handlers/ + ui/）
+│   ├── scandoc/            # 扫描文档（app.js + state.js + render.js + filters.js + warp.js + detect.js + corners-ui.js + exporter.js + lib/）
+│   ├── qrcode/             # 二维码
+│   ├── color/              # 颜色转换
+│   ├── password/           # 密码生成
+│   ├── unit/               # 单位换算
+│   └── otp-migration/      # OTP 迁移
 ├── vite.config.js          # 多入口 + conditional COEP 插件
 └── package.json
 ```
