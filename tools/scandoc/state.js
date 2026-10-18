@@ -38,7 +38,7 @@ export function selectPage(id) {
 export async function addImageFiles(files) {
   const added = [];
   for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
+    if (!isImageFile(file)) continue;
     try {
       const img = await loadImage(file);
       pages.push({
@@ -96,6 +96,13 @@ export function clearPages() {
 
 export function nextId() {
   return `p${Date.now().toString(36)}_${idSeed++}`;
+}
+
+/** 判断是否为图片文件：type 优先，type 为空时退回扩展名（部分截图工具不给 type） */
+export function isImageFile(file) {
+  if (file.type.startsWith('image/')) return true;
+  if (!file.type && /\.(png|jpe?g|gif|webp|bmp|avif|tiff?)$/i.test(file.name || '')) return true;
+  return false;
 }
 
 function loadImage(file) {

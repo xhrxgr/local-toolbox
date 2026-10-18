@@ -279,6 +279,10 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - 连通域坐标反推宽度用 `Math.sqrt(length)` 只对正方形图有效，必须显式传 w/h
 - 3× 膨胀会把文档内部文字边缘连成「梳形」blob，四角极值点落在人工痕迹上；解法是最小外接矩形给种子 + 原始边缘图直线拟合求精
 - `setBusy` 里调用 `syncToolbar(getSelected())` 时无选中页会 NPE（`page.filter`），需判空
+- **iframe 在 `display:none` 时被设置 `srcdoc`，Chrome 会出现取消隐藏后永久空白绘制的缺陷**（克隆替换元素才能恢复）；预览 iframe 必须先显示再设 srcdoc，隐藏时绝不清空 srcdoc
+- **事件的 `FileList` / `DataTransfer.files` 在事件结束后即失效**：把导入处理放进 Promise 队列（微任务）时必须先 `Array.from` 同步拷贝，否则队列执行时拿到空列表
+- SVG 元素无 `.hidden` IDL 属性，显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
+- SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类
 
 ## TOTP 迁移工具功能
 ### 核心

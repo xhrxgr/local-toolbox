@@ -4,8 +4,6 @@
  */
 import { rotatedToCorners, cornersToRotated } from './render.js';
 
-const LABELS = ['左上', '右上', '右下', '左下'];
-
 export class CornerOverlay {
   /**
    * @param svg      SVG 元素（与画布显示区重合）

@@ -4,7 +4,7 @@
  */
 import {
   subscribe, getPages, getSelected, selectPage,
-  addImageFiles, removePage, movePage, updatePage, clearPages,
+  addImageFiles, removePage, movePage, updatePage, clearPages, isImageFile,
 } from './state.js';
 import { renderPage, defaultCorners } from './render.js';
 import { detectCorners } from './detect.js';
@@ -193,15 +193,31 @@ function syncToolbar(page) {
 }
 
 /* ========== 导入 ========== */
-async function importFiles(fileList) {
-  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
-  if (files.length === 0) {
+// 导入串行队列：避免两次快速导入的 busy 状态与页序互相踩
+let importQueue = Promise.resolve();
+
+function enqueueImport(fileList) {
+  // 必须同步拷贝：事件的 FileList / DataTransfer.files 在事件结束后即失效，
+  // 而 importFiles 在队列微任务里才执行，直接传引用会拿到空列表
+  const files = Array.from(fileList);
+  importQueue = importQueue
+    .then(() => importFiles(files))
+    .catch((err) => {
+      console.error('[导入失败]', err);
+      showToast('导入失败：' + (err.message || String(err)), 'error');
+    });
+  return importQueue;
+}
+
+async function importFiles(files) {
+  const images = files.filter(isImageFile);
+  if (images.length === 0) {
     showToast('请选择图片文件', 'warning');
     return;
   }
   setBusy('导入图片...');
   try {
-    const added = await addImageFiles(files);
+    const added = await addImageFiles(images);
     showToast(`已导入 ${added.length} 张图片`, 'success');
     // 缩略图 + 自动识别四角（按导入顺序处理）
     for (const page of added) {
@@ -248,9 +264,11 @@ async function onExportOne() {
 async function onExportPdf() {
   const pages = getPages();
   if (pages.length === 0) return;
+  // 快照：导出期间用户若继续导入，不把新页塞进本次 PDF
+  const snapshot = [...pages];
   setBusy('生成 PDF...');
   try {
-    await exportMergedPdf(pages, (i, total) => {
+    await exportMergedPdf(snapshot, (i, total) => {
       setBusy(`生成 PDF ${i + 1}/${total}...`);
     });
   } catch (err) {
@@ -285,7 +303,7 @@ export function initScanDoc() {
   const fileInput = document.getElementById('file-input');
   document.getElementById('btn-import').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
-    importFiles(e.target.files);
+    enqueueImport(e.target.files);
     e.target.value = '';
   });
 
@@ -297,7 +315,7 @@ export function initScanDoc() {
       e.preventDefault();
       if (type === 'dragover') drop.classList.add('scan-drop--active');
       else drop.classList.remove('scan-drop--active');
-      if (type === 'drop' && e.dataTransfer.files.length) importFiles(e.dataTransfer.files);
+      if (type === 'drop' && e.dataTransfer.files.length) enqueueImport(e.dataTransfer.files);
     });
   });
 
@@ -307,12 +325,12 @@ export function initScanDoc() {
     for (const item of e.clipboardData?.items || []) {
       if (item.kind === 'file') {
         const f = item.getAsFile();
-        if (f && f.type.startsWith('image/')) files.push(f);
+        if (f && isImageFile(f)) files.push(f);
       }
     }
     if (files.length) {
       e.preventDefault();
-      importFiles(files);
+      enqueueImport(files);
     }
   });
 
@@ -323,23 +341,30 @@ export function initScanDoc() {
     showToast('已清空', 'info');
   });
 
-  // 滤镜切换
+  // 滤镜切换（同步刷新缩略图，保持列表与画布一致）
   document.querySelectorAll('#filter-segmented .segmented__btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const page = getSelected();
       if (!page) return;
       updatePage(page.id, { filter: btn.dataset.filter });
+      refreshThumb(page);
     });
   });
 
-  // 旋转
+  // 旋转（同步刷新缩略图）
   document.getElementById('btn-rotate-left').addEventListener('click', () => {
     const page = getSelected();
-    if (page) updatePage(page.id, { rotation: (page.rotation + 270) % 360 });
+    if (page) {
+      updatePage(page.id, { rotation: (page.rotation + 270) % 360 });
+      refreshThumb(page);
+    }
   });
   document.getElementById('btn-rotate-right').addEventListener('click', () => {
     const page = getSelected();
-    if (page) updatePage(page.id, { rotation: (page.rotation + 90) % 360 });
+    if (page) {
+      updatePage(page.id, { rotation: (page.rotation + 90) % 360 });
+      refreshThumb(page);
+    }
   });
 
   // 自动识别 / 重置四角

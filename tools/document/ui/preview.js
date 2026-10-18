@@ -13,8 +13,9 @@ export function resetPreview() {
   currentPreviewResult = null;
   const iframe = document.getElementById('result-preview');
   if (iframe) {
+    // 只隐藏、不清 srcdoc：iframe 在 display:none 时被赋值 srcdoc 会触发
+    // Chrome 绘制缺陷（取消隐藏后永久空白，克隆元素才能恢复）
     iframe.hidden = true;
-    iframe.srcdoc = '';
   }
 }
 
@@ -52,12 +53,14 @@ export function setPreviewMode(mode) {
   btnPreview?.classList.toggle('result-view-btn--active', mode === 'preview');
 
   if (mode === 'preview' && currentPreviewResult) {
+    // 必须先显示再设置 srcdoc；隐藏状态下绝不赋值 srcdoc——
+    // iframe 在 display:none 时被设置 srcdoc 会触发 Chrome 绘制缺陷
+    // （取消隐藏后永久空白，只能替换元素恢复）
+    iframe.hidden = false;
     iframe.srcdoc = buildPreviewDoc(currentPreviewResult.text);
     pre.hidden = true;
-    iframe.hidden = false;
   } else {
     iframe.hidden = true;
-    iframe.srcdoc = '';
     pre.hidden = false;
   }
 }

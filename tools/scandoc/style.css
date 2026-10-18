@@ -431,6 +431,7 @@
   stroke-width: 2;
   cursor: grab;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .corner-layer .corner-handle:active {

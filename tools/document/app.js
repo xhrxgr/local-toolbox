@@ -121,7 +121,8 @@ function importTextFile(file) {
 /* ========== 收集当前操作上下文（传给 handler） ========== */
 function buildContext() {
   return {
-    files: getFiles(),
+    // 文件列表取快照：转换期间用户继续导入不会改动本次处理
+    files: [...getFiles()],
     text: document.getElementById('text-input').value,
     options: {
       'pdf-image-format':  document.getElementById('pdf-image-format')?.value,
