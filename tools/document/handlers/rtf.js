@@ -15,7 +15,7 @@
  *
  * 解析策略：状态机 + 栈跟踪组嵌套
  */
-import { getBaseName } from './utils.js';
+import { getBaseName, escapeHtml } from './utils.js';
 
 /* ========== RTF 解析器 ========== */
 class RtfParser {
@@ -334,14 +334,6 @@ ${body}
 
   setProgress('完成', '', 100);
   return { text: html, filename: `${getBaseName(file.name)}.html` };
-}
-
-function escapeHtml(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export const HANDLERS = {

@@ -6,6 +6,39 @@ export function getBaseName(filename) {
   return filename.replace(/\.[^.]+$/, '');
 }
 
+export function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** 字节数 → 人类可读大小 */
+export function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+/** 按扩展名返回文件类型标签（用于列表图标替代 emoji） */
+export function getFileKind(filename) {
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf') return 'PDF';
+  if (ext === 'docx' || ext === 'doc') return 'DOC';
+  if (ext === 'xlsx' || ext === 'xls') return 'XLS';
+  if (ext === 'csv' || ext === 'tsv') return 'CSV';
+  if (ext === 'md' || ext === 'markdown') return 'MD';
+  if (ext === 'html' || ext === 'htm' || ext === 'xhtml') return 'HTM';
+  if (ext === 'txt') return 'TXT';
+  if (ext === 'rtf') return 'RTF';
+  if (ext === 'epub') return 'EPB';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'tiff', 'avif'].includes(ext)) return 'IMG';
+  return 'FILE';
+}
+
 /**
  * HTML 字符串 → PDF Blob
  * 用临时 div + html2canvas 截图 + jsPDF 分页嵌入

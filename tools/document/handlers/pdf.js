@@ -235,6 +235,12 @@ export async function pdfExtract(ctx) {
   return [{ blob: new Blob([bytes], { type: 'application/pdf' }), filename: `${getBaseName(file.name)}_extracted_p${rangeStr}.pdf` }];
 }
 
+/* ========== 读取 PDF 页数（供 UI 提示，不渲染） ========== */
+export async function readPdfPageCount(file) {
+  const src = await PDFDocument.load(await file.arrayBuffer());
+  return src.getPageCount();
+}
+
 export const HANDLERS = {
   'pdf-to-image': pdfToImage,
   'image-to-pdf': imageToPdf,

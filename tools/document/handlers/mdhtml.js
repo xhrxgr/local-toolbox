@@ -4,7 +4,7 @@
  */
 import { marked } from 'marked';
 import TurndownService from 'turndown';
-import { htmlToPdfBlob } from './utils.js';
+import { htmlToPdfBlob, escapeHtml } from './utils.js';
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -16,11 +16,45 @@ const turndown = new TurndownService({
 
 /* ========== Markdown → HTML ========== */
 export async function mdToHtml(ctx) {
-  const { text, setProgress } = ctx;
+  const { text, options, setProgress } = ctx;
   setProgress('渲染 Markdown...', '', 30);
   const html = marked.parse(text);
   setProgress('完成', '', 100);
+  if (options['md-full-doc']) {
+    return { text: buildFullDoc(html, 'Markdown Export'), filename: 'export.html' };
+  }
   return { text: html, filename: 'export.html' };
+}
+
+/** HTML 片段 → 带基础样式的完整文档 */
+function buildFullDoc(fragmentHtml, title) {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; line-height: 1.6; max-width: 800px; margin: 2em auto; padding: 0 1em; color: #1f2937; }
+h1 { font-size: 1.8em; margin: 0.6em 0 0.3em; }
+h2 { font-size: 1.5em; margin: 0.6em 0 0.3em; }
+h3 { font-size: 1.2em; margin: 0.6em 0 0.3em; }
+p { margin: 0.6em 0; }
+code { font-family: Consolas, monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 6px; overflow-x: auto; }
+pre code { background: none; color: inherit; padding: 0; }
+blockquote { border-left: 3px solid #6366f1; padding-left: 12px; color: #6b7280; margin: 0.6em 0; }
+table { border-collapse: collapse; width: 100%; margin: 0.6em 0; }
+th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }
+th { background: #f1f5f9; }
+img { max-width: 100%; }
+a { color: #6366f1; }
+</style>
+</head>
+<body>
+${fragmentHtml}
+</body>
+</html>`;
 }
 
 /* ========== HTML → Markdown ========== */
@@ -76,13 +110,6 @@ pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; margin
   const blob = await htmlToPdfBlob(html, 'text_export');
   setProgress('完成', '', 100);
   return [{ blob, filename: 'text_export.pdf' }];
-}
-
-function escapeHtml(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 export const HANDLERS = {

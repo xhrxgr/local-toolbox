@@ -5,17 +5,24 @@
 import * as XLSX from 'xlsx';
 import { getBaseName } from './utils.js';
 
+/* ========== 读取工作表名称列表（供 UI 下拉选择） ========== */
+export async function readSheetNames(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  return wb.SheetNames;
+}
+
 /* ========== Excel → CSV ========== */
 export async function excelToCsv(ctx) {
   const { files, options, setProgress } = ctx;
   const file = files[0];
   const sheetIdx = parseInt(options['excel-sheet']) || 0;
+  const FS = options['csv-separator'] || ',';
   setProgress('解析 Excel...', '', 30);
   const data = await file.arrayBuffer();
   const wb = XLSX.read(data, { type: 'array' });
   if (sheetIdx >= wb.SheetNames.length) throw new Error(`工作表索引 ${sheetIdx} 超出范围（共 ${wb.SheetNames.length} 个工作表）`);
   const ws = wb.Sheets[wb.SheetNames[sheetIdx]];
-  const csv = XLSX.utils.sheet_to_csv(ws, { FS: ',', RS: '\n' });
+  const csv = XLSX.utils.sheet_to_csv(ws, { FS, RS: '\n' });
   setProgress('完成', '', 100);
   return { text: csv, filename: `${getBaseName(file.name)}.csv` };
 }
@@ -48,7 +55,7 @@ export async function csvToJson(ctx) {
 
 /* ========== JSON → CSV ========== */
 export async function jsonToCsv(ctx) {
-  const { text, setProgress } = ctx;
+  const { text, options, setProgress } = ctx;
   setProgress('解析 JSON...', '', 30);
   let data;
   try {
@@ -62,8 +69,9 @@ export async function jsonToCsv(ctx) {
   if (data.length === 0) {
     return { text: '', filename: 'converted.csv' };
   }
+  const FS = options['csv-separator'] || ',';
   const ws = XLSX.utils.json_to_sheet(data);
-  const csv = XLSX.utils.sheet_to_csv(ws, { FS: ',', RS: '\n' });
+  const csv = XLSX.utils.sheet_to_csv(ws, { FS, RS: '\n' });
   setProgress('完成', '', 100);
   return { text: csv, filename: 'converted.csv' };
 }

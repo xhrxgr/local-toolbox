@@ -9,7 +9,7 @@
  *   → 拼接所有章节
  */
 import JSZip from 'jszip';
-import { getBaseName } from './utils.js';
+import { getBaseName, escapeHtml } from './utils.js';
 
 /* ========== 解析 OPF manifest + spine ========== */
 function parseOpf(opfXml) {
@@ -75,6 +75,48 @@ function extractBodyContent(xhtml, mode = 'html') {
   return body.innerHTML || '';
 }
 
+/* ========== 图片内嵌：相对路径 img → base64 data URI ========== */
+function resolveZipPath(dir, href) {
+  const clean = href.replace(/^\.\//, '');
+  const parts = dir ? dir.split('/') : [];
+  for (const seg of clean.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') { parts.pop(); continue; }
+    parts.push(seg);
+  }
+  return parts.join('/');
+}
+
+function guessImageMime(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  const map = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+    svg: 'image/svg+xml', avif: 'image/avif', tiff: 'image/tiff',
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+async function inlineImages(html, zip, chapterDir) {
+  const wrapper = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const imgs = wrapper.querySelectorAll('img');
+  for (const img of imgs) {
+    const src = img.getAttribute('src');
+    if (!src || /^(data:|https?:|blob:|mailto:)/i.test(src)) continue;
+    const clean = decodeURIComponent(src.split('#')[0].split('?')[0]);
+    const zipPath = resolveZipPath(chapterDir, clean);
+    const file = zip.file(zipPath) || zip.file(clean);
+    if (!file) continue;
+    try {
+      const b64 = await file.async('base64');
+      img.setAttribute('src', `data:${guessImageMime(zipPath)};base64,${b64}`);
+    } catch {
+      // 单张图片失败不阻塞整体转换
+    }
+  }
+  return wrapper.body.firstElementChild?.innerHTML ?? html;
+}
+
 /* ========== 核心解析：返回 [chapterHtml, chapterText][] ========== */
 async function parseEpub(file, setProgress) {
   setProgress('读取 EPUB 文件...', '', 10);
@@ -101,11 +143,12 @@ async function parseEpub(file, setProgress) {
     const item = manifest.get(spine[i]);
     if (!item) continue;
     // 只处理 application/xhtml+xml 或 .html/.xhtml 文件
-    const hrefPath = opfDir ? `${opfDir}/${item.href}` : item.href;
-    const chapterFile = zip.file(hrefPath) || zip.file(item.href);
+    const href = decodeURIComponent(item.href);
+    const hrefPath = opfDir ? `${opfDir}/${href}` : href;
+    const chapterFile = zip.file(hrefPath) || zip.file(href);
     if (!chapterFile) continue;
     const xhtml = await chapterFile.async('string');
-    const html = extractBodyContent(xhtml, 'html');
+    const html = await inlineImages(extractBodyContent(xhtml, 'html'), zip, hrefPath.includes('/') ? hrefPath.replace(/\/[^/]*$/, '') : '');
     const text = extractBodyContent(xhtml, 'text');
     chapters.push({ html, text });
     setProgress(`提取章节 ${i + 1}/${spine.length}...`, '', 40 + Math.round((i + 1) / spine.length * 50));
@@ -157,10 +200,6 @@ ${body}
 </html>`;
   setProgress('完成', '', 100);
   return { text: html, filename: `${getBaseName(file.name)}.html` };
-}
-
-function escapeHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export const HANDLERS = {
