@@ -11,6 +11,7 @@ Thumbs.db
 
 # AI 助手内部文档（不公开）
 # AGENTS.md 已纳入 git 跟踪（用户 2026-07-21 起改为公开保留跨对话上下文）
+.workbuddy/
 conversation_summary.md
 .screenshots/
 sw.png
