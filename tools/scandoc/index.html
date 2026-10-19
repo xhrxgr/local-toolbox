@@ -6,12 +6,12 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-CHg8WpVq.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-DUUYDiZg.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-Ccewxtzx.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-DgUgGyJt.css">
 </head>
 <body>
   <main class="scan-app">
@@ -41,14 +41,14 @@
           <span class="scan-pages__tip">拖拽调整顺序</span>
         </div>
         <div class="scan-pages__list" id="page-list"></div>
-        <div class="scan-drop" id="scan-drop">
+        <div class="scan-drop" id="scan-drop" role="button" tabindex="0" aria-label="选择图片导入">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          <p>拖入图片</p>
-          <p class="scan-drop__hint">或点击「导入图片」，支持 Ctrl+V 粘贴</p>
+          <p>点击选择图片</p>
+          <p class="scan-drop__hint">也可拖拽文件到此处，或直接粘贴截图</p>
         </div>
       </aside>
 
@@ -90,13 +90,13 @@
             </button>
           </div>
           <div class="scan-toolbar__group" role="group" aria-label="四角裁剪">
-            <span class="scan-toolbar__label">四角</span>
+            <span class="scan-toolbar__label" title="拖动四个角定义文档边界，导出图片与 PDF 时会按这四角自动透视矫正拉直">四角</span>
             <button class="btn btn-sm btn-secondary" id="btn-detect" type="button">自动识别</button>
             <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button">重置</button>
           </div>
           <label class="scan-toolbar__check">
             <input type="checkbox" id="chk-live-preview" checked />
-            <span>实时矫正预览</span>
+            <span>实时查看矫正结果</span>
           </label>
         </div>
 
@@ -113,8 +113,8 @@
           </div>
           <div class="scan-busy" id="scan-busy" hidden><span class="scan-busy__spinner"></span><span id="scan-busy-text">处理中...</span></div>
           <div class="warp-preview" id="warp-preview" hidden>
-            <span class="warp-preview__label">矫正效果</span>
-            <img id="warp-preview-img" alt="曲面矫正效果预览" />
+            <span class="warp-preview__label">按四角矫正后</span>
+            <img id="warp-preview-img" alt="四角矫正后的效果预览" />
           </div>
         </div>
       </section>
