@@ -143,8 +143,8 @@ export function warpPerspective(srcCanvas, corners, maxSize = Infinity) {
       const p11 = applyH(Hinv, x1, y1);
       const p01 = applyH(Hinv, x0, y1);
       // 两个三角形：dst 与 src 一一对应
-      drawTexTriangle(ctx, src, p00, p10, p11, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 });
-      drawTexTriangle(ctx, src, p00, p11, p01, { x: x0, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 });
+      drawTexTriangle(ctx, srcCanvas, p00, p10, p11, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 });
+      drawTexTriangle(ctx, srcCanvas, p00, p11, p01, { x: x0, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 });
     }
   }
   return out;

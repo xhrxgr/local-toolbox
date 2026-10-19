@@ -274,6 +274,8 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - 角点存储为**原图相对坐标**（0-1，TL/TR/BR/BL 序）；旋转时角点不变，渲染时经 `cornersToRotated` 映射到旋转后画布，`rotatedToCorners` 逆向转换拖拽输入
 - SVG 元素无 `.hidden` IDL 属性（HTMLElement 才有），显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
 - SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类（`.corner-poly` / `.corner-handle`）
+- **四角 = 矫正开关**：四角一旦存在（自动识别或手动拖动），预览与导出都会做透视矫正拉直，没有独立的「曲面矫正」开关；矫正失败（如四角退化）会退回未矫正图并打 console.warn，不要用空catch 吞掉
+- 验证矫正是否生效要看**输出尺寸/宽高比**，不能只看预览框「有图」——未矫正的图看起来也有内容
 - 层级：角点覆盖层 z-index 25 > 矫正预览 15（否则右下角手柄被浮动预览挡住），忙碌遮罩 30，Toast 300
 - PDF 页面顺序 = 导入顺序（新页追加末尾），列表拖拽排序；导出按当前数组顺序
 - 排序双通道：列表 HTML5 拖拽（桌面）+ 工具栏「上移/下移」按钮（移动端 DnD 不可用，同时键盘可达）

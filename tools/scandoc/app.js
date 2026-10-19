@@ -320,7 +320,7 @@ export function initScanDoc() {
     e.target.value = '';
   });
 
-  // 拖放导入
+  // 拖放导入（桌面）
   const drop = document.getElementById('scan-drop');
   const wrap = document.getElementById('scan-pages');
   ['dragover', 'dragleave', 'drop'].forEach(type => {
@@ -330,6 +330,14 @@ export function initScanDoc() {
       else drop.classList.remove('scan-drop--active');
       if (type === 'drop' && e.dataTransfer.files.length) enqueueImport(e.dataTransfer.files);
     });
+  });
+  // 拖放区本身可点击：移动端没有拖拽，点它要能打开文件选择器
+  drop.addEventListener('click', () => fileInput.click());
+  drop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
   });
 
   // 粘贴导入

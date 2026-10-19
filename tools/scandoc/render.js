@@ -95,8 +95,9 @@ export function renderPage(page, opts = {}) {
     if (inside) {
       try {
         return warpPerspective(rotated, absCorners, maxSize);
-      } catch {
-        // 四角退化（共线等）时退回未矫正图
+      } catch (err) {
+        // 四角退化（共线等）时退回未矫正图；留日志便于排查
+        console.warn('[scandoc] 透视矫正失败，本次输出未拉直：', err);
       }
     }
   }

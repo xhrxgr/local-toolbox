@@ -235,9 +235,23 @@
   border: 2px dashed var(--border);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
   font-size: var(--text-sm);
   text-align: center;
   transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+/* 触摸端点击反馈 */
+.scan-drop:active {
+  background: var(--tag-bg);
+  border-color: var(--accent);
+}
+
+.scan-drop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .scan-drop--active,
