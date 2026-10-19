@@ -326,3 +326,155 @@ export function sortCorners(corners) {
   }
   return ordered;
 }
+
+/**
+ * 校验检测出的四边形是否可信。
+ * 翻拍作业纸时经常出现「轮廓不明显」「纸张超出画面」等情况，
+ * 此时检测可能返回一个畸形四边形（细长、非凸、角点重合），
+ * 直接使用会把正文裁没，导出近乎空白的结果，必须拦截并回退。
+ *
+ * @returns {string|null} null 表示通过，否则返回拒绝原因
+ */
+export function validateQuad(corners, w, h) {
+  if (!corners || corners.length !== 4) return '角点数量异常';
+
+  // 1. 凸性：四条边叉积必须同号，否则会出现「一角内凹」的畸形
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i];
+    const b = corners[(i + 1) % 4];
+    const c = corners[(i + 2) % 4];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(cross) < 1e-6) continue;
+    const s = cross > 0 ? 1 : -1;
+    if (sign === 0) sign = s;
+    else if (s !== sign) return '四边形内凹（非凸）';
+  }
+
+  // 2. 面积占比：文档照片里纸张通常占画面主体，
+  //    太小说明只框住了一小块，太接近满幅说明多半没找到纸边
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i];
+    const b = corners[(i + 1) % 4];
+    area += a.x * b.y - b.x * a.y;
+  }
+  area = Math.abs(area / 2);
+  const ratio = area / (w * h);
+  if (ratio < 0.12) return '四边形面积过小';
+  if (ratio > 0.985) return '四边形几乎覆盖全图，未识别出纸张边缘';
+
+  // 3. 边长比例：排除细长条
+  const lens = [];
+  for (let i = 0; i < 4; i++) {
+    const a = corners[i];
+    const b = corners[(i + 1) % 4];
+    lens.push(Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  const maxL = Math.max(...lens);
+  const minL = Math.min(...lens);
+  if (maxL <= 0) return '四边形退化';
+  if (minL / maxL < 0.2) return '四边形过于细长';
+
+  // 4. 内角：每角应在 25°~155° 之间
+  for (let i = 0; i < 4; i++) {
+    const prev = corners[(i + 3) % 4];
+    const cur = corners[i];
+    const next = corners[(i + 1) % 4];
+    const v1x = prev.x - cur.x;
+    const v1y = prev.y - cur.y;
+    const v2x = next.x - cur.x;
+    const v2y = next.y - cur.y;
+    const m1 = Math.hypot(v1x, v1y);
+    const m2 = Math.hypot(v2x, v2y);
+    if (m1 < 1 || m2 < 1) return '角点重合';
+    const dot = (v1x * v2x + v1y * v2y) / (m1 * m2);
+    const ang = (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI;
+    if (ang < 25 || ang > 155) return `内角异常（${Math.round(ang)}°）`;
+  }
+
+  return null;
+}
+
+/**
+ * 纸张超出画面时，把贴边的角点外推到画面边缘。
+ * 入参是 0-1 归一化坐标（与 detectCorners 一致），仅当角点距边缘很近（<1.5%）才推，
+ * 避免把正常的背景边距也吃掉。
+ */
+export function snapToBorder(corners) {
+  const m = 0.015;
+  return corners.map(p => ({
+    x: p.x <= m ? 0 : p.x >= 1 - m ? 1 : p.x,
+    y: p.y <= m ? 0 : p.y >= 1 - m ? 1 : p.y,
+  }));
+}
+
+/**
+ * 边强度校验：判断四边是否真的落在「纸张与背景的交界」上。
+ *
+ * 轮廓不明显时，检测可能锁定在正文内部——此时四边形几何上完全合法，
+ * 但边并不是真正的纸边，裁出来会把正文切掉。
+ * 判据：沿每条边采样，比较内侧与外侧的平均亮度。
+ *   - 真纸边：内外亮度差稳定（同一侧始终更亮或更暗），台阶明显；
+ *   - 误框（穿过正文）：内外亮度差忽正忽负，方向不一致。
+ *
+ * @returns {string|null} null 表示通过
+ */
+export function checkEdgeStrength(corners, imageData, opt = {}) {
+  const minStep = opt.minStep ?? 10;     // 亮度台阶下限
+  const minConsistency = opt.minConsistency ?? 0.7; // 方向一致率下限
+  const { data, width: w, height: h } = imageData;
+  if (!data || w < 32 || h < 32) return null;
+
+  const lum = (x, y) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return null;
+    const i = (y * w + x) * 4;
+    return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+  };
+
+  const cx = corners.reduce((s, p) => s + p.x, 0) / 4;
+  const cy = corners.reduce((s, p) => s + p.y, 0) / 4;
+
+  for (let i = 0; i < 4; i++) {
+    const p = corners[i];
+    const q = corners[(i + 1) % 4];
+    const ex = q.x - p.x;
+    const ey = q.y - p.y;
+    const len = Math.hypot(ex, ey);
+    if (len < 16) continue;
+
+    // 外法线（背离中心）
+    let nx = ey / len;
+    let ny = -ex / len;
+    const mx = (p.x + q.x) / 2 - cx;
+    const my = (p.y + q.y) / 2 - cy;
+    if (mx * nx + my * ny < 0) { nx = -nx; ny = -ny; }
+
+    const steps = [];
+    for (let t = 1; t <= 15; t++) {
+      const bx = p.x + ex * (t / 16);
+      const by = p.y + ey * (t / 16);
+      const d = len * 0.025;
+      // 内外各取 3 个点求均值，避开边缘抗锯齿带
+      let inSum = 0, outSum = 0, inN = 0, outN = 0;
+      for (let k = 1; k <= 3; k++) {
+        const off = d * (0.6 + k * 0.5);
+        const ai = lum(Math.round(bx - nx * off), Math.round(by - ny * off));
+        const ao = lum(Math.round(bx + nx * off), Math.round(by + ny * off));
+        if (ai !== null) { inSum += ai; inN++; }
+        if (ao !== null) { outSum += ao; outN++; }
+      }
+      if (inN === 0 || outN === 0) continue;
+      steps.push((inSum / inN) - (outSum / outN));
+    }
+    if (steps.length < 8) continue;
+
+    const median = [...steps].sort((a, b) => a - b)[Math.floor(steps.length / 2)];
+    const consistent = steps.filter(s => Math.sign(s) === Math.sign(median) && Math.abs(s) > minStep * 0.6).length / steps.length;
+
+    if (Math.abs(median) < minStep || consistent < minConsistency) {
+      return `第 ${i + 1} 条边不像纸张边缘（可能是识别到了正文）`;
+    }
+  }
+  return null;
+}

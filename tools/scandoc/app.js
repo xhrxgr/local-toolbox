@@ -7,7 +7,7 @@ import {
   addImageFiles, removePage, movePage, updatePage, clearPages, isImageFile,
 } from './state.js';
 import { renderPage, defaultCorners } from './render.js';
-import { detectCorners } from './detect.js';
+import { detectCorners, validateQuad, snapToBorder, checkEdgeStrength } from './detect.js';
 import { CornerOverlay } from './corners-ui.js';
 import { exportPageImage, exportMergedPdf } from './exporter.js';
 import { showToast } from './lib/toast.js';
@@ -246,19 +246,52 @@ async function importFiles(files) {
 /** 自动识别四角；失败则用默认整图四角 */
 async function autoDetect(page) {
   setBusy(`识别四角：${page.name}`);
+  const w = page.img.naturalWidth;
+  const h = page.img.naturalHeight;
+  let corners = null;
   try {
-    const corners = await detectCorners(page.img);
-    if (corners) {
-      updatePage(page.id, { corners, cornersDetected: true });
-    } else {
-      updatePage(page.id, { corners: defaultCorners(page), cornersDetected: false });
-    }
+    corners = await detectCorners(page.img);
   } catch {
-    updatePage(page.id, { corners: defaultCorners(page), cornersDetected: false });
-  } finally {
-    setBusy(null);
-    if (getSelected() === page) renderEditor();
+    corners = null;
   }
+
+  // 轮廓不明显或纸张超出画面时，检测结果可能是畸形四边形，
+  // 直接采用会把正文裁没，因此先做合理性校验，不通过则回退到整图范围
+  let rejectReason = null;
+  if (corners) {
+    // detectCorners 返回 0-1 归一化坐标，几何校验需要像素坐标
+    const snapped = snapToBorder(corners);
+    const toPx = snapped.map(pt => ({ x: pt.x * w, y: pt.y * h }));
+    rejectReason = validateQuad(toPx, w, h);
+    if (!rejectReason) {
+      // 几何合法不代表语义正确：四边可能落在正文内部，再校验边强度
+      const probe = document.createElement('canvas');
+      // 探针分辨率不能太低：缩放后细笔画会被模糊，导致漏判
+      const pw = Math.min(640, w);
+      const ph = Math.max(8, Math.round((h / w) * pw));
+      probe.width = pw;
+      probe.height = ph;
+      const pctx = probe.getContext('2d', { willReadFrequently: true });
+      pctx.drawImage(page.img, 0, 0, pw, ph);
+      const scaled = snapped.map(pt => ({ x: pt.x * pw, y: pt.y * ph }));
+      rejectReason = checkEdgeStrength(scaled, pctx.getImageData(0, 0, pw, ph));
+      probe.width = probe.height = 0;
+    }
+    if (!rejectReason) corners = snapped;
+  }
+
+  if (corners && !rejectReason) {
+    updatePage(page.id, { corners, cornersDetected: true });
+  } else {
+    updatePage(page.id, { corners: defaultCorners(page), cornersDetected: false });
+  }
+
+  if (rejectReason) {
+    showToast(`未识别到清晰的纸张轮廓（${rejectReason}），已按整图范围处理，可手动拖动角点修正`, 'warning', 5200);
+  }
+
+  setBusy(null);
+  if (getSelected() === page) renderEditor();
 }
 
 /* ========== 去手写 ========== */
