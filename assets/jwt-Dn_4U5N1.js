@@ -1,0 +1,28 @@
+import{t as e}from"./common-fvDkMcza.js";var t=`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjk5OTk5OTk5OTksImlzcyI6ImxvY2FsLXRvb2xib3gifQ.signatureplaceholder`,n={iss:`签发者`,sub:`主题（用户标识）`,aud:`受众`,exp:`过期时间`,nbf:`生效时间`,iat:`签发时间`,jti:`唯一标识`},r=new Set([`exp`,`nbf`,`iat`]);function i(e){let t=e.replace(/-/g,`+`).replace(/_/g,`/`),n=t.length%4;n&&(t+=`=`.repeat(4-n));let r=atob(t),i=new Uint8Array(r.length);for(let e=0;e<r.length;e++)i[e]=r.charCodeAt(e);return new TextDecoder(`utf-8`).decode(i)}function a(e){let t=e.replace(/-/g,`+`).replace(/_/g,`/`),n=t.length%4;n&&(t+=`=`.repeat(4-n));let r=atob(t),i=new Uint8Array(r.length);for(let e=0;e<r.length;e++)i[e]=r.charCodeAt(e);return i}function o(e){return Array.from(e).map(e=>e.toString(16).padStart(2,`0`)).join(``)}function s(e){return String(e).replace(/&/g,`&amp;`).replace(/</g,`&lt;`).replace(/>/g,`&gt;`).replace(/"/g,`&quot;`).replace(/'/g,`&#39;`)}async function c(e){try{return await navigator.clipboard.writeText(e),!0}catch{let t=document.createElement(`textarea`);t.value=e,t.style.position=`fixed`,t.style.opacity=`0`,document.body.appendChild(t),t.select();try{return document.execCommand(`copy`),document.body.removeChild(t),!0}catch{return document.body.removeChild(t),!1}}}function l(e){e=Math.abs(e);let t=Math.floor(e/86400),n=Math.floor(e%86400/3600),r=Math.floor(e%3600/60),i=Math.floor(e%60),a=[];return t&&a.push(t+` 天`),n&&a.push(n+` 小时`),r&&a.push(r+` 分`),!t&&!n&&a.push(i+` 秒`),a.join(` `)||`0 秒`}function u(e){return typeof e!=`number`||!isFinite(e)?null:new Date(e*1e3).toLocaleString(`zh-CN`,{hour12:!1})}function d(e,t){if(r.has(e)&&typeof t==`number`){let e=u(t);return e?`${t}（${e}）`:String(t)}return typeof t==`object`&&t?JSON.stringify(t):String(t)}function f(e){let t=Math.floor(Date.now()/1e3),n=typeof e.exp==`number`;if(typeof e.nbf==`number`&&e.nbf>t)return{type:`red`,text:`未生效`,detail:`生效时间在未来，距生效还有 `+l(e.nbf-t)};if(!n)return{type:`blue`,text:`无过期时间`,detail:`payload 中缺少 exp 字段，无法判断是否过期`};let r=e.exp-t;return r<=0?{type:`red`,text:`已过期`,detail:`已过期 `+l(-r)}:r<86400?{type:`yellow`,text:`即将过期`,detail:`剩余 `+l(r)+`（不足 24 小时）`}:{type:`green`,text:`有效`,detail:`剩余 `+l(r)}}function p(e){let t=document.getElementById(`jwt-banner`);t.className=`jwt-banner jwt-banner--`+e.type,t.innerHTML=`
+    <div class="jwt-banner__head">
+      <span class="jwt-banner__dot"></span>
+      <span class="jwt-banner__title">${s(e.text)}</span>
+    </div>
+    <div class="jwt-banner__detail">${s(e.detail)}</div>
+  `,t.hidden=!1}function m(){let e=document.getElementById(`jwt-banner`);e.hidden=!0,e.innerHTML=``}function h(e,t,n,r){let i=document.getElementById(e);i.innerHTML=`
+    <div class="jwt-card__head">
+      <span class="jwt-card__label">${t}</span>
+      <button class="jwt-copy" data-copy="${encodeURIComponent(r)}">复制</button>
+    </div>
+    <pre class="jwt-card__pre">${s(n)}</pre>
+  `}function g(e){let t=document.getElementById(`claims-section`),r=Object.keys(e);if(!r.length){t.innerHTML=`<div class="jwt-claims__head">声明详情</div><div class="jwt-claims__empty">Payload 无声明字段</div>`;return}t.innerHTML=`
+    <div class="jwt-claims__head">声明详情</div>
+    <div class="jwt-claims__wrap">
+      <table class="jwt-claims__table">
+        <thead>
+          <tr><th>字段</th><th>含义</th><th>值</th></tr>
+        </thead>
+        <tbody>${r.map(t=>{let r=Object.prototype.hasOwnProperty.call(n,t),i=r?n[t]:`自定义声明`,a=d(t,e[t]),o=r?`<span class="jwt-claims__tag jwt-claims__tag--std">标准</span>`:`<span class="jwt-claims__tag jwt-claims__tag--custom">自定义</span>`;return`
+        <tr>
+          <td class="jwt-claims__key">${s(t)}${o}</td>
+          <td class="jwt-claims__desc">${s(i)}</td>
+          <td class="jwt-claims__val">${s(a)}</td>
+        </tr>`}).join(``)}</tbody>
+      </table>
+    </div>
+  `}function _(){m(),[`card-header`,`card-payload`,`card-signature`].forEach(e=>{document.getElementById(e).innerHTML=``}),document.getElementById(`claims-section`).innerHTML=``}function v(e){_();let t=document.getElementById(`jwt-error`);t.textContent=e,t.hidden=!1}function y(){let e=document.getElementById(`jwt-error`);e.hidden=!0,e.textContent=``}function b(){document.querySelectorAll(`.jwt-copy`).forEach(e=>{e.addEventListener(`click`,async()=>{if(await c(decodeURIComponent(e.dataset.copy||``))){let t=e.textContent;e.textContent=`已复制`,e.classList.add(`jwt-copy--success`),setTimeout(()=>{e.textContent=t,e.classList.remove(`jwt-copy--success`)},1200)}})})}function x(){let e=document.getElementById(`jwt-input`).value.trim();if(y(),!e){_();return}let t=e.split(`.`);if(t.length!==3){v(`JWT 格式错误：需要恰好 3 段（header.payload.signature），当前 `+t.length+` 段`);return}if(!t[0]||!t[1]||!t[2]){v(`JWT 格式错误：存在空段，三段都不能为空`);return}let n,r;try{n=JSON.parse(i(t[0]))}catch(e){v(`Header 解码失败：`+e.message);return}try{r=JSON.parse(i(t[1]))}catch(e){v(`Payload 解码失败：`+e.message);return}if(typeof r!=`object`||!r||Array.isArray(r)){v(`Payload 不是有效的 JSON 对象`);return}let s;try{s=o(a(t[2]))}catch(e){v(`Signature 解码失败：`+e.message);return}let c=JSON.stringify(n,null,2),l=JSON.stringify(r,null,2);h(`card-header`,`Header`,c,c),h(`card-payload`,`Payload`,l,l),h(`card-signature`,`Signature（hex）`,s,s),p(f(r)),g(r),b()}function S(){let e=document.getElementById(`jwt-input`);e.addEventListener(`input`,x),document.getElementById(`btn-jwt-sample`).addEventListener(`click`,()=>{e.value=t,x()}),document.getElementById(`btn-jwt-clear`).addEventListener(`click`,()=>{e.value=``,y(),_()}),e.addEventListener(`keydown`,e=>{(e.ctrlKey||e.metaKey)&&e.key===`Enter`&&(e.preventDefault(),x())})}document.addEventListener(`DOMContentLoaded`,()=>{e(`JWT 解析`),S()});

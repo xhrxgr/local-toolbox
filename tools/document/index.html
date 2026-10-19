@@ -6,12 +6,12 @@
   <meta name="description" content="文档转换工具 —— PDF/Word/Excel/Markdown/HTML 本地互转，文件不上传云端" />
   <title>文档转换 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/document-CZZf64ib.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/document-WFUk52O1.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Bdn-WeNm.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/document-BUr2sm9m.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/global-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/document-CYL9vGYv.css">
 </head>
 <body>
   <main class="doc-container">
@@ -24,6 +24,7 @@
         <button class="mode-tab" data-tab="mdhtml">MD / HTML / TXT</button>
         <button class="mode-tab" data-tab="rtf">RTF</button>
         <button class="mode-tab" data-tab="epub">EPUB</button>
+        <button class="mode-tab" data-tab="image">图片去手写</button>
       </div>
     </section>
 
@@ -160,6 +161,152 @@
           </select>
         </div>
       </div>
+    </section>
+
+
+    <!-- 图片去手写（笔迹消除）：独立布局，进入该 Tab 时才加载推理代码 -->
+    <section class="tab-panel tab-panel--ink" data-panel="image" hidden>
+<div class="ink-tool">
+    <div class="ink-notice-row">
+      <span class="ink-privacy" title="本地处理，图片不上传">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+          </svg>
+          本地处理
+        </span>
+    </div>
+
+
+    <!-- 能力边界说明 -->
+    <section class="ink-notice" id="ink-notice">
+      <strong>当前支持：</strong>红笔批改、蓝笔批注（颜色自动识别 + 手动涂抹）。
+      <strong>暂不支持：</strong>黑笔与铅笔手写——它们与印刷体同为深色，强行按亮度识别会误删印刷文字和表格线，因此不提供该功能，可用画笔手动涂抹。
+    </section>
+
+    <div class="ink-layout">
+      <!-- 左：上传与预览 -->
+      <section class="ink-panel">
+        <div class="ink-drop" id="ink-drop" role="button" tabindex="0" aria-label="选择图片">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="30" height="30">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>点击选择图片</p>
+          <p class="ink-drop__hint">或拖拽到此处 · 支持 JPG / PNG / WebP</p>
+          <input type="file" id="ink-file" accept="image/jpeg,image/png,image/webp" hidden />
+        </div>
+
+        <div class="ink-meta" id="ink-meta" hidden>
+          <span id="ink-meta-name"></span>
+          <span id="ink-meta-size"></span>
+          <span id="ink-meta-dim"></span>
+        </div>
+
+        <!-- 编辑画布 -->
+        <div class="ink-canvas-wrap" id="ink-canvas-wrap" hidden>
+          <div class="ink-toolbar" role="toolbar" aria-label="掩码编辑工具">
+            <button class="ink-tool-btn ink-tool-btn--active" id="ink-mode-paint" type="button" title="涂抹标记为待擦除">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="7.5" cy="7.5" r=".5"/></svg>
+              涂抹
+            </button>
+            <button class="ink-tool-btn" id="ink-mode-erase" type="button" title="擦除误选区域">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M20 20H8.5L3 14.5a2 2 0 0 1 0-2.8l7.7-7.7a2 2 0 0 1 2.8 0l6.5 6.5a2 2 0 0 1 0 2.8L13 20"/><path d="M7 11l6 6"/></svg>
+              橡皮
+            </button>
+            <span class="ink-toolbar__sep"></span>
+            <button class="ink-tool-btn ink-tool-btn--icon" id="ink-undo" type="button" title="撤销" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>
+            </button>
+            <button class="ink-tool-btn ink-tool-btn--icon" id="ink-redo" type="button" title="重做" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/></svg>
+            </button>
+            <span class="ink-toolbar__sep"></span>
+            <label class="ink-range">
+              笔刷
+              <input type="range" id="ink-brush" min="4" max="80" value="18" />
+              <span id="ink-brush-val">18</span>
+            </label>
+            <label class="ink-check">
+              <input type="checkbox" id="ink-show-mask" checked />
+              <span>显示掩码</span>
+            </label>
+          </div>
+
+          <div class="ink-stage" id="ink-stage">
+            <canvas id="ink-canvas"></canvas>
+            <canvas id="ink-overlay"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右：操作面板 -->
+      <aside class="ink-side">
+        <section class="ink-card">
+          <h2 class="ink-card__title">1 自动识别笔迹</h2>
+          <div class="ink-field">
+            <label class="ink-label" for="ink-detect-type">笔迹类型</label>
+            <select class="ink-select" id="ink-detect-type">
+              <option value="red">红笔批改</option>
+              <option value="blue">蓝笔批注</option>
+            </select>
+          </div>
+          <div class="ink-field">
+            <label class="ink-label" for="ink-sensitivity">
+              检测灵敏度 <span id="ink-sensitivity-val">50</span>
+            </label>
+            <input type="range" class="ink-slider" id="ink-sensitivity" min="0" max="100" value="50" />
+            <p class="ink-hint">偏低更严格（只抓明显彩色笔迹），偏高会连浅色笔迹一起抓。</p>
+          </div>
+          <button class="btn btn-secondary ink-block" id="ink-detect" type="button" disabled>识别并标记</button>
+          <p class="ink-hint" id="ink-detect-hint">识别后可手动涂抹增删。</p>
+        </section>
+
+        <section class="ink-card">
+          <h2 class="ink-card__title">2 修正掩码</h2>
+          <div class="ink-field">
+            <label class="ink-label" for="ink-expand">
+              掩码膨胀 <span id="ink-expand-val">3</span> px
+            </label>
+            <input type="range" class="ink-slider" id="ink-expand" min="0" max="6" value="3" />
+            <p class="ink-hint">笔迹边缘若残留一圈原色，适度膨胀可一并盖掉。</p>
+          </div>
+          <div class="ink-stats" id="ink-stats">
+            <span>待擦除占比 <strong id="ink-ratio">0.0%</strong></span>
+          </div>
+          <button class="btn btn-secondary ink-block" id="ink-clear-mask" type="button">清空掩码</button>
+        </section>
+
+        <section class="ink-card">
+          <h2 class="ink-card__title">3 AI 修复</h2>
+          <div class="ink-model" id="ink-model-info">
+            <div class="ink-model__row"><span>模型</span><strong>MI-GAN</strong></div>
+            <div class="ink-model__row"><span>许可</span><span>MIT</span></div>
+            <div class="ink-model__row"><span>首次下载</span><span id="ink-model-size">约 40 MB</span></div>
+            <div class="ink-model__row"><span>状态</span><span id="ink-model-state">未加载</span></div>
+          </div>
+          <button class="btn btn-primary ink-block" id="ink-run" type="button" disabled>开始擦除</button>
+          <div class="ink-progress" id="ink-progress" hidden>
+            <div class="ink-progress__bar"><div class="ink-progress__fill" id="ink-progress-fill"></div></div>
+            <span class="ink-progress__text" id="ink-progress-text"></span>
+          </div>
+          <p class="ink-hint" id="ink-run-hint">需先选择图片并标记要擦除的区域。</p>
+        </section>
+
+        <section class="ink-card" id="ink-result-card" hidden>
+          <h2 class="ink-card__title">4 结果</h2>
+          <div class="ink-compare" id="ink-compare">
+            <canvas id="ink-result-canvas"></canvas>
+            <div class="ink-compare__divider" id="ink-divider">
+              <span class="ink-compare__handle"></span>
+            </div>
+            <span class="ink-compare__tag ink-compare__tag--l">原图</span>
+            <span class="ink-compare__tag ink-compare__tag--r">擦除后</span>
+          </div>
+          <div class="ink-result-meta" id="ink-result-meta"></div>
+          <button class="btn btn-primary ink-block" id="ink-download" type="button">下载 PNG</button>
+          <button class="btn btn-secondary ink-block" id="ink-again" type="button">回到掩码继续调整</button>
+        </section>
+      </aside>
+    </div>
     </section>
 
     <!-- 文件上传区（动态显示） -->
