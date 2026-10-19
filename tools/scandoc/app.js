@@ -187,6 +187,8 @@ function syncToolbar(page) {
     btn.classList.toggle('segmented__btn--active', hasPage && btn.dataset.filter === page.filter);
   });
   document.getElementById('btn-rotate-left').disabled = !hasPage || isWorking;
+  document.getElementById('btn-move-up').disabled = !hasPage || isWorking;
+  document.getElementById('btn-move-down').disabled = !hasPage || isWorking;
   document.getElementById('btn-rotate-right').disabled = !hasPage || isWorking;
   document.getElementById('btn-detect').disabled = !hasPage || isWorking;
   document.getElementById('btn-reset-corners').disabled = !hasPage || isWorking;
@@ -217,8 +219,19 @@ async function importFiles(files) {
   }
   setBusy('导入图片...');
   try {
-    const added = await addImageFiles(images);
-    showToast(`已导入 ${added.length} 张图片`, 'success');
+    const { added, failed } = await addImageFiles(images);
+    // 失败反馈：HEIC 等不支持格式 / 文件损坏，不能静默跳过
+    if (failed.length > 0) {
+      const names = failed.map(f => f.name).join('、');
+      const detail = `无法导入 ${failed.length} 个文件（${names}）：${failed[0].reason}`;
+      if (added.length === 0) {
+        showToast(detail, 'error', 6000);
+        return;
+      }
+      showToast(`已导入 ${added.length} 张，${detail}`, 'warning', 6000);
+    } else {
+      showToast(`已导入 ${added.length} 张图片`, 'success');
+    }
     // 缩略图 + 自动识别四角（按导入顺序处理）
     for (const page of added) {
       await refreshThumb(page);
@@ -334,12 +347,42 @@ export function initScanDoc() {
     }
   });
 
-  // 清空
-  document.getElementById('btn-clear').addEventListener('click', () => {
+  // 清空（二次确认：清空会丢失全部滤镜/旋转/四角编辑结果，不可撤销）
+  const clearBtn = document.getElementById('btn-clear');
+  let clearArmed = false;
+  let clearTimer = null;
+  clearBtn.addEventListener('click', () => {
     if (getPages().length === 0) return;
+    if (!clearArmed) {
+      clearArmed = true;
+      clearBtn.textContent = '确认清空？';
+      clearBtn.classList.add('btn-clear-all--armed');
+      clearTimer = setTimeout(() => {
+        clearArmed = false;
+        clearBtn.textContent = '清空';
+        clearBtn.classList.remove('btn-clear-all--armed');
+      }, 4000);
+      return;
+    }
+    clearTimeout(clearTimer);
+    clearArmed = false;
+    clearBtn.textContent = '清空';
+    clearBtn.classList.remove('btn-clear-all--armed');
     clearPages();
     showToast('已清空', 'info');
   });
+
+  // 页面顺序（上移 / 下移：移动端 HTML5 拖拽不可用，同时提供键盘可达路径）
+  const moveSelected = (dir) => {
+    const page = getSelected();
+    if (!page) return;
+    const idx = getPages().indexOf(page);
+    const to = idx + dir;
+    if (to < 0 || to >= getPages().length) return;
+    movePage(idx, to);
+  };
+  document.getElementById('btn-move-up').addEventListener('click', () => moveSelected(-1));
+  document.getElementById('btn-move-down').addEventListener('click', () => moveSelected(1));
 
   // 滤镜切换（同步刷新缩略图，保持列表与画布一致）
   document.querySelectorAll('#filter-segmented .segmented__btn').forEach(btn => {

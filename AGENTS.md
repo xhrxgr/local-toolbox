@@ -246,6 +246,9 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - 文件类型标签（PDF/DOC/XLS/...）替代 emoji 图标
 - Excel 操作显示工作表下拉（自动读取 sheet 名）
 - 进度条显示当前阶段 + 百分比 + 状态文本
+- 错误提示中文化：`friendlyError()` 将第三方库英文报错映射为中文（加密 PDF / 文件损坏 / 内存不足 / 库加载失败等），未命中则透传原文
+- 解析结果兜底校验：Excel handler 拦截空表/乱码（SheetJS 会把损坏文件解析出 NUL 字符），文本结果为空或含大量控制字符时给出警告而非静默展示
+- 预览 iframe 加 `sandbox=""`，阻断转换 HTML 中的脚本执行
 
 ## 扫描文档工具功能（tools/scandoc/，2026-10-19 新增）
 ### 定位
@@ -271,9 +274,14 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - 角点存储为**原图相对坐标**（0-1，TL/TR/BR/BL 序）；旋转时角点不变，渲染时经 `cornersToRotated` 映射到旋转后画布，`rotatedToCorners` 逆向转换拖拽输入
 - SVG 元素无 `.hidden` IDL 属性（HTMLElement 才有），显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
 - SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类（`.corner-poly` / `.corner-handle`）
+- 层级：角点覆盖层 z-index 25 > 矫正预览 15（否则右下角手柄被浮动预览挡住），忙碌遮罩 30，Toast 300
 - PDF 页面顺序 = 导入顺序（新页追加末尾），列表拖拽排序；导出按当前数组顺序
+- 排序双通道：列表 HTML5 拖拽（桌面）+ 工具栏「上移/下移」按钮（移动端 DnD 不可用，同时键盘可达）
 - 导入时自动检测四角，失败回退默认整图四角（内缩 2%），用户可手动拖拽调整
 - 转换防重入 + 忙碌遮罩 + Toast 反馈，与 document 工具一致
+- 导入失败（HEIC 等浏览器不支持格式、文件损坏）必须显式提示文件名与原因，不能静默跳过
+- 清空为破坏性操作且不可撤销，按钮需二次确认（4 秒未确认自动还原）
+- 导入串行队列：入队时必须同步拷贝 `FileList`（事件结束后即失效）
 
 ### 踩过的坑（2026-10-19 调试记录）
 - 连通域坐标反推宽度用 `Math.sqrt(length)` 只对正方形图有效，必须显式传 w/h

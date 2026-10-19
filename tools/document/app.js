@@ -206,10 +206,28 @@ async function convert() {
   } catch (err) {
     console.error('[文档转换失败]', err);
     showProgress(false);
-    showToast('转换失败：' + (err.message || String(err)), 'error');
+    showToast('转换失败：' + friendlyError(err), 'error', 6000);
   } finally {
     setConvertBusy(false);
   }
+}
+
+/** 把第三方库的英文报错转成用户能看懂的中文（未命中则透传原文） */
+function friendlyError(err) {
+  const msg = err?.message || String(err);
+  const rules = [
+    [/encrypted|password/i, 'PDF 已加密，请先解密后再转换'],
+    [/Invalid PDF|PDFParseError|not a PDF/i, 'PDF 文件已损坏或格式不正确'],
+    [/No valid images|unsupported image/i, '图片格式不受支持，请换 JPG / PNG'],
+    [/Cannot read properties of null/i, '文件内容为空或结构异常'],
+    [/out of memory|RangeError|Array buffer/i, '文件过大导致内存不足，请换小文件或减少数量'],
+    [/Failed to fetch|NetworkError/i, '处理库加载失败，请检查网络后重试'],
+    [/JSZip|zip/i, '文件结构异常（压缩包损坏）'],
+  ];
+  for (const [pattern, text] of rules) {
+    if (pattern.test(msg)) return text;
+  }
+  return msg;
 }
 
 /* ========== 结果展示 ========== */
@@ -220,6 +238,10 @@ function showResult(op, result) {
     const downloadBtn = document.getElementById('btn-download-text');
     const viewToggle = document.getElementById('result-view-toggle');
     resultEl.textContent = result.text;
+    // 通用兜底：解析器对损坏文件可能返回空内容或控制字符乱码，明确告知用户
+    if (!result.text || !result.text.trim() || /\0{4,}/.test(result.text)) {
+      showToast('未从文件中解析到有效内容，请确认文件是否损坏或格式是否正确', 'warning', 5000);
+    }
     if (result.filename) {
       downloadBtn.hidden = false;
       downloadBtn.onclick = () => {

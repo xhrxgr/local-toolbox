@@ -23,8 +23,16 @@ export async function excelToCsv(ctx) {
   if (sheetIdx >= wb.SheetNames.length) throw new Error(`工作表索引 ${sheetIdx} 超出范围（共 ${wb.SheetNames.length} 个工作表）`);
   const ws = wb.Sheets[wb.SheetNames[sheetIdx]];
   const csv = XLSX.utils.sheet_to_csv(ws, { FS, RS: '\n' });
+  assertParsed(csv, file.name);
   setProgress('完成', '', 100);
   return { text: csv, filename: `${getBaseName(file.name)}.csv` };
+}
+
+/** SheetJS 对损坏文件会解析出空表/乱码，这里显式拦截，避免把垃圾当成功结果 */
+function assertParsed(text, fileName) {
+  if (!text || !text.trim() || /^[\s\0]+$/.test(text)) {
+    throw new Error(`未从「${fileName}」解析到表格内容，文件可能已损坏或不是有效的 Excel 文件`);
+  }
 }
 
 /* ========== Excel → JSON ========== */
@@ -38,6 +46,9 @@ export async function excelToJson(ctx) {
   if (sheetIdx >= wb.SheetNames.length) throw new Error(`工作表索引 ${sheetIdx} 超出范围（共 ${wb.SheetNames.length} 个工作表）`);
   const ws = wb.Sheets[wb.SheetNames[sheetIdx]];
   const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  if (!Array.isArray(json) || json.length === 0) {
+    throw new Error(`未从「${file.name}」解析到数据行，文件可能已损坏或第一个工作表为空`);
+  }
   setProgress('完成', '', 100);
   return { text: JSON.stringify(json, null, 2), filename: `${getBaseName(file.name)}.json` };
 }

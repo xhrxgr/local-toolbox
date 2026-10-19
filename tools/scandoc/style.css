@@ -57,6 +57,17 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
+/* 清空二次确认状态 */
+.btn-clear-all--armed {
+  color: #fff;
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-clear-all--armed:hover {
+  background: #dc2626;
+}
+
 /* ========== 主体两栏 ========== */
 .scan-body {
   display: grid;
@@ -395,7 +406,8 @@
   background: rgba(15, 23, 42, 0.55);
   color: #fff;
   font-size: var(--text-sm);
-  z-index: 20;
+  /* 高于四角覆盖层(25)，处理中禁止拖拽角点 */
+  z-index: 30;
 }
 
 .scan-busy__spinner {
@@ -415,7 +427,8 @@
 .corner-layer {
   position: absolute;
   pointer-events: none;
-  z-index: 10;
+  /* 必须高于 .warp-preview(15)，否则右下角手柄会被浮动预览挡住无法拖拽 */
+  z-index: 25;
 }
 
 .corner-layer .corner-poly {

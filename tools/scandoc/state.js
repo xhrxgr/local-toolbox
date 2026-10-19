@@ -34,11 +34,15 @@ export function selectPage(id) {
   emit();
 }
 
-/** 导入图片文件 → 解码为页面，返回新增的页面（按导入时间追加到末尾） */
+/** 导入图片文件 → 解码为页面，返回 { added, failed }（按导入时间追加到末尾） */
 export async function addImageFiles(files) {
   const added = [];
+  const failed = [];
   for (const file of files) {
-    if (!isImageFile(file)) continue;
+    if (!isImageFile(file)) {
+      failed.push({ name: file.name || '未命名文件', reason: '非图片格式' });
+      continue;
+    }
     try {
       const img = await loadImage(file);
       pages.push({
@@ -53,14 +57,15 @@ export async function addImageFiles(files) {
       });
       added.push(pages[pages.length - 1]);
     } catch {
-      // 单张解码失败跳过
+      // 解码失败：HEIC 等浏览器不支持的格式，或文件损坏
+      failed.push({ name: file.name || '未命名文件', reason: '无法解码（HEIC 等格式浏览器不支持，或文件已损坏）' });
     }
   }
   if (added.length > 0 && !selectedId) {
     selectedId = added[0].id;
   }
   emit();
-  return added;
+  return { added, failed };
 }
 
 export function removePage(id) {
