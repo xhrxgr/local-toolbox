@@ -6,12 +6,12 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-DUubJM7S.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-CHg8WpVq.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-Bj-aeCuC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-Ccewxtzx.css">
 </head>
 <body>
   <main class="scan-app">
@@ -73,6 +73,19 @@
             <button class="btn btn-sm btn-secondary" id="btn-rotate-right" type="button" title="右转 90 度">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
                 <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            </button>
+          </div>
+          <div class="scan-toolbar__group" role="group" aria-label="页面顺序">
+            <span class="scan-toolbar__label">顺序</span>
+            <button class="btn btn-sm btn-secondary" id="btn-move-up" type="button" title="当前页上移" aria-label="当前页上移">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </button>
+            <button class="btn btn-sm btn-secondary" id="btn-move-down" type="button" title="当前页下移" aria-label="当前页下移">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
               </svg>
             </button>
           </div>
