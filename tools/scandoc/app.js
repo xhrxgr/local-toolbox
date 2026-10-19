@@ -188,6 +188,7 @@ function syncToolbar(page) {
   });
   document.getElementById('btn-rotate-left').disabled = !hasPage || isWorking;
   document.getElementById('btn-move-up').disabled = !hasPage || isWorking;
+  document.getElementById('btn-erase-ink').disabled = !hasPage || isWorking;
   document.getElementById('btn-move-down').disabled = !hasPage || isWorking;
   document.getElementById('btn-rotate-right').disabled = !hasPage || isWorking;
   document.getElementById('btn-detect').disabled = !hasPage || isWorking;
@@ -257,6 +258,35 @@ async function autoDetect(page) {
   } finally {
     setBusy(null);
     if (getSelected() === page) renderEditor();
+  }
+}
+
+/* ========== 去手写 ========== */
+async function eraseCurrentPage() {
+  const page = getSelected();
+  if (!page) return;
+  const type = document.getElementById('ink-type').value;
+  setBusy('准备去手写...');
+  try {
+    const mod = await import('./handwriting/app.js');
+    const res = await mod.eraseHandwriting(page, type, (stage, ratio) => {
+      setBusy(`${stage}... ${Math.round(ratio * 100)}%`);
+    });
+    // 用修复后的图替换原图；滤镜重置为原图（结果本身已是修复过的图像），
+    // 旋转与四角保持不变（输出与输入同尺寸，几何关系未变）
+    updatePage(page.id, { img: res.img, filter: 'original', thumb: null });
+    await refreshThumb(page);
+    renderPageList();
+    showToast(
+      `已擦除${(res.coverage * 100).toFixed(1)}% 区域的${type === 'red' ? '红笔' : '蓝笔'}笔迹（${(res.ms / 1000).toFixed(1)} 秒）`,
+      'success'
+    );
+  } catch (err) {
+    const msg = (err && err.message) || String(err);
+    showToast(msg, err && err.code === 'NO_INK' ? 'warning' : 'error', 4200);
+    console.error('[去手写] 失败', err);
+  } finally {
+    setBusy(null);
   }
 }
 
@@ -379,6 +409,9 @@ export function initScanDoc() {
     clearPages();
     showToast('已清空', 'info');
   });
+
+  // 去手写：对当前页擦除彩色笔迹
+  document.getElementById('btn-erase-ink').addEventListener('click', () => { eraseCurrentPage(); });
 
   // 页面顺序（上移 / 下移：移动端 HTML5 拖拽不可用，同时提供键盘可达路径）
   const moveSelected = (dir) => {

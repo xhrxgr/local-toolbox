@@ -17,7 +17,7 @@ export function cornersToRotated(corners, page) {
   const w = page.img.naturalWidth;
   const h = page.img.naturalHeight;
   const rot = ((page.rotation % 360) + 360) % 360;
-  return corners.map(p => {
+  const mapped = corners.map(p => {
     const x = p.x * w;
     const y = p.y * h;
     switch (rot) {
@@ -27,6 +27,11 @@ export function cornersToRotated(corners, page) {
       default: return { x, y };
     }
   });
+  // 角点顺序必须随旋转一起调整：角点始终按原图的 TL/TR/BR/BL 存储，
+  // 旋转后原 TL 可能跑到右上角，若不重排，矫正会把页面又转回去，
+  // 表现为导出结果被转置（非正方形页面尤其明显）
+  const order = { 0: [0, 1, 2, 3], 90: [3, 0, 1, 2], 180: [2, 3, 0, 1], 270: [1, 2, 3, 0] }[rot];
+  return order.map(i => mapped[i]);
 }
 
 /** cornersToRotated 的逆变换：旋转后画布坐标 → 原图相对坐标 */
@@ -65,14 +70,17 @@ export function renderPage(page, opts = {}) {
   rotated.height = rh;
   const rctx = rotated.getContext('2d', { willReadFrequently: true });
   rctx.save();
+  // 平移量必须用旋转后画布的对应边长：90° 时是 rw（=原图高），270° 时是 rh（=原图宽）。
+  // 用错会导致非正方形图片错位，且四角映射（cornersToRotated）与实际绘制不一致，
+  // 矫正时采样到空白区，导出会得到近乎空白的 PDF
   if (rot === 90) {
-    rctx.translate(rh, 0);
+    rctx.translate(rw, 0);
     rctx.rotate(Math.PI / 2);
   } else if (rot === 180) {
     rctx.translate(rw, rh);
     rctx.rotate(Math.PI);
   } else if (rot === 270) {
-    rctx.translate(0, rw);
+    rctx.translate(0, rh);
     rctx.rotate(-Math.PI / 2);
   }
   rctx.drawImage(img, 0, 0);

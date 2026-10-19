@@ -104,28 +104,7 @@ function switchTab(tab) {
     p.hidden = p.dataset.panel !== tab;
     p.classList.toggle('tab-panel--active', p.dataset.panel === tab);
   });
-  // 「图片去手写」是完整独立布局：隐藏转换用的公共上传区与结果区
-  const isInk = tab === 'image';
-  document.getElementById('upload-section').hidden = isInk;
-  document.getElementById('text-result-section').hidden = isInk;
-  document.getElementById('file-result-section').hidden = isInk;
-  if (isInk) {
-    mountInkPanel();
-    return;
-  }
   updateUIForOp();
-}
-
-/** 首次进入图片 Tab 时才加载笔迹消除模块：保持首屏零模型、零推理代码 */
-let inkMounted = false;
-function mountInkPanel() {
-  if (inkMounted) return;
-  inkMounted = true;
-  import('./inkerase/app.js').then(m => m.initInkErase()).catch(err => {
-    inkMounted = false;
-    console.error('[图片去手写] 模块加载失败', err);
-    showToast('笔迹消除模块加载失败，请刷新重试', 'error');
-  });
 }
 
 /* ========== 文本类操作：从文件导入 ========== */

@@ -41,7 +41,7 @@
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
 - **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）
 - **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown、text（文本工具）、chmod（权限计算器）、sqlcron（SQL/CRON）、unicode（Unicode 查看器）、crypto（加解密）
-- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）；document 工具新增「图片去手写」Tab（红蓝笔自动识别 + MI-GAN 本地修复）
+- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/去手写/合并 PDF）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
 ## 首页搜索栏（核心功能）
@@ -299,48 +299,48 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - SVG 元素无 `.hidden` IDL 属性，显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
 - SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类
 
-## 图片去手写功能（文档工具第7 个 Tab，2026-10-19 新增）
+## 去手写功能（扫描文档的处理步骤，2026-10-19 新增）
 ### 定位
-纯前端擦除试卷/作业上的手写批注。图片全程留在浏览器，模型懒加载，首次下载后可离线使用。
+扫描流程中的一次页面处理：对当前页识别红笔/蓝笔批注并用本地 AI 修复背景，
+擦除后的图替换原图，后续滤镜、旋转、曲面矫正、PDF 导出照常作用于新图。
 
 ### 能力边界（如实标注，不夸大）
-- **已验证可用**：红笔批改、蓝笔批注 —— 颜色检测出掩码 + MI-GAN 修复背景
-- **不提供**：黑笔与铅笔手写 —— 与印刷体同为深色，按亮度识别会误删印刷文字和表格线；
-  可用画笔手动涂抹标记
-- 被笔迹完全遮住的印刷文字无法保证还原（所有 GAN 修复模型的共性局限）
+- **已验证可用**：红笔批改、蓝笔批注（颜色检测出掩码 + MI-GAN 修复）
+- **不提供**：黑笔与铅笔手写——与印刷体同为深色，按亮度识别会误删印刷文字和表格线
+- 被笔迹完全遮住的印刷文字无法保证还原（GAN 修复模型的共性局限）
 
-### 模块结构
-- `tools/document/inkerase/app.js`：协调层（进入 Tab 时动态 import，首屏不加载）
-- `tools/document/inkerase/model-manager.js`：模型懒加载、Cache Storage 缓存、SHA-256 完整性校验
-- `tools/document/inkerase/inpaint-worker.js`：ONNX Runtime Web 推理（Worker 隔离）
-- `tools/document/inkerase/mask-editor.js`：画笔/橡皮、撤销重做、膨胀
-- `tools/document/inkerase/detect-ink.js`：红蓝笔颜色检测（零模型）、去噪、形态学膨胀
-- `tools/document/inkerase/models/migan.onnx`：MI-GAN 流水线 ONNX（26.8 MB，MIT）
+### 模块结构（tools/scandoc/handwriting/）
+- `app.js`：流程编排（检测 → 膨胀 → 推理 → 替换页面图像）
+- `model-manager.js`：模型懒加载、Cache Storage 缓存、SHA-256 校验
+- `inpaint-worker.js`：ONNX Runtime Web 推理（Worker 隔离）
+- `detect-ink.js`：红蓝笔颜色检测（零模型）、去噪、形态学膨胀
+- `models/migan.onnx`：MI-GAN 流水线 ONNX（26.8 MB，MIT）
 
 ### 关键实现要点
-- **输入签名以模型文件为准**：`image` uint8 [1,3,H,W]、`mask` uint8 [1,1,H,W]、输出 `result`，
-  其中掩码 **0 = 待修复（挖洞）、255 = 保留**；输出是 CHW 三平面，需转成 RGBA 才能显示
-- **postMessage 传的是 ArrayBuffer**，在 Worker 里必须 `new Uint8Array(buf)` 再按下标访问，
-  否则读到 undefined，模型会收到全黑图像且不报错
-- **只走 WASM，不启用 WebGPU**：调研发现 LaMa 在 WebGPU 上会静默输出纯白；
-  MI-GAN 的 GPU 行为未验证，按「不把未验证的模型标记为可用」的原则只用 CPU 路径
-- **掩码必须膨胀**：检测出的掩码边缘比笔迹可见边缘小 1~2px，不膨胀时修复后残留一圈原色
-  （实测残留率 54%，膨胀 3px 后降至 0）
-- **懒加载**：首屏只有 14.8 KB 的 JS，模型与 ORT 运行时都不在首屏；
-  用户点「开始擦除」才下载，之后存 Cache Storage，二次访问直接命中
-- **iOS 内存**：推理放 Worker，空闲 30 秒销毁 Worker 归还 WASM 堆；`numThreads = 1`
-  （Safari 不支持嵌套 Worker，多线程会静默卡住）
+- **输入签名以模型文件为准**：`image` uint8 [1,3,H,W]、`mask` uint8 [1,1,H,W]、输出 `result`；
+  掩码 **0 = 待修复、255 = 保留**；输出是 CHW 三平面，需组装成 RGBA
+- **postMessage 传的是 ArrayBuffer**，Worker 里必须 `new Uint8Array(buf)` 再按下标访问
+- **只走 WASM 不启用 WebGPU**：调研发现同类模型在 WebGPU 上会静默输出错误结果
+- **掩码必须膨胀 3px**：检测掩码边缘比笔迹可见边缘小，不膨胀会残留一圈原色（实测残留 54% → 0）
+- **工作分辨率分档**：默认长边 2200，iOS 与低内存设备降到 1600
+- 推理在 Worker，空闲 30 秒销毁归还 WASM 堆；`numThreads = 1`（Safari 无嵌套 Worker）
 - ORT 运行时由 vite.config.js 在配置加载时从 node_modules 同步到
-  `tools/document/inkerase/runtime/`，该目录不入 git
-- 该 Tab 是完整独立布局：切换到它时隐藏文档工具的公共上传区与结果区，切走时恢复
+  `tools/scandoc/handwriting/runtime/`，该目录不入 git
 
-### 实测结果（合成测试图：红笔覆盖印刷文字，600×800）
+### 旋转与矫正的坐标约定（曾有 Bug，务必保留）
+- 90°/270° 旋转的平移量必须用旋转后画布的对应边长：90° 用 `translate(rw,0)`、270° 用 `translate(0,rh)`。
+  用错会让非正方形图片错位，且与角点映射不一致，矫正时采样到空白区，导出近乎空白的 PDF
+- **角点顺序必须随旋转一起重排**：角点按原图 TL/TR/BR/BL 存储，旋转后原 TL 可能跑到右上角；
+  不重排会让矫正把页面又转回去。顺序表：0° [0,1,2,3]、90° [3,0,1,2]、180° [2,3,0,1]、270° [1,2,3,0]
+
+### 实测结果（合成测试图 600×800，红笔覆盖印刷文字）
 | 指标 | 结果 |
 | --- | --- |
-| 首屏下载 | 13 个请求 / 4 KB（零模型） |
+| 页面加载 | 无模型下载（模型仅在点击擦除后拉取） |
 | 红笔消除率 | 100% |
 | 印刷字保留率 | 107% |
-| 推理耗时 | 3.0 秒（桌面 WASM） |
+| 推理耗时 | 约 2.5 秒 |
+| 擦除后导出 PDF | 正常（旋转 0/90/180/270 四向均已回归） |
 
 ## TOTP 迁移工具功能
 ### 核心

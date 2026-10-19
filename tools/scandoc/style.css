@@ -585,3 +585,13 @@
     max-height: 60vh;
   }
 }
+
+/* 去手写：笔迹类型下拉 */
+.scan-select {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: var(--text-sm);
+}

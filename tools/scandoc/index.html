@@ -74,6 +74,14 @@
               </svg>
             </button>
           </div>
+          <div class="scan-toolbar__group" role="group" aria-label="去除手写">
+            <span class="scan-toolbar__label" title="自动识别彩色笔迹并用本地 AI 修复背景，仅支持红笔与蓝笔">去手写</span>
+            <select class="scan-select" id="ink-type" aria-label="笔迹类型">
+              <option value="red">红笔</option>
+              <option value="blue">蓝笔</option>
+            </select>
+            <button class="btn btn-sm btn-secondary" id="btn-erase-ink" type="button" title="对当前页擦除笔迹">擦除</button>
+          </div>
           <div class="scan-toolbar__group" role="group" aria-label="页面顺序">
             <span class="scan-toolbar__label">顺序</span>
             <button class="btn btn-sm btn-secondary" id="btn-move-up" type="button" title="当前页上移" aria-label="当前页上移">

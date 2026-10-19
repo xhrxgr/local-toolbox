@@ -32,7 +32,7 @@
 | 开发 | Unicode 查看器 | 字符码点 / 编码 / 名称查询，字符可视化 |
 | 开发 | 加解密 | AES / DES / RC4 / Rabbit，哈希，编码转换 |
 | 文档 | 文档转换 | PDF/Word/Excel/CSV/Markdown/HTML/TXT/RTF/EPUB 本地互转，6 Tab |
-| 文档 | 扫描文档 | 图片转文档：批量导入、黑白/增强滤镜、曲面矫正、四角裁剪、按序合并 PDF |
+| 文档 | 扫描文档 | 图片转文档：批量导入、黑白/增强滤镜、曲面矫正、四角裁剪、去手写（红蓝笔擦除）、按序合并 PDF |
 | 实用 | 二维码 | 生成 / 识别（jsqr），自定义颜色与容错级别 |
 | 实用 | 颜色转换 | HEX / RGB / HSL / HSV 互转，调色板，对比度检测 |
 | 实用 | 密码生成 | 随机密码 / 密码短语，强度评估 |
@@ -121,7 +121,7 @@ location / {
 │   ├── crypto/             # 加解密
 │   ├── document/           # 文档转换（app.js + operations.js + tab-loaders.js + handlers/ + ui/）
 │   ├── scandoc/            # 扫描文档（app.js + state.js + render.js + filters.js + warp.js + detect.js + corners-ui.js + exporter.js + lib/）
-││   └── inkerase/         # 「图片去手写」Tab（app.js + model-manager.js + inpaint-worker.js + mask-editor.js + detect-ink.js + models/）
+│   └── handwriting/      # 去手写处理步骤（app.js + model-manager.js + inpaint-worker.js + detect-ink.js + models/）
 │   ├── qrcode/             # 二维码
 │   ├── color/              # 颜色转换
 │   ├── password/           # 密码生成
