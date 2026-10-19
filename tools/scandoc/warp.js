@@ -120,74 +120,88 @@ export function warpPerspective(srcCanvas, corners, maxSize = Infinity) {
   const out = document.createElement('canvas');
   out.width = outW;
   out.height = outH;
-  const ctx = out.getContext('2d');
+  const ctx = out.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, outW, outH);
 
-  // 网格切分（三角形 affine 近似）
-  const COLS = 24;
-  const ROWS = 24;
-  const cw = outW / COLS;
-  const ch = outH / ROWS;
+  const sw = srcCanvas.width;
+  const sh = srcCanvas.height;
 
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      // 格四角（dst 坐标）
-      const x0 = c * cw;
-      const y0 = r * ch;
-      const x1 = (c + 1) * cw;
-      const y1 = (r + 1) * ch;
-      // 反查到源图坐标
-      const p00 = applyH(Hinv, x0, y0);
-      const p10 = applyH(Hinv, x1, y0);
-      const p11 = applyH(Hinv, x1, y1);
-      const p01 = applyH(Hinv, x0, y1);
-      // 两个三角形：dst 与 src 一一对应
-      drawTexTriangle(ctx, srcCanvas, p00, p10, p11, { x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 });
-      drawTexTriangle(ctx, srcCanvas, p00, p11, p01, { x: x0, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 });
+  // 快速路径：四角几乎构成轴对齐矩形时（多数平拍照片），
+  // 直接裁剪绘制即可，没必要逐像素反查——省掉几百毫秒的 JS 计算
+  const xs = corners.map(c => c.x);
+  const ys = corners.map(c => c.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const tol = Math.max(1, Math.max(outW, outH) * 0.002);
+  const axisAligned = corners.every((c, i) => {
+    const wantX = (i === 1 || i === 2) ? maxX : minX;
+    const wantY = (i === 2 || i === 3) ? maxY : minY;
+    return Math.abs(c.x - wantX) <= tol && Math.abs(c.y - wantY) <= tol;
+  });
+  if (axisAligned) {
+    const cw = maxX - minX;
+    const chh = maxY - minY;
+    if (cw > 2 && chh > 2) {
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(srcCanvas, minX, minY, cw, chh, 0, 0, outW, outH);
+      return out;
     }
   }
+
+  // 逐像素反查 + 双线性采样。
+  // 早前用「网格切分为三角形 + 每块 affine 近似」实现：透视变换本身不是仿射的，
+  // 相邻块在共享边上的反查源坐标不完全一致，会留下发丝状缝隙，
+  // 在导出图上表现为规则网格线。逐像素反查是精确解，结构上不存在接缝。
+  const srcData = srcCanvas.getContext('2d').getImageData(0, 0, sw, sh).data;
+  const outData = ctx.createImageData(outW, outH);
+  const px = outData.data;
+  const h0 = Hinv[0], h1 = Hinv[1], h2 = Hinv[2];
+  const h3 = Hinv[3], h4 = Hinv[4], h5 = Hinv[5];
+  const h6 = Hinv[6], h7 = Hinv[7], h8 = Hinv[8];
+
+  for (let y = 0; y < outH; y++) {
+    // 按行预计算分子分母，x 方向增量累加，避免每像素重复乘法
+    let nx = h1 * y + h2;
+    let ny = h4 * y + h5;
+    let nw = h7 * y + h8;
+    let o = y * outW * 4;
+    for (let x = 0; x < outW; x++) {
+      // 一次倒数供两个坐标共用，比分别做两次除法省一半开销
+      const dd = nw !== 0 ? nw : 1e-6;
+      const inv = 1 / dd;
+      const fx = nx * inv - 0.5;
+      const fy = ny * inv - 0.5;
+      nx += h0;
+      ny += h3;
+      nw += h6;
+
+      if (fx < 0 || fy < 0 || fx > sw - 1 || fy > sh - 1) {
+        px[o] = 255; px[o + 1] = 255; px[o + 2] = 255; px[o + 3] = 255;
+        o += 4;
+        continue;
+      }
+      const ix = fx | 0;
+      const iy = fy | 0;
+      const ax = fx - ix;
+      const ay = fy - iy;
+      const i0 = (iy * sw + ix) * 4;
+      const i1 = i0 + 4;
+      const i2 = i0 + sw * 4;
+      const i3 = i2 + 4;
+      const w00 = (1 - ax) * (1 - ay);
+      const w10 = ax * (1 - ay);
+      const w01 = (1 - ax) * ay;
+      const w11 = ax * ay;
+      px[o] = srcData[i0] * w00 + srcData[i1] * w10 + srcData[i2] * w01 + srcData[i3] * w11;
+      px[o + 1] = srcData[i0 + 1] * w00 + srcData[i1 + 1] * w10 + srcData[i2 + 1] * w01 + srcData[i3 + 1] * w11;
+      px[o + 2] = srcData[i0 + 2] * w00 + srcData[i1 + 2] * w10 + srcData[i2 + 2] * w01 + srcData[i3 + 2] * w11;
+      px[o + 3] = 255;
+      o += 4;
+    }
+  }
+  ctx.putImageData(outData, 0, 0);
   return out;
-}
-
-/** 纹理三角形：把 src 中 (t0,t1,t2) 区域画到 dst 的 (d0,d1,d2) */
-function drawTexTriangle(ctx, src, t0, t1, t2, d0, d1, d2) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(d0.x, d0.y);
-  ctx.lineTo(d1.x, d1.y);
-  ctx.lineTo(d2.x, d2.y);
-  ctx.closePath();
-  ctx.clip();
-
-  // 由三对点求 affine：dst = M · src
-  const [a, b, c, d, e, f] = solveAffine(t0, t1, t2, d0, d1, d2);
-  ctx.transform(a, b, c, d, e, f);
-  ctx.drawImage(src, 0, 0);
-  ctx.restore();
-}
-
-/** 三对点求解 affine 变换（2x3 矩阵） */
-function solveAffine(s0, s1, s2, d0, d1, d2) {
-  const x0 = s0.x;
-  const y0 = s0.y;
-  const x1 = s1.x;
-  const y1 = s1.y;
-  const x2 = s2.x;
-  const y2 = s2.y;
-  const denom = x0 * (y1 - y2) - x1 * (y0 - y2) + x2 * (y0 - y1);
-  if (Math.abs(denom) < 1e-9) return [1, 0, 0, 0, 1, 0];
-  const u0 = d0.x;
-  const v0 = d0.y;
-  const u1 = d1.x;
-  const v1 = d1.y;
-  const u2 = d2.x;
-  const v2 = d2.y;
-  const a = (u0 * (y1 - y2) - u1 * (y0 - y2) + u2 * (y0 - y1)) / denom;
-  const c = (v0 * (y1 - y2) - v1 * (y0 - y2) + v2 * (y0 - y1)) / denom;
-  const b = (u0 * (x2 - x1) - u1 * (x2 - x0) + u2 * (x1 - x0)) / denom;
-  const d = (v0 * (x2 - x1) - v1 * (x2 - x0) + v2 * (x1 - x0)) / denom;
-  const e = (u0 * (x1 * y2 - x2 * y1) - u1 * (x0 * y2 - x2 * y0) + u2 * (x0 * y1 - x1 * y0)) / denom;
-  const f = (v0 * (x1 * y2 - x2 * y1) - v1 * (x0 * y2 - x2 * y0) + v2 * (x0 * y1 - x1 * y0)) / denom;
-  return [a, b, c, d, e, f];
 }
