@@ -2,7 +2,7 @@
  * 笔迹消除：协调层
  * 负责状态流转、画布渲染、交互绑定与推理调度
  */
-import { showToast } from './lib/toast.js';
+import { showToast } from '../ui/toast.js';
 import { MaskEditor } from './mask-editor.js';
 import { detectColoredInk, maskRatio } from './detect-ink.js';
 import { MODEL_INFO, ensureModel, isModelCached, requestPersistence, runtimeWasmPaths } from './model-manager.js';
@@ -23,7 +23,12 @@ let showMask = true;
 let stroke = null;       // 当前拖拽笔画
 let rafPending = false;
 
+let inited = false;
+
+/** 首次进入「图片」Tab 时才挂载，确保首屏不加载模型与推理代码 */
 export function initInkErase() {
+  if (inited) return;
+  inited = true;
   const ids = [
     'ink-drop', 'ink-file', 'ink-meta', 'ink-meta-name', 'ink-meta-size', 'ink-meta-dim',
     'ink-canvas-wrap', 'ink-mode-paint', 'ink-mode-erase', 'ink-undo', 'ink-redo',

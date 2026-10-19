@@ -35,13 +35,13 @@
 └── package.json
 ```
 
-## 工具列表（31 个）
+## 工具列表（30 个）
 - **媒体 (media)**：ffmpeg（多媒体转换）、image（图片处理）、svg（SVG 优化器）、ocr（OCR 图片识字）
 - **时间 (time)**：countdown、stopwatch、timestamp、worldclock
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
 - **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）
 - **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown、text（文本工具）、chmod（权限计算器）、sqlcron（SQL/CRON）、unicode（Unicode 查看器）、crypto（加解密）
-- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）、inkerase（笔迹消除：红蓝笔自动识别 + MI-GAN 本地修复）
+- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）；document 工具新增「图片去手写」Tab（红蓝笔自动识别 + MI-GAN 本地修复）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
 ## 首页搜索栏（核心功能）
@@ -299,7 +299,7 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - SVG 元素无 `.hidden` IDL 属性，显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
 - SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类
 
-## 笔迹消除工具功能（tools/inkerase/，2026-10-19 新增）
+## 图片去手写功能（文档工具第7 个 Tab，2026-10-19 新增）
 ### 定位
 纯前端擦除试卷/作业上的手写批注。图片全程留在浏览器，模型懒加载，首次下载后可离线使用。
 
@@ -310,12 +310,12 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - 被笔迹完全遮住的印刷文字无法保证还原（所有 GAN 修复模型的共性局限）
 
 ### 模块结构
-- `app.js`：协调层（状态流转、画布渲染、交互绑定、推理调度）
-- `model-manager.js`：模型懒加载、Cache Storage 缓存、SHA-256 完整性校验
-- `inpaint-worker.js`：ONNX Runtime Web 推理（Worker 隔离）
-- `mask-editor.js`：画笔/橡皮、撤销重做、膨胀
-- `detect-ink.js`：红蓝笔颜色检测（零模型）、去噪、形态学膨胀
-- `models/migan.onnx`：MI-GAN 流水线 ONNX（26.8 MB，MIT）
+- `tools/document/inkerase/app.js`：协调层（进入 Tab 时动态 import，首屏不加载）
+- `tools/document/inkerase/model-manager.js`：模型懒加载、Cache Storage 缓存、SHA-256 完整性校验
+- `tools/document/inkerase/inpaint-worker.js`：ONNX Runtime Web 推理（Worker 隔离）
+- `tools/document/inkerase/mask-editor.js`：画笔/橡皮、撤销重做、膨胀
+- `tools/document/inkerase/detect-ink.js`：红蓝笔颜色检测（零模型）、去噪、形态学膨胀
+- `tools/document/inkerase/models/migan.onnx`：MI-GAN 流水线 ONNX（26.8 MB，MIT）
 
 ### 关键实现要点
 - **输入签名以模型文件为准**：`image` uint8 [1,3,H,W]、`mask` uint8 [1,1,H,W]、输出 `result`，
@@ -330,8 +330,9 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
   用户点「开始擦除」才下载，之后存 Cache Storage，二次访问直接命中
 - **iOS 内存**：推理放 Worker，空闲 30 秒销毁 Worker 归还 WASM 堆；`numThreads = 1`
   （Safari 不支持嵌套 Worker，多线程会静默卡住）
-- ORT 运行时由 vite.config.js 在配置加载时从 node_modules 同步到 `tools/inkerase/runtime/`，
-  该目录不入 git
+- ORT 运行时由 vite.config.js 在配置加载时从 node_modules 同步到
+  `tools/document/inkerase/runtime/`，该目录不入 git
+- 该 Tab 是完整独立布局：切换到它时隐藏文档工具的公共上传区与结果区，切走时恢复
 
 ### 实测结果（合成测试图：红笔覆盖印刷文字，600×800）
 | 指标 | 结果 |
