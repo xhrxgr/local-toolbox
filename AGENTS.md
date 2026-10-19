@@ -35,13 +35,13 @@
 └── package.json
 ```
 
-## 工具列表（30 个）
+## 工具列表（31 个）
 - **媒体 (media)**：ffmpeg（多媒体转换）、image（图片处理）、svg（SVG 优化器）、ocr（OCR 图片识字）
 - **时间 (time)**：countdown、stopwatch、timestamp、worldclock
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
 - **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）
 - **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown、text（文本工具）、chmod（权限计算器）、sqlcron（SQL/CRON）、unicode（Unicode 查看器）、crypto（加解密）
-- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）
+- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）、inkerase（笔迹消除：红蓝笔自动识别 + MI-GAN 本地修复）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
 ## 首页搜索栏（核心功能）
@@ -298,6 +298,48 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - **事件的 `FileList` / `DataTransfer.files` 在事件结束后即失效**：把导入处理放进 Promise 队列（微任务）时必须先 `Array.from` 同步拷贝，否则队列执行时拿到空列表
 - SVG 元素无 `.hidden` IDL 属性，显隐必须用 `setAttribute/removeAttribute('hidden')`，否则被 global.css 的 `[hidden]{display:none!important}` 挡住
 - SVG 表现属性不支持 `var(--accent)`，颜色一律走 CSS 类
+
+## 笔迹消除工具功能（tools/inkerase/，2026-10-19 新增）
+### 定位
+纯前端擦除试卷/作业上的手写批注。图片全程留在浏览器，模型懒加载，首次下载后可离线使用。
+
+### 能力边界（如实标注，不夸大）
+- **已验证可用**：红笔批改、蓝笔批注 —— 颜色检测出掩码 + MI-GAN 修复背景
+- **不提供**：黑笔与铅笔手写 —— 与印刷体同为深色，按亮度识别会误删印刷文字和表格线；
+  可用画笔手动涂抹标记
+- 被笔迹完全遮住的印刷文字无法保证还原（所有 GAN 修复模型的共性局限）
+
+### 模块结构
+- `app.js`：协调层（状态流转、画布渲染、交互绑定、推理调度）
+- `model-manager.js`：模型懒加载、Cache Storage 缓存、SHA-256 完整性校验
+- `inpaint-worker.js`：ONNX Runtime Web 推理（Worker 隔离）
+- `mask-editor.js`：画笔/橡皮、撤销重做、膨胀
+- `detect-ink.js`：红蓝笔颜色检测（零模型）、去噪、形态学膨胀
+- `models/migan.onnx`：MI-GAN 流水线 ONNX（26.8 MB，MIT）
+
+### 关键实现要点
+- **输入签名以模型文件为准**：`image` uint8 [1,3,H,W]、`mask` uint8 [1,1,H,W]、输出 `result`，
+  其中掩码 **0 = 待修复（挖洞）、255 = 保留**；输出是 CHW 三平面，需转成 RGBA 才能显示
+- **postMessage 传的是 ArrayBuffer**，在 Worker 里必须 `new Uint8Array(buf)` 再按下标访问，
+  否则读到 undefined，模型会收到全黑图像且不报错
+- **只走 WASM，不启用 WebGPU**：调研发现 LaMa 在 WebGPU 上会静默输出纯白；
+  MI-GAN 的 GPU 行为未验证，按「不把未验证的模型标记为可用」的原则只用 CPU 路径
+- **掩码必须膨胀**：检测出的掩码边缘比笔迹可见边缘小 1~2px，不膨胀时修复后残留一圈原色
+  （实测残留率 54%，膨胀 3px 后降至 0）
+- **懒加载**：首屏只有 14.8 KB 的 JS，模型与 ORT 运行时都不在首屏；
+  用户点「开始擦除」才下载，之后存 Cache Storage，二次访问直接命中
+- **iOS 内存**：推理放 Worker，空闲 30 秒销毁 Worker 归还 WASM 堆；`numThreads = 1`
+  （Safari 不支持嵌套 Worker，多线程会静默卡住）
+- ORT 运行时由 vite.config.js 在配置加载时从 node_modules 同步到 `tools/inkerase/runtime/`，
+  该目录不入 git
+
+### 实测结果（合成测试图：红笔覆盖印刷文字，600×800）
+| 指标 | 结果 |
+| --- | --- |
+| 首屏下载 | 13 个请求 / 4 KB（零模型） |
+| 红笔消除率 | 100% |
+| 印刷字保留率 | 107% |
+| 推理耗时 | 3.0 秒（桌面 WASM） |
 
 ## TOTP 迁移工具功能
 ### 核心

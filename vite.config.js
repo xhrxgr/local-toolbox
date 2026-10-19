@@ -1,5 +1,23 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { copyFileSync, mkdirSync, existsSync } from 'fs';
+
+// ONNX Runtime Web 的 wasm 运行时体积较大且由 npm 管理，
+// 构建时同步到工具目录并交给 Vite 作为静态资源处理（不入 git）
+const ORT_DIST = resolve(__dirname, 'node_modules/onnxruntime-web/dist');
+const ORT_RUNTIME = resolve(__dirname, 'tools/inkerase/runtime');
+const ORT_FILES = ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs'];
+
+function syncOrtRuntime() {
+  if (!existsSync(ORT_DIST)) return;
+  mkdirSync(ORT_RUNTIME, { recursive: true });
+  for (const f of ORT_FILES) {
+    copyFileSync(resolve(ORT_DIST, f), resolve(ORT_RUNTIME, f));
+  }
+}
+
+// 配置加载时同步：必须早于模块解析，否则工具目录里的 wasm 还不存在
+syncOrtRuntime();
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/local-toolbox/' : '/',
@@ -29,6 +47,7 @@ export default defineConfig(({ mode }) => ({
         otpMigration: resolve(__dirname, 'tools/otp-migration/index.html'),
         document: resolve(__dirname, 'tools/document/index.html'),
         scandoc: resolve(__dirname, 'tools/scandoc/index.html'),
+        inkerase: resolve(__dirname, 'tools/inkerase/index.html'),
         text: resolve(__dirname, 'tools/text/index.html'),
         radix: resolve(__dirname, 'tools/radix/index.html'),
         chmod: resolve(__dirname, 'tools/chmod/index.html'),
@@ -44,6 +63,9 @@ export default defineConfig(({ mode }) => ({
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },
   plugins: [
+    {
+      name: 'sync-ort-runtime',
+    },
     {
       name: 'conditional-coep',
       configureServer(server) {
