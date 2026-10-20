@@ -5,6 +5,7 @@
  */
 
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 /* ========== Marked 配置 ========== */
 marked.setOptions({ gfm: true, breaks: false });
@@ -188,10 +189,34 @@ function insertAtCursor(ta, text) {
 /* ========== 渲染 ========== */
 function render(state) {
   const text = state.editor.value;
-  const html = marked.parse(text);
+  // marked 不消毒：原始 HTML（含 <img onerror>、<script>）会原样透传，
+  // 直接 innerHTML 就是 XSS——粘贴别人分享的 Markdown 即可触发。
+  // 这里必须过 DOMPurify，导出 HTML 时也要用同一份消毒结果。
+  const html = sanitizeHtml(marked.parse(text));
   state.preview.innerHTML = html;
   highlightAllCode(state.preview);
   buildToc(state);
+}
+
+/** 消毒 HTML：移除脚本、事件属性与危险协议 */
+function sanitizeHtml(dirty) {
+  const clean = DOMPurify.sanitize(dirty, {
+    USE_PROFILES: { html: true },
+    // 默认已剔除 script/iframe/on*，这里再挡掉表单与 srcdoc
+    FORBID_TAGS: ['style', 'form', 'input', 'button'],
+    FORBID_ATTR: ['srcdoc', 'formaction'],
+  });
+  // DOMPurify 默认保留 style 属性，而 expression() / url(javascript:) 在
+  // 老 IE 与部分内嵌环境中仍可执行，做一次值级清洗（不整体禁 style，
+  // 因为中文 Markdown 常用 style 做居中/颜色）
+  if (!/expression\s*\(|javascript:|moz-binding|-o-link/i.test(clean)) return clean;
+  const box = document.createElement('div');
+  box.innerHTML = clean;
+  box.querySelectorAll('[style]').forEach((el) => {
+    const v = el.getAttribute('style') || '';
+    if (/expression\s*\(|javascript:|moz-binding|-o-link/i.test(v)) el.removeAttribute('style');
+  });
+  return box.innerHTML;
 }
 
 /* ========== 目录生成 ========== */
@@ -310,7 +335,8 @@ ${bodyHtml}
 }
 
 function exportHtml(state) {
-  const bodyHtml = state.preview.innerHTML;
+  // 用消毒后的副本导出，避免把注入内容持久化进 .html 文件
+  const bodyHtml = sanitizeHtml(state.preview.innerHTML);
   const title = (state.preview.querySelector('h1')?.textContent || 'Markdown 文档').trim() || 'Markdown 文档';
   const full = buildExportDoc(title, bodyHtml);
   const blob = new Blob([full], { type: 'text/html;charset=utf-8' });

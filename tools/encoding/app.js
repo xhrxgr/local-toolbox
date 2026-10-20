@@ -69,7 +69,13 @@ function showMeta(el, html) {
 }
 
 function showError(el, msg) {
-  el.innerHTML = `<span class="meta-error">${msg}</span>`;
+  // 用 textContent：错误信息里会带用户输入的原文（如「无法识别的码值："<img onerror=...>"」），
+  // 走 innerHTML 就是 XSS
+  el.textContent = '';
+  const span = document.createElement('span');
+  span.className = 'meta-error';
+  span.textContent = msg;
+  el.appendChild(span);
 }
 
 /* ========== Base64 模式 ========== */

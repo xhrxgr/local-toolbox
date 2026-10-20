@@ -13,6 +13,10 @@ export function rotatedSize(page) {
 }
 
 /** 把相对角点（0-1，基于未旋转原图）映射到旋转后画布的绝对像素坐标 */
+/** 旋转后角点的显示顺序（元素是该顺序下标对应的「原图角点序号」）。
+ *  0° [0,1,2,3] / 90° [3,0,1,2] / 180° [2,3,0,1] / 270° [1,2,3,0] */
+const CORNER_ORDER = { 0: [0, 1, 2, 3], 90: [3, 0, 1, 2], 180: [2, 3, 0, 1], 270: [1, 2, 3, 0] };
+
 export function cornersToRotated(corners, page) {
   const w = page.img.naturalWidth;
   const h = page.img.naturalHeight;
@@ -30,8 +34,13 @@ export function cornersToRotated(corners, page) {
   // 角点顺序必须随旋转一起调整：角点始终按原图的 TL/TR/BR/BL 存储，
   // 旋转后原 TL 可能跑到右上角，若不重排，矫正会把页面又转回去，
   // 表现为导出结果被转置（非正方形页面尤其明显）
-  const order = { 0: [0, 1, 2, 3], 90: [3, 0, 1, 2], 180: [2, 3, 0, 1], 270: [1, 2, 3, 0] }[rot];
-  return order.map(i => mapped[i]);
+  return CORNER_ORDER[rot].map(i => mapped[i]);
+}
+
+/** 旋转后「显示顺序」的角点序号 → 存储顺序（原图）的角点序号 */
+export function rotatedIndexToCornerIndex(rotation, rotatedIdx) {
+  const rot = ((rotation % 360) + 360) % 360;
+  return (CORNER_ORDER[rot] || CORNER_ORDER[0])[rotatedIdx];
 }
 
 /** cornersToRotated 的逆变换：旋转后画布坐标 → 原图相对坐标 */

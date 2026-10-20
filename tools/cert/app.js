@@ -101,9 +101,14 @@ function parseTlv(bytes, offset) {
     const numBytes = lengthByte & 0x7F;
     if (numBytes === 0) throw new Error('不支持 indefinite length');
     if (offset + 2 + numBytes > bytes.length) throw new Error('证书数据不完整（长度字段截断）');
+    // 用无符号乘法累积，且每步校验范围：
+    // 原写法 (length << 8) | byte 是 32 位有符号运算，
+    // 长度字段 ≥ 0x80000000 时会变负 → totalLength 变 0 →
+    // parseChildren 的 offset 永不推进，死循环直到标签页 OOM
     length = 0;
     for (let i = 0; i < numBytes; i++) {
-      length = (length << 8) | bytes[offset + 2 + i];
+      length = length * 256 + bytes[offset + 2 + i];
+      if (length > bytes.length * 4) throw new Error('证书数据异常（长度字段超出文件范围）');
     }
     valueOffset = offset + 2 + numBytes;
   }

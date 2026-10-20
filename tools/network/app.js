@@ -51,7 +51,7 @@ function formatMs(ms) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function escapeHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* ========== 目标信息解析（DoH + IP 地理位置查询）========== */
@@ -120,7 +120,7 @@ async function showTargetInfo(url, elId) {
     }
     el.innerHTML = html;
   } catch (e) {
-    el.innerHTML = `<div class="target-info__row target-info__row--error">目标信息获取失败：${e.message}</div>`;
+    el.innerHTML = `<div class="target-info__row target-info__row--error">目标信息获取失败：${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -322,7 +322,7 @@ async function runDiag() {
 
   // 详细信息
   html += '<div class="diag-detail">';
-  html += `<div class="diag-detail-row"><span>请求 URL</span><code>${url}</code></div>`;
+  html += `<div class="diag-detail-row"><span>请求 URL</span><code>${escapeHtml(url)}</code></div>`;
   html += `<div class="diag-detail-row"><span>协议</span><code>${new URL(url).protocol}</code></div>`;
   if (entry.transferSize !== undefined) {
     html += `<div class="diag-detail-row"><span>传输大小</span><code>${formatBytes(entry.transferSize)}</code></div>`;
@@ -385,7 +385,7 @@ async function runDownloadTest() {
       <div class="speed-result__row"><span>耗时</span><strong>${totalTime.toFixed(2)} s</strong></div>
       <div class="speed-result__row speed-result__row--highlight"><span>平均速度</span><strong>${formatSpeed(avgSpeed)}</strong></div>`;
   } catch (e) {
-    resultEl.innerHTML = `<div class="diag-error">下载失败：${e.message}（目标可能不支持 CORS）</div>`;
+    resultEl.innerHTML = `<div class="diag-error">下载失败：${escapeHtml(e.message)}（目标可能不支持 CORS）</div>`;
   } finally {
     speedRunning = false;
     baseBtn.disabled = false;
@@ -504,7 +504,7 @@ async function queryDNS() {
     html += '</tbody></table>';
     resultEl.innerHTML = html;
   } catch (e) {
-    resultEl.innerHTML = `<div class="diag-error">查询失败：${e.message}</div>`;
+    resultEl.innerHTML = `<div class="diag-error">查询失败：${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -662,8 +662,8 @@ async function loadExitCompare() {
             <span class="exit-compare__region">${v.region}</span>
             ${ver ? `<span class="exit-compare__version exit-compare__version--${ver.toLowerCase()}">${ver}</span>` : ''}
           </div>
-          <div class="exit-compare__ip">${v.ip || '—'}</div>
-          <div class="exit-compare__loc">${v.loc || v.org || '—'}</div>
+          <div class="exit-compare__ip">${escapeHtml(v.ip || '—')}</div>
+          <div class="exit-compare__loc">${escapeHtml(v.loc || v.org || '—')}</div>
         </div>`;
     } else {
       const reason = r.reason;

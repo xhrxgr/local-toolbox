@@ -210,6 +210,7 @@ function initSqlCron() {
             baseMin = parseInt(base, 10);
           }
         }
+        if (!(stepNum > 0)) throw new Error(`步长必须大于 0，收到 ${raw}`);
         for (let i = baseMin; i <= baseMax; i += stepNum) set.add(i);
       } else if (trimmed.includes('-')) {
         const [s, e] = trimmed.split('-');

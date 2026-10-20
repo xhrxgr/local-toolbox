@@ -2,7 +2,7 @@
  * 四角裁剪覆盖层：SVG 四边形 + 4 个可拖拽手柄
  * 手柄在显示坐标系拖拽，内部转换为原图相对坐标存储
  */
-import { rotatedToCorners, cornersToRotated } from './render.js';
+import { rotatedToCorners, cornersToRotated, rotatedIndexToCornerIndex } from './render.js';
 
 export class CornerOverlay {
   /**
@@ -142,7 +142,11 @@ export class CornerOverlay {
     const viewPoint = { x: vx * rw, y: vy * rh };
     // → 原图相对坐标
     const [orig] = rotatedToCorners([viewPoint], this.page);
-    const corners = this.page.corners.map((c, i) => (i === this.dragIndex ? orig : c));
+    // 手柄是按「旋转后的显示顺序」绘制的，而角点按原图顺序存储，
+    // 两者在 rotation≠0 时不是同一套下标，必须换算后再写入，
+    // 否则会出现「抓住左上角、却把右下的角拖走」
+    const target = rotatedIndexToCornerIndex(this.page.rotation, this.dragIndex);
+    const corners = this.page.corners.map((c, i) => (i === target ? orig : c));
     this.page.corners = corners;
     this.redraw();
   }
