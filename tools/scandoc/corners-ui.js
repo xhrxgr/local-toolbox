@@ -26,6 +26,11 @@ export class CornerOverlay {
     this.handles = [];
     for (let i = 0; i < 4; i++) {
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      // 透明的大命中区：手机上 22px 的可见手柄太难点，手指落空就会变成页面滚动。
+      // 44px 是常见的最小触控目标尺寸。
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      hit.setAttribute('r', '22');
+      hit.setAttribute('class', 'corner-handle-hit');
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('r', '11');
       circle.setAttribute('class', 'corner-handle');
@@ -37,10 +42,14 @@ export class CornerOverlay {
       label.setAttribute('fill', '#ffffff');
       label.setAttribute('pointer-events', 'none');
       label.textContent = String(i + 1);
+      g.appendChild(hit);
       g.appendChild(circle);
       g.appendChild(label);
       g.dataset.index = String(i);
       g.addEventListener('pointerdown', (e) => this.onHandleDown(e, i));
+      // 触摸设备上额外拦截 touchstart：部分浏览器对 SVG 子元素的 touch-action 处理不一致，
+      // 漏掉这一步会让页面在拖角点时跟着滚动
+      g.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
       this.handles.push(g);
       this.svg.appendChild(g);
     }
@@ -104,19 +113,27 @@ export class CornerOverlay {
     } catch {
       // 合成事件 / 异常指针 ID 时忽略，拖拽仍可工作
     }
+    // 监听挂在 window 上，而不是手柄元素上：
+    // 手柄只有 22px，手指很快就会滑出它的范围；
+    // 若监听在元素上，一旦滑出就收不到 pointermove，拖拽会直接断掉。
+    // （SVG 元素上的 setPointerCapture 在部分浏览器并不可靠，不能只依赖它）
     const move = (ev) => this.onHandleMove(ev);
     const up = () => {
       this.dragIndex = -1;
-      e.target.removeEventListener('pointermove', move);
-      e.target.removeEventListener('pointerup', up);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
       this.onChange(this.page.corners);
     };
-    e.target.addEventListener('pointermove', move);
-    e.target.addEventListener('pointerup', up);
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   }
 
   onHandleMove(e) {
     if (this.dragIndex < 0 || !this.page) return;
+    // 拖拽期间阻止页面滚动（pointermove 默认被动监听时阻止无效）
+    if (e.cancelable) e.preventDefault();
     const rect = this.canvas.getBoundingClientRect();
     // 显示坐标 → [0,1] 相对旋转后画布
     const vx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));

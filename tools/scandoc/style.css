@@ -457,8 +457,16 @@
   stroke: #ffffff;
   stroke-width: 2;
   cursor: grab;
-  pointer-events: auto;
+  pointer-events: none; /* 命中由下层 .corner-handle-hit 承担 */
   touch-action: none;
+}
+
+/* 透明的大命中区（44px）：手机上可见手柄只有 22px，落空就会变成页面滚动 */
+.corner-layer .corner-handle-hit {
+  fill: transparent;
+  pointer-events: all;
+  touch-action: none;
+  cursor: grab;
 }
 
 .corner-layer .corner-handle:active {
