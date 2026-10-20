@@ -20,6 +20,7 @@ const MASK_DILATE = 3; // 检测掩码边缘比笔迹可见边缘小，不膨胀
 let worker = null;
 let workerIdleTimer = null;
 let modelBuffer = null;
+let pendingReject = null; // 挂起的推理 promise，取消时需要主动结算
 
 /** 模型是否已缓存（用于界面提示） */
 export function modelCached() {
@@ -102,6 +103,7 @@ export async function eraseHandwriting(page, type, onStage = () => {}) {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
+  try {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(page.img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
@@ -111,7 +113,6 @@ export async function eraseHandwriting(page, type, onStage = () => {}) {
   const mask = new Uint8Array(w * h);
   const hits = detectColoredInk(imageData.data, mask, type, 50);
   if (hits === 0) {
-    canvas.width = canvas.height = 0;
     const err = new Error(type === 'red' ? '未检测到红笔笔迹' : '未检测到蓝笔笔迹');
     err.code = 'NO_INK';
     throw err;
@@ -119,7 +120,6 @@ export async function eraseHandwriting(page, type, onStage = () => {}) {
   dilate(mask, w, h, MASK_DILATE);
   const coverage = maskRatio(mask);
   if (coverage > 0.5) {
-    canvas.width = canvas.height = 0;
     const err = new Error(`检测区域达 ${(coverage * 100).toFixed(0)}%，可能选错了颜色，请确认后重试`);
     err.code = 'TOO_LARGE';
     throw err;
@@ -135,6 +135,9 @@ export async function eraseHandwriting(page, type, onStage = () => {}) {
   // 4. 推理会话
   onStage('初始化推理环境', 0.6);
   await createWorker();
+  // 权重已复制进 ORT 会话，这份26.8MB 的副本不必继续常驻
+  //（Worker 内部还持有一份，提前释放主线程这份能省下峰值内存）
+  modelBuffer = null;
 
   // 5. 执行修复
   onStage('AI 修复中', 0.7);
@@ -145,23 +148,48 @@ export async function eraseHandwriting(page, type, onStage = () => {}) {
   const outCanvas = document.createElement('canvas');
   outCanvas.width = w;
   outCanvas.height = h;
-  outCanvas.getContext('2d').putImageData(result.imageData, 0, 0);
-  const img = await loadImageFromCanvas(outCanvas);
+  try {
+    outCanvas.getContext('2d').putImageData(result.imageData, 0, 0);
+    const img = await loadImageFromCanvas(outCanvas);
+    return { img, width: w, height: h, coverage, ms: result.ms };
+  } finally {
+    releaseCanvas(outCanvas);
+    scheduleWorkerDispose();
+  }
+  } finally {
+    // 无论成功还是失败，工作画布都必须立刻释放
+    //（最大 2200×3000 ≈ 26MB，iOS 上滞留会触发 jetsam）
+    releaseCanvas(canvas);
+  }
+}
 
-  // 释放中间内存
-  canvas.width = canvas.height = 0;
-  outCanvas.width = outCanvas.height = 0;
-  scheduleWorkerDispose();
+/** 立即释放画布内存：iOS Safari 上仅置空引用不会立刻归还，必须把尺寸置 0 */
+function releaseCanvas(cv) {
+  if (!cv) return;
+  cv.width = 0;
+  cv.height = 0;
+}
 
-  return { img, width: w, height: h, coverage, ms: result.ms };
+/** 取消当前推理：ORT 的 WASM 推理无法在运行中被打断，只能终止 Worker。
+ *  注意：终止 Worker 后主线程里挂起的 promise 永远不会自行 settle，
+ *  必须主动 reject，否则界面会一直卡在忙碌遮罩里。 */
+export function abortInference() {
+  if (pendingReject) {
+    const reject = pendingReject;
+    pendingReject = null;
+    reject(new Error('已取消'));
+  }
+  disposeWorker();
 }
 
 function runInference(rgba, mask, width, height) {
   return new Promise((resolve, reject) => {
+    pendingReject = reject;
     const onMessage = (e) => {
       const d = e.data;
       if (d.type === 'result') {
         cleanup();
+        pendingReject = null;
         // 模型输出是 CHW 三平面，需组装成 RGBA
         const data = d.data;
         const n = width * height;
@@ -177,10 +205,11 @@ function runInference(rgba, mask, width, height) {
         resolve({ imageData, ms: d.ms });
       } else if (d.type === 'error') {
         cleanup();
+        pendingReject = null;
         reject(new Error(d.message));
       }
     };
-    const onError = () => { cleanup(); reject(new Error('推理中断')); };
+    const onError = () => { cleanup(); pendingReject = null; reject(new Error('推理中断')); };
     const cleanup = () => {
       worker?.removeEventListener('message', onMessage);
       worker?.removeEventListener('error', onError);
@@ -198,10 +227,27 @@ function runInference(rgba, mask, width, height) {
 }
 
 function loadImageFromCanvas(canvas) {
+  // 用 toBlob + objectURL，不用 toDataURL：
+  // toDataURL 会同步编码阻塞主线程（实测 1622×2200 真实照片约 136ms，手机更久），
+  // 且产生无法主动释放的 base64 字符串（同一张约 5.3MB）
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('结果图像生成失败'));
-    img.src = canvas.toDataURL('image/png');
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('结果图像编码失败'));
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        resolve(img);
+        // 图片已解码进内存，URL 可以立即回收
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('结果图像生成失败'));
+      };
+      img.src = url;
+    }, 'image/png');
   });
 }

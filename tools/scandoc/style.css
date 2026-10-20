@@ -595,3 +595,20 @@
   color: var(--text);
   font-size: var(--text-sm);
 }
+
+/* 忙碌遮罩里的取消按钮 */
+.scan-busy__cancel {
+  margin-left: var(--space-sm);
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.scan-busy__cancel:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

@@ -80,7 +80,11 @@
               <option value="red">红笔</option>
               <option value="blue">蓝笔</option>
             </select>
-            <button class="btn btn-sm btn-secondary" id="btn-erase-ink" type="button" title="对当前页擦除笔迹">擦除</button>
+            <select class="scan-select" id="ink-scope" aria-label="处理范围">
+              <option value="current">本页</option>
+              <option value="all">全部页面</option>
+            </select>
+            <button class="btn btn-sm btn-secondary" id="btn-erase-ink" type="button" title="擦除笔迹">擦除</button>
           </div>
           <div class="scan-toolbar__group" role="group" aria-label="页面顺序">
             <span class="scan-toolbar__label">顺序</span>
@@ -117,7 +121,7 @@
             <p>导入图片后在此编辑</p>
             <p class="scan-empty__hint">自动识别文档四角 · 黑白 / 增强滤镜 · 曲面矫正 · 合并导出 PDF</p>
           </div>
-          <div class="scan-busy" id="scan-busy" hidden><span class="scan-busy__spinner"></span><span id="scan-busy-text">处理中...</span></div>
+          <div class="scan-busy" id="scan-busy" hidden><span class="scan-busy__spinner"></span><span id="scan-busy-text">处理中...</span><button class="scan-busy__cancel" id="btn-cancel" type="button" hidden>取消</button></div>
           <div class="warp-preview" id="warp-preview" hidden>
             <span class="warp-preview__label">按四角矫正后</span>
             <img id="warp-preview-img" alt="四角矫正后的效果预览" />

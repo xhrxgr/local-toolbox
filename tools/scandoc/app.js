@@ -258,6 +258,10 @@ async function autoDetect(page) {
   // 轮廓不明显或纸张超出画面时，检测结果可能是畸形四边形，
   // 直接采用会把正文裁没，因此先做合理性校验，不通过则回退到整图范围
   let rejectReason = null;
+  if (!corners) {
+    // 彻底没找到纸张边缘：也要告诉用户，否则会误以为「识别成功就是整图」
+    showToast('未识别到纸张边缘，已按整图范围处理，可手动拖动角点修正', 'warning', 4600);
+  }
   if (corners) {
     // detectCorners 返回 0-1 归一化坐标，几何校验需要像素坐标
     const snapped = snapToBorder(corners);
@@ -299,28 +303,72 @@ async function eraseCurrentPage() {
   const page = getSelected();
   if (!page) return;
   const type = document.getElementById('ink-type').value;
+  const scope = document.getElementById('ink-scope').value;
+  const allPages = scope === 'all' ? getPages() : [page];
+  const typeLabel = type === 'red' ? '红笔' : '蓝笔';
+
+  if (allPages.length > 1) {
+    const ok = window.confirm(
+      `将对全部 ${allPages.length} 页执行${typeLabel}笔迹擦除，每页约需 2~4 秒，确定继续？`
+    );
+    if (!ok) return;
+  }
+
   setBusy('准备去手写...');
+  showCancel(true);
+  let done = 0;
+  let totalMs = 0;
+  let lastCoverage = 0;
   try {
     const mod = await import('./handwriting/app.js');
-    const res = await mod.eraseHandwriting(page, type, (stage, ratio) => {
-      setBusy(`${stage}... ${Math.round(ratio * 100)}%`);
-    });
-    // 用修复后的图替换原图；滤镜重置为原图（结果本身已是修复过的图像），
-    // 旋转与四角保持不变（输出与输入同尺寸，几何关系未变）
-    updatePage(page.id, { img: res.img, filter: 'original', thumb: null });
-    await refreshThumb(page);
+    for (const p of allPages) {
+      if (cancelRequested) break;
+      const res = await mod.eraseHandwriting(p, type, (stage, ratio) => {
+        const prefix = allPages.length > 1 ? `第 ${done + 1}/${allPages.length} 页 · ` : '';
+        setBusy(`${prefix}${stage}... ${Math.round(ratio * 100)}%`);
+      });
+      // 用修复后的图替换原图；保留当前滤镜设置（滤镜是视图层偏好，不该被静默丢弃），
+      // 旋转与四角保持不变（输出与输入同尺寸，几何关系未变）
+      updatePage(p.id, { img: res.img, thumb: null });
+      await refreshThumb(p);
+      totalMs += res.ms;
+      lastCoverage = res.coverage;
+      done++;
+    }
     renderPageList();
-    showToast(
-      `已擦除${(res.coverage * 100).toFixed(1)}% 区域的${type === 'red' ? '红笔' : '蓝笔'}笔迹（${(res.ms / 1000).toFixed(1)} 秒）`,
-      'success'
-    );
+    if (cancelRequested) {
+      showToast(`已取消，完成 ${done}/${allPages.length} 页`, 'warning');
+    } else if (done > 0) {
+      showToast(
+        `已擦除 ${done} 页的${typeLabel}笔迹（末页 ${(lastCoverage * 100).toFixed(1)}% 区域，共 ${(totalMs / 1000).toFixed(1)} 秒）。原图已被替换`,
+        'success',
+        4200
+      );
+    }
   } catch (err) {
     const msg = (err && err.message) || String(err);
-    showToast(msg, err && err.code === 'NO_INK' ? 'warning' : 'error', 4200);
-    console.error('[去手写] 失败', err);
+    const cancelled = cancelRequested || /cancel|取消|terminat/i.test(msg);
+    if (cancelled) {
+      showToast(`已取消，完成 ${done}/${allPages.length} 页`, 'warning');
+    } else {
+      showToast(msg, err && err.code === 'NO_INK' ? 'warning' : 'error', 4200);
+      console.error('[去手写] 失败', err);
+    }
   } finally {
+    showCancel(false);
     setBusy(null);
   }
+}
+
+/* ========== 取消 ========== */
+let cancelRequested = false;
+
+/** 忙碌时显示/隐藏取消按钮 */
+function showCancel(show) {
+  const btn = document.getElementById('btn-cancel');
+  if (!btn) return;
+  btn.hidden = !show;
+  cancelRequested = false;
 }
 
 /* ========== 导出 ========== */
@@ -443,8 +491,19 @@ export function initScanDoc() {
     showToast('已清空', 'info');
   });
 
-  // 去手写：对当前页擦除彩色笔迹
+  // 去手写：擦除彩色笔迹
   document.getElementById('btn-erase-ink').addEventListener('click', () => { eraseCurrentPage(); });
+
+  // 取消：ORT 的 WASM 推理无法在运行中打断，只能终止 Worker
+  document.getElementById('btn-cancel').addEventListener('click', async () => {
+    cancelRequested = true;
+    const btn = document.getElementById('btn-cancel');
+    if (btn) btn.hidden = true;
+    try {
+      const mod = await import('./handwriting/app.js');
+      mod.abortInference();
+    } catch { /* 模块未加载时无需处理 */ }
+  });
 
   // 页面顺序（上移 / 下移：移动端 HTML5 拖拽不可用，同时提供键盘可达路径）
   const moveSelected = (dir) => {

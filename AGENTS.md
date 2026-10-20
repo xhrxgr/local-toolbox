@@ -338,7 +338,18 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 - **postMessage 传的是 ArrayBuffer**，Worker 里必须 `new Uint8Array(buf)` 再按下标访问
 - **只走 WASM 不启用 WebGPU**：调研发现同类模型在 WebGPU 上会静默输出错误结果
 - **掩码必须膨胀 3px**：检测掩码边缘比笔迹可见边缘小，不膨胀会残留一圈原色（实测残留 54% → 0）
-- **工作分辨率分档**：默认长边 2200，iOS 与低内存设备降到 1600
+- **擦除后的页面图会被替换**：原图不再保留（这是擦除的语义），页面图分辨率降到工作分辨率
+  （长边 2200 / 低端 1600）。实际无损——导出上限本就是 2200（EXPORT_MAX_SIZE），
+  编辑画布上限 1400，所以肉眼不可见；需要真正保留原分辨率只能自建原图备份，代价是翻倍内存，不划算
+- **滤镜不会被擦除重置**：滤镜属于视图层偏好，擦除只换底图，用户的黑白/增强设置应当保留
+- **支持批量擦除**：工具栏「范围」选「全部页面」时逐页处理，处理中可取消。
+  取消的实现要点：ORT 的 WASM 推理无法在运行中打断，终止 Worker 后主线程挂起的 promise
+  **永远不会自行 settle**，必须主动 reject，否则界面会永久卡在忙碌遮罩里
+- **内存纪律（写这个模块时踩过）**：
+  - 结果图用 `toBlob` + objectURL，不要用 `toDataURL`：后者同步编码阻塞主线程
+    （实测 1622×2200 真实照片约 136ms），且 base64 字符串无法主动释放（同一张约 5.3MB）
+  - 工作画布必须 `try/finally` 释放（最大 2200×3000 ≈ 26MB），失败路径也要释放
+  - 模型缓冲在建完 session 后立即置空（权重已复制进 ORT 会话）
 - 推理在 Worker，空闲 30 秒销毁归还 WASM 堆；`numThreads = 1`（Safari 无嵌套 Worker）
 - ORT 运行时由 vite.config.js 在配置加载时从 node_modules 同步到
   `tools/scandoc/handwriting/runtime/`，该目录不入 git

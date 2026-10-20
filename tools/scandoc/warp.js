@@ -135,7 +135,9 @@ export function warpPerspective(srcCanvas, corners, maxSize = Infinity) {
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  const tol = Math.max(1, Math.max(outW, outH) * 0.002);
+  // 容差在「源坐标」空间判定：角点与画布尺寸无关，
+  // 用输出尺寸算会让 maxSize 变化时判定标准跟着漂移
+  const tol = Math.max(1, Math.max(sw, sh) * 0.002);
   const axisAligned = corners.every((c, i) => {
     const wantX = (i === 1 || i === 2) ? maxX : minX;
     const wantY = (i === 2 || i === 3) ? maxY : minY;
