@@ -301,46 +301,252 @@ function downscaleGray(src, w, h, dw, dh) {
 }
 
 /** 增强：灰度 + 2%/98% 分位对比度拉伸 + 轻度 gamma */
+/**
+ * 增强：保留彩色，做「白平衡 → 光照均匀化 → 对比度 → 锐化」
+ *
+ * 与扫描类 App 的「增强」一致：去掉纸张发黄与环境光不均，
+ * 让纸面接近中性白、文字更锐利，同时保留原有颜色
+ *（红笔批注不能被抹成灰色，黑白效果由「黑白」滤镜负责）。
+ */
+/**
+ * 增强：保留彩色，做「白平衡 → 光照均匀化 → 对比度 → 锐化」
+ *
+ * 与扫描类 App 的「增强」一致：去掉纸张发黄与环境光不均，
+ * 让纸面接近中性白、文字更锐利，同时保留原有颜色
+ *（红笔批注不能被抹成灰色，黑白效果由「黑白」滤镜负责）。
+ */
 function applyEnhance(imageData) {
   const { data, width, height } = imageData;
   const n = width * height;
-  const gray = toGray(imageData);
 
-  // 直方图
-  const hist = new Array(256).fill(0);
-  for (let j = 0; j < n; j++) hist[gray[j]]++;
+  // 1. 白平衡：估计纸张白点，把纸面拉回中性
+  const gains = estimateWhiteBalance(data, n);
 
-  // 2% / 98% 分位作为拉伸区间
-  const clip = Math.floor(n * 0.02);
-  let acc = 0;
-  let lo = 0;
-  let hi = 255;
-  for (let t = 0; t < 256; t++) {
-    acc += hist[t];
-    if (acc > clip) { lo = t; break; }
-  }
-  acc = 0;
-  for (let t = 255; t >= 0; t--) {
-    acc += hist[t];
-    if (acc > clip) { hi = t; break; }
-  }
-  if (hi <= lo) { lo = 0; hi = 255; }
+  // 2. 光照均匀化：大半径估计背景光照后相除，消除阴影与暗角
+  const illum = estimateIllumination(imageData, width, height);
 
-  // 查找表：线性拉伸 + gamma 0.9 提亮
-  const lut = new Uint8ClampedArray(256);
-  const range = hi - lo;
-  for (let v = 0; v < 256; v++) {
-    let x = (v - lo) / range;
-    x = x < 0 ? 0 : x > 1 ? 1 : x;
-    lut[v] = 255 * Math.pow(x, 0.9);
+  // 3. 校正后的亮度（白平衡 + 光照都算进去），后面分位数与锐化都用它
+  const gray = new Float32Array(n);
+  for (let j = 0; j < n; j++) {
+    const i = j * 4;
+    const r = data[i] * gains[0];
+    const g = data[i + 1] * gains[1];
+    const b = data[i + 2] * gains[2];
+    gray[j] = (r * 0.299 + g * 0.587 + b * 0.114) * (illum[j] / 127.5);
   }
+
+  // 4. 对比度：按「校正后」的亮度分位拉伸
+  //    （必须在校正之后统计，否则阴影会把分位点拉偏，导致亮区被压暗）
+  const { lo, hi } = percentilesOf(gray);
+  const range = Math.max(1, hi - lo);
+
+  // 5. 锐化（USM）：与 3×3 模糊的差值放大
+  const blur = boxBlur3(gray, width, height);
+  const SHARP = 0.7;
 
   for (let j = 0; j < n; j++) {
-    const v = lut[gray[j]];
     const i = j * 4;
-    data[i] = v;
-    data[i + 1] = v;
-    data[i + 2] = v;
+    const g = gray[j];
+    // 把亮度映射到 lo..hi，再按比例缩放各通道以保留颜色
+    const target = ((g - lo) / range) * 255;
+    const scale = g > 1 ? target / g : 1;
+    // 锐化只作用在亮度上，幅度按原亮度比例折算到各通道
+    const sharp = g + SHARP * (g - blur[j]);
+    const sf = g > 1 ? sharp / g : 1;
+    const k = scale * sf;
+    const il = illum[j] / 127.5;
+    data[i] = clamp255(data[i] * gains[0] * il * k);
+    data[i + 1] = clamp255(data[i + 1] * gains[1] * il * k);
+    data[i + 2] = clamp255(data[i + 2] * gains[2] * il * k);
   }
   return imageData;
 }
+
+/**
+ * 估计纸张白点，返回三通道增益。
+ * 用「白点法」：三个通道里最亮的那个视为真实白，其余按比例拉到同一水平，
+ * 泛黄的纸（248,236,204）会变成中性白（248,248,248）。
+ */
+function estimateWhiteBalance(data, n) {
+  const hist = new Int32Array(256);
+  const step = Math.max(1, Math.floor(n / 200000));
+  let count = 0;
+  for (let j = 0; j < n; j += step) {
+    const i = j * 4;
+    hist[((data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0)]++;
+    count++;
+  }
+  // 取亮度最高的 8% 像素视为纸面
+  const cut = count * 0.08;
+  let acc = 0;
+  let thresh = 250;
+  for (let v = 255; v >= 0; v--) {
+    acc += hist[v];
+    if (acc >= cut) { thresh = v; break; }
+  }
+  let sr = 0, sg = 0, sb = 0, sn = 0;
+  for (let j = 0; j < n; j += step) {
+    const i = j * 4;
+    const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
+    if (lum >= thresh) { sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; sn++; }
+  }
+  if (sn === 0) return [1, 1, 1];
+  const mr = sr / sn;
+  const mg = sg / sn;
+  const mb = sb / sn;
+  const maxC = Math.max(mr, mg, mb);
+  const minC = Math.min(mr, mg, mb);
+  // 纸面应够亮且通道差异不悬殊，否则多半不是纸（暗场景、彩色封面），不做白平衡
+  if (maxC < 90 || maxC > 252 || maxC / Math.max(1, minC) > 1.7) return [1, 1, 1];
+  // 增益 = 最亮通道 / 各通道，限制幅度避免过冲
+  const cl = (v) => Math.min(1.3, Math.max(0.75, maxC / Math.max(1, v)));
+  return [cl(mr), cl(mg), cl(mb)];
+}
+
+/**
+ * 估计光照场：把图缩到很小的尺寸后取局部最大亮度（忽略文字），
+ * 再用 canvas 双线性放大回原尺寸，逐像素相除做归一化。
+ * 重活在小图上做、放大交给 GPU，12MP 也只要百来毫秒。
+ */
+function estimateIllumination(imageData, width, height) {
+  const n = width * height;
+  const LONG = 96;
+  const scale = Math.min(1, LONG / Math.max(width, height));
+  const sw = Math.max(4, Math.round(width * scale));
+  const sh = Math.max(4, Math.round(height * scale));
+
+  // 降采样交给 canvas（GPU 面积平均），比手写逐块平均快一个量级
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = width;
+  srcCanvas.height = height;
+  const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+  srcCtx.putImageData(imageData, 0, 0);
+  const smallCanvas = document.createElement('canvas');
+  smallCanvas.width = sw;
+  smallCanvas.height = sh;
+  const smallCtx = smallCanvas.getContext('2d', { willReadFrequently: true });
+  smallCtx.imageSmoothingEnabled = true;
+  smallCtx.imageSmoothingQuality = 'high';
+  smallCtx.drawImage(srcCanvas, 0, 0, sw, sh);
+  const smallPixels = smallCtx.getImageData(0, 0, sw, sh).data;
+
+  // 小图上的亮度
+  const small = new Float32Array(sw * sh);
+  for (let i = 0; i < small.length; i++) {
+    const p = i * 4;
+    small[i] = smallPixels[p] * 0.299 + smallPixels[p + 1] * 0.587 + smallPixels[p + 2] * 0.114;
+  }
+  srcCanvas.width = srcCanvas.height = 0;
+
+  // 3×3 局部最大：滤掉文字的影响，只留纸面亮度
+  const paper = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      let m = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= sh) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= sw) continue;
+          const v = small[yy * sw + xx];
+          if (v > m) m = v;
+        }
+      }
+      paper[y * sw + x] = m;
+    }
+  }
+
+  // 参考白：取偏亮的一档（避免个别高光把基准拉太高）
+  const sorted = Array.from(paper).sort((a, b) => b - a);
+  const P = sorted[Math.floor(sorted.length * 0.15)] || 255;
+
+  // 归一化系数 P / L，限制在 [0.55, 1.8]
+  const ratio = new Float32Array(sw * sh);
+  for (let i = 0; i < ratio.length; i++) {
+    const L = Math.max(20, paper[i]);
+    ratio[i] = Math.min(1.8, Math.max(0.55, P / L));
+  }
+
+  // 交给 canvas 做双线性放大（GPU，比手写插值快得多）
+  const ratioCanvas = document.createElement('canvas');
+  ratioCanvas.width = sw;
+  ratioCanvas.height = sh;
+  const rctx = ratioCanvas.getContext('2d', { willReadFrequently: true });
+  const rData = rctx.createImageData(sw, sh);
+  for (let i = 0; i < ratio.length; i++) {
+    const v = Math.min(255, ratio[i] * 127.5); // ratio 0.55~1.8 映射到 0~255
+    rData.data[i * 4] = v;
+    rData.data[i * 4 + 1] = v;
+    rData.data[i * 4 + 2] = v;
+    rData.data[i * 4 + 3] = 255;
+  }
+  rctx.putImageData(rData, 0, 0);
+
+  const bigCanvas = document.createElement('canvas');
+  bigCanvas.width = width;
+  bigCanvas.height = height;
+  const bctx = bigCanvas.getContext('2d', { willReadFrequently: true });
+  bctx.imageSmoothingEnabled = true;
+  bctx.imageSmoothingQuality = 'high';
+  bctx.drawImage(ratioCanvas, 0, 0, width, height);
+  const up = bctx.getImageData(0, 0, width, height).data;
+
+  // 还原为逐像素系数（用 Uint8 存，12MP 时省下约 36MB 内存）
+  const out = new Uint8Array(n);
+  for (let j = 0; j < n; j++) out[j] = up[j * 4];
+  return out;
+}
+
+/** 亮度分位数（用于对比度拉伸），输入为已校正的亮度数组 */
+function percentilesOf(values) {
+  const hist = new Int32Array(256);
+  const step = Math.max(1, Math.floor(values.length / 200000));
+  let count = 0;
+  for (let j = 0; j < values.length; j += step) {
+    const v = values[j] < 0 ? 0 : values[j] > 255 ? 255 : values[j];
+    hist[v | 0]++;
+    count++;
+  }
+  const pick = (q) => {
+    const target = count * q;
+    let acc = 0;
+    for (let v = 0; v < 256; v++) {
+      acc += hist[v];
+      if (acc >= target) return v;
+    }
+    return 255;
+  };
+  return { lo: pick(0.02), hi: pick(0.98) };
+}
+
+/** 3×3 可分离盒式模糊（USM 的模糊项） */
+function boxBlur3(src, width, height) {
+  const tmp = new Float32Array(src.length);
+  const out = new Float32Array(src.length);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      const a = src[row + (x > 0 ? x - 1 : 0)];
+      const b = src[row + x];
+      const c = src[row + (x < width - 1 ? x + 1 : width - 1)];
+      tmp[row + x] = (a + b + c) / 3;
+    }
+  }
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    const up = (y > 0 ? y - 1 : 0) * width;
+    const dn = (y < height - 1 ? y + 1 : height - 1) * width;
+    for (let x = 0; x < width; x++) {
+      out[row + x] = (tmp[up + x] + tmp[row + x] + tmp[dn + x]) / 3;
+    }
+  }
+  return out;
+}
+
+function clamp255(v) {
+  return v < 0 ? 0 : v > 255 ? 255 : v;
+}
+
+
+/** 估计纸张白点，返回三通道增益（把偏黄的纸拉回中性） */
