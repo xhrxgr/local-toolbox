@@ -64,7 +64,7 @@ export function rotatedToCorners(points, page) {
  * @param opts    { maxSize?: number, applyWarp?: boolean }
  * @returns HTMLCanvasElement
  */
-export function renderPage(page, opts = {}) {
+export async function renderPage(page, opts = {}) {
   const { maxSize = Infinity, applyWarp = true } = opts;
   const img = page.img;
   const iw = img.naturalWidth;
@@ -95,23 +95,42 @@ export function renderPage(page, opts = {}) {
   rctx.drawImage(img, 0, 0);
   rctx.restore();
 
-  // 2. 滤镜
-  if (page.filter && page.filter !== 'original') {
-    const imageData = rctx.getImageData(0, 0, rw, rh);
-    applyFilter(imageData, page.filter);
-    rctx.putImageData(imageData, 0, 0);
+  // 2. 先按目标尺寸降采样，再跑滤镜。
+  //    滤镜结果最终只用到 maxSize（编辑画布 1400 / 缩略图 200 / 导出 2200），
+  //    而原图可能是 12MP——在原图分辨率上跑等于 97% 的算力被丢弃，
+  //    期间主线程被占满，界面完全无响应（用户表现为「点了没反应」）。
+  let work = rotated;
+  let rctxWork = rctx;
+  let scale = 1;
+  if (Math.max(rw, rh) > maxSize) {
+    scale = maxSize / Math.max(rw, rh);
+    work = document.createElement('canvas');
+    work.width = Math.max(1, Math.round(rw * scale));
+    work.height = Math.max(1, Math.round(rh * scale));
+    const wctx = work.getContext('2d', { willReadFrequently: true });
+    wctx.imageSmoothingQuality = 'high';
+    wctx.drawImage(rotated, 0, 0, work.width, work.height);
+    rctxWork = wctx;
   }
 
-  // 3. 曲面矫正（有四角时）
+  // 3. 滤镜（跑在目标分辨率上）
+  if (page.filter && page.filter !== 'original') {
+    const imageData = rctxWork.getImageData(0, 0, work.width, work.height);
+    await applyFilter(imageData, page.filter, opts.onProgress);
+    rctxWork.putImageData(imageData, 0, 0);
+  }
+
+  // 4. 曲面矫正（有四角时）。角点按同一比例缩放到工作画布坐标
   if (applyWarp && page.corners) {
-    const absCorners = cornersToRotated(page.corners, page);
+    const absCorners = cornersToRotated(page.corners, page)
+      .map(c => ({ x: c.x * scale, y: c.y * scale }));
     // 四角需在旋转后画布尺寸内
     const inside = absCorners.every(c =>
-      c.x >= 0 && c.y >= 0 && c.x <= rw && c.y <= rh
+      c.x >= 0 && c.y >= 0 && c.x <= work.width && c.y <= work.height
     );
     if (inside) {
       try {
-        return warpPerspective(rotated, absCorners, maxSize);
+        return warpPerspective(work, absCorners, Infinity);
       } catch (err) {
         // 四角退化（共线等）时退回未矫正图；留日志便于排查
         console.warn('[scandoc] 透视矫正失败，本次输出未拉直：', err);
@@ -119,17 +138,7 @@ export function renderPage(page, opts = {}) {
     }
   }
 
-  // 4. 尺寸限制
-  if (Math.max(rw, rh) > maxSize) {
-    const s = maxSize / Math.max(rw, rh);
-    const scaled = document.createElement('canvas');
-    scaled.width = Math.round(rw * s);
-    scaled.height = Math.round(rh * s);
-    const sctx = scaled.getContext('2d');
-    sctx.drawImage(rotated, 0, 0, scaled.width, scaled.height);
-    return scaled;
-  }
-  return rotated;
+  return work;
 }
 
 /** 默认四角（内缩 2% 的整图矩形） */

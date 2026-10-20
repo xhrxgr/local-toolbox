@@ -11,7 +11,7 @@ const EXPORT_MAX_SIZE = 2200; // 导出最长边限制，控制 PDF 体积
 
 /** 导出当前页为图片（PNG） */
 export async function exportPageImage(page) {
-  const canvas = renderPage(page, { maxSize: EXPORT_MAX_SIZE, applyWarp: true });
+  const canvas = await renderPage(page, { maxSize: EXPORT_MAX_SIZE, applyWarp: true });
   const blob = await canvasToBlob(canvas, 'image/png');
   downloadBlob(blob, `${baseName(page.name)}_扫描.png`);
   showToast('已导出当前页图片', 'success');
@@ -22,7 +22,7 @@ export async function exportMergedPdf(pages, onProgress) {
   const pdfDoc = await PDFDocument.create();
   for (let i = 0; i < pages.length; i++) {
     onProgress?.(i, pages.length, pages[i]);
-    const canvas = renderPage(pages[i], { maxSize: EXPORT_MAX_SIZE, applyWarp: true });
+    const canvas = await renderPage(pages[i], { maxSize: EXPORT_MAX_SIZE, applyWarp: true });
     const pngBytes = await canvasToBlob(canvas, 'image/png').then(b => b.arrayBuffer());
     const img = await pdfDoc.embedPng(pngBytes);
     const page = pdfDoc.addPage([img.width, img.height]);

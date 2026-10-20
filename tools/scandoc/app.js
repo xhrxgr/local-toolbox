@@ -21,6 +21,14 @@ let warpTimer = null;
 let isWorking = false;
 
 /* ========== 忙碌遮罩 ========== */
+/** 只控制忙碌遮罩显隐，不联动工具栏状态（滤镜切换时工具栏要保持可用） */
+function showBusyOverlay(show, text) {
+  const busy = document.getElementById('scan-busy');
+  const busyText = document.getElementById('scan-busy-text');
+  if (busy) busy.hidden = !show;
+  if (show && busyText && text) busyText.textContent = text;
+}
+
 function setBusy(text) {
   isWorking = !!text;
   const busy = document.getElementById('scan-busy');
@@ -115,7 +123,7 @@ function filterLabel(f) {
 /* ========== 缩略图 ========== */
 async function refreshThumb(page) {
   try {
-    const c = renderPage(page, { maxSize: THUMB_SIZE, applyWarp: false });
+    const c = await renderPage(page, { maxSize: THUMB_SIZE, applyWarp: false });
     const url = c.toDataURL('image/png');
     updatePage(page.id, { thumb: url });
   } catch {
@@ -124,7 +132,18 @@ async function refreshThumb(page) {
 }
 
 /* ========== 编辑器 ========== */
-function renderEditor() {
+let editorRenderToken = 0;
+/** 最近一次编辑器渲染的 promise。updatePage 触发的渲染是「即发即忘」，
+ *  需要等待完整渲染结束的地方（如滤镜切换的进度提示）可以 await 它。 */
+let editorRenderPromise = Promise.resolve();
+
+async function renderEditor() {
+  editorRenderPromise = doRenderEditor();
+  return editorRenderPromise;
+}
+
+async function doRenderEditor() {
+  const token = ++editorRenderToken;
   const page = getSelected();
   const empty = document.getElementById('editor-empty');
   if (!page) {
@@ -139,7 +158,9 @@ function renderEditor() {
   canvas.hidden = false;
 
   // 画布恒为「旋转 + 滤镜」原图视图，四角覆盖层常驻可拖拽
-  const source = renderPage(page, { maxSize: EDITOR_MAX_SIZE, applyWarp: false });
+  const source = await renderPage(page, { maxSize: EDITOR_MAX_SIZE, applyWarp: false });
+  // 滤镜是分块异步的，等待期间用户可能又切了页/改了滤镜，过期结果直接丢弃
+  if (token !== editorRenderToken || getSelected() !== page) return;
   paintCanvas(source);
 
   if (page.corners) {
@@ -165,12 +186,18 @@ function paintCanvas(source) {
 }
 
 /** 矫正效果小预览（debounce，避免拖拽时频繁重算） */
+let warpPreviewToken = 0;
+
 function scheduleWarpPreview(page) {
   clearTimeout(warpTimer);
-  warpTimer = setTimeout(() => {
+  const token = ++warpPreviewToken;
+  warpTimer = setTimeout(async () => {
     if (getSelected() !== page || !page.corners) return;
     try {
-      const warped = renderPage(page, { maxSize: 360, applyWarp: true });
+      const warped = await renderPage(page, { maxSize: 360, applyWarp: true });
+      // renderPage 现在是异步的，期间可能已切换页面或又拖了一次角点，
+      // 过期的结果不能写回界面
+      if (token !== warpPreviewToken) return;
       const img = document.getElementById('warp-preview-img');
       img.src = warped.toDataURL('image/png');
       document.getElementById('warp-preview').hidden = false;
@@ -519,11 +546,38 @@ export function initScanDoc() {
 
   // 滤镜切换（同步刷新缩略图，保持列表与画布一致）
   document.querySelectorAll('#filter-segmented .segmented__btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const page = getSelected();
       if (!page) return;
-      updatePage(page.id, { filter: btn.dataset.filter });
-      refreshThumb(page);
+      const next = btn.dataset.filter;
+      if (page.filter === next) return;
+      // 滤镜是同步计算（会占住主线程），必须先让浏览器把「处理中」画出来，
+      // 否则在大图上点按钮会像没反应。同时禁掉按钮避免连点排队。
+      const label = filterLabel(next);
+      showBusyOverlay(true, `正在应用「${label}」...`);
+      btn.disabled = true;
+      const t0 = performance.now();
+      try {
+        // 让出一帧，等遮罩真正渲染出来再开始计算
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+        updatePage(page.id, { filter: next });
+        // 立刻同步按钮选中态：state 是同步更新的，不必等画布渲染完，
+        // 用户点下去马上就能看到反馈，不会以为没点上
+        syncToolbar(getSelected() || page);
+        // 必须等编辑器渲染真正结束：updatePage 触发的 renderEditor 是即发即忘的，
+        // 只等缩略图会让遮罩提前消失，而滤镜还在后台跑——用户依然觉得「没反应」
+        await editorRenderPromise;
+        await refreshThumb(page);
+      } finally {
+        // 最短显示时长：处理很快时遮罩只闪 1 帧反而像界面抽了一下，
+        // 补足到 220ms 让用户确实看到「正在处理」。慢操作不受影响。
+        const elapsed = performance.now() - t0;
+        if (elapsed < 220) {
+          await new Promise((r) => setTimeout(r, 220 - elapsed));
+        }
+        btn.disabled = false;
+        showBusyOverlay(false);
+      }
     });
   });
 

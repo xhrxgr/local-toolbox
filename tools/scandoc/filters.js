@@ -4,11 +4,40 @@
  */
 import { toGray } from './lib/imgutils.js';
 
-export function applyFilter(imageData, mode) {
+/**
+ * 应用滤镜。
+ *
+ * 逐像素阶段按横向条带切开，条带之间让出主线程。
+ * 否则在大图上会连续阻塞数百毫秒，浏览器一帧都画不出来——
+ * 用户看到的就是「点了没反应」，连处理中的提示都来不及显示。
+ *
+ * @param {(ratio:number)=>void} [onProgress] 完成比例回调（0~1）
+ */
+export async function applyFilter(imageData, mode, onProgress) {
   switch (mode) {
-    case 'bw': return applyBw(imageData);
-    case 'enhance': return applyEnhance(imageData);
+    case 'bw': return applyBw(imageData, onProgress);
+    case 'enhance': return applyEnhance(imageData, onProgress);
     default: return imageData;
+  }
+}
+
+/** 单条带的像素上限。取小值让出更频繁（每条约 5~10ms），
+ *  处理期间浏览器能画出更多帧，遮罩与进度条才是活的。 */
+const BAND_PIXELS = 150000;
+
+function yieldToBrowser() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** 把逐像素处理按横向条带切开执行，条带之间让出主线程 */
+async function inBands(height, width, fn, onProgress) {
+  if (height <= 0) return;
+  const bandRows = Math.max(1, Math.floor(BAND_PIXELS / Math.max(1, width)));
+  for (let y0 = 0; y0 < height; y0 += bandRows) {
+    const y1 = Math.min(height, y0 + bandRows);
+    fn(y0, y1);
+    onProgress?.(y1 / height);
+    if (y1 < height) await yieldToBrowser();
   }
 }
 
@@ -25,7 +54,7 @@ export function applyFilter(imageData, mode) {
  *      判为背景强制置白。
  * 所有窗口统计在降采样工作图上用积分图完成，O(1)/像素。
  */
-function applyBw(imageData) {
+async function applyBw(imageData, onProgress) {
   const { data, width: w, height: h } = imageData;
   const gray = toGray(imageData);
 
@@ -149,14 +178,20 @@ function applyBw(imageData) {
     }
   }
 
-  // 8. 写回 RGBA
-  for (let j = 0; j < w * h; j++) {
-    const v = bin[j] ? 0 : 255;
-    const o = j * 4;
-    data[o] = v;
-    data[o + 1] = v;
-    data[o + 2] = v;
-  }
+  // 8. 写回 RGBA（分块，避免长时间阻塞主线程）
+  await inBands(h, w, (y0, y1) => {
+    for (let y = y0; y < y1; y++) {
+      const row = y * w;
+      for (let x = 0; x < w; x++) {
+        const j = row + x;
+        const v = bin[j] ? 0 : 255;
+        const o = j * 4;
+        data[o] = v;
+        data[o + 1] = v;
+        data[o + 2] = v;
+      }
+    }
+  }, onProgress);
   return imageData;
 }
 
@@ -315,7 +350,7 @@ function downscaleGray(src, w, h, dw, dh) {
  * 让纸面接近中性白、文字更锐利，同时保留原有颜色
  *（红笔批注不能被抹成灰色，黑白效果由「黑白」滤镜负责）。
  */
-function applyEnhance(imageData) {
+async function applyEnhance(imageData, onProgress) {
   const { data, width, height } = imageData;
   const n = width * height;
 
@@ -344,21 +379,27 @@ function applyEnhance(imageData) {
   const blur = boxBlur3(gray, width, height);
   const SHARP = 0.7;
 
-  for (let j = 0; j < n; j++) {
-    const i = j * 4;
-    const g = gray[j];
-    // 把亮度映射到 lo..hi，再按比例缩放各通道以保留颜色
-    const target = ((g - lo) / range) * 255;
-    const scale = g > 1 ? target / g : 1;
-    // 锐化只作用在亮度上，幅度按原亮度比例折算到各通道
-    const sharp = g + SHARP * (g - blur[j]);
-    const sf = g > 1 ? sharp / g : 1;
-    const k = scale * sf;
-    const il = illum[j] / 127.5;
-    data[i] = clamp255(data[i] * gains[0] * il * k);
-    data[i + 1] = clamp255(data[i + 1] * gains[1] * il * k);
-    data[i + 2] = clamp255(data[i + 2] * gains[2] * il * k);
-  }
+  await inBands(height, width, (y0, y1) => {
+    for (let y = y0; y < y1; y++) {
+      const row = y * width;
+      for (let x = 0; x < width; x++) {
+        const j = row + x;
+        const i = j * 4;
+        const g = gray[j];
+        // 把亮度映射到 lo..hi，再按比例缩放各通道以保留颜色
+        const target = ((g - lo) / range) * 255;
+        const scale = g > 1 ? target / g : 1;
+        // 锐化只作用在亮度上，幅度按原亮度比例折算到各通道
+        const sharp = g + SHARP * (g - blur[j]);
+        const sf = g > 1 ? sharp / g : 1;
+        const k = scale * sf;
+        const il = illum[j] / 127.5;
+        data[i] = clamp255(data[i] * gains[0] * il * k);
+        data[i + 1] = clamp255(data[i + 1] * gains[1] * il * k);
+        data[i + 2] = clamp255(data[i + 2] * gains[2] * il * k);
+      }
+    }
+  }, onProgress);
   return imageData;
 }
 
