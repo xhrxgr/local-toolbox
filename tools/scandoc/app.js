@@ -17,25 +17,51 @@ const EDITOR_MAX_SIZE = 1400;
 
 let canvas;
 let overlay;
-let warpTimer = null;
+let compareMode = false;      // 按住「看原图」中
+let editorProgress = null;  // 编辑器渲染的进度回调（滤镜分块时上报）
 let isWorking = false;
 
 /* ========== 忙碌遮罩 ========== */
-/** 只控制忙碌遮罩显隐，不联动工具栏状态（滤镜切换时工具栏要保持可用） */
-function showBusyOverlay(show, text) {
+/** 只控制忙碌遮罩显隐，不联动工具栏状态（滤镜切换时工具栏要保持可用）。
+ *  ratio 为 0~1；给出时显示进度条与百分比，避免用户只能干等。 */
+function showBusyOverlay(show, text, ratio) {
   const busy = document.getElementById('scan-busy');
   const busyText = document.getElementById('scan-busy-text');
   if (busy) busy.hidden = !show;
   if (show && busyText && text) busyText.textContent = text;
+  if (show && typeof ratio === 'number') {
+    setBusyProgress(ratio);
+  } else {
+    setBusyProgress(null);
+  }
 }
 
-function setBusy(text) {
+/** 更新进度条；传 null 表示这次操作没有可量化的进度 */
+function setBusyProgress(ratio) {
+  const bar = document.getElementById('scan-busy-bar');
+  const fill = document.getElementById('scan-busy-fill');
+  const pct = document.getElementById('scan-busy-pct');
+  if (!bar || !fill || !pct) return;
+  if (ratio == null || Number.isNaN(ratio)) {
+    bar.hidden = true;
+    pct.hidden = true;
+    return;
+  }
+  const r = Math.max(0, Math.min(1, ratio));
+  bar.hidden = false;
+  pct.hidden = false;
+  fill.style.width = (r * 100).toFixed(1) + '%';
+  pct.textContent = Math.round(r * 100) + '%';
+}
+
+function setBusy(text, ratio) {
   isWorking = !!text;
   const busy = document.getElementById('scan-busy');
   const busyText = document.getElementById('scan-busy-text');
   if (!busy) return;
   busy.hidden = !text;
   if (text) busyText.textContent = text;
+  setBusyProgress(typeof ratio === 'number' ? ratio : null);
   // 忙碌状态影响导出/工具按钮可用性
   updateFooter();
   syncToolbar(getSelected());
@@ -150,29 +176,29 @@ async function doRenderEditor() {
     canvas.hidden = true;
     empty.hidden = false;
     overlay.hide();
-    document.getElementById('warp-preview').hidden = true;
     syncToolbar(null);
     return;
   }
   empty.hidden = true;
   canvas.hidden = false;
 
-  // 画布恒为「旋转 + 滤镜」原图视图，四角覆盖层常驻可拖拽
-  const source = await renderPage(page, { maxSize: EDITOR_MAX_SIZE, applyWarp: false });
+  // 有四角且不在「按住看原图」状态时，主画布直接显示矫正结果——
+  // 浮动小窗会被用户挡住，反而看不清效果。改为整屏显示 + 按住对比。
+  const showOriginal = !page.corners || compareMode;
+  const source = await renderPage(page, {
+    maxSize: EDITOR_MAX_SIZE,
+    applyWarp: !showOriginal,
+    onProgress: editorProgress,
+  });
   // 滤镜是分块异步的，等待期间用户可能又切了页/改了滤镜，过期结果直接丢弃
   if (token !== editorRenderToken || getSelected() !== page) return;
   paintCanvas(source);
 
-  if (page.corners) {
+  if (showOriginal) {
+    // 只有原图视图才需要四角手柄（矫正结果里角点已被拉直，手柄无处对齐）
     overlay.setPage(page);
-    if (document.getElementById('chk-live-preview').checked) {
-      scheduleWarpPreview(page);
-    } else {
-      document.getElementById('warp-preview').hidden = true;
-    }
   } else {
     overlay.hide();
-    document.getElementById('warp-preview').hidden = true;
   }
   syncToolbar(page);
 }
@@ -183,29 +209,6 @@ function paintCanvas(source) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(source, 0, 0);
-}
-
-/** 矫正效果小预览（debounce，避免拖拽时频繁重算） */
-let warpPreviewToken = 0;
-
-function scheduleWarpPreview(page) {
-  clearTimeout(warpTimer);
-  const token = ++warpPreviewToken;
-  warpTimer = setTimeout(async () => {
-    if (getSelected() !== page || !page.corners) return;
-    try {
-      const warped = await renderPage(page, { maxSize: 360, applyWarp: true });
-      // renderPage 现在是异步的，期间可能已切换页面或又拖了一次角点，
-      // 过期的结果不能写回界面
-      if (token !== warpPreviewToken) return;
-      const img = document.getElementById('warp-preview-img');
-      img.src = warped.toDataURL('image/png');
-      document.getElementById('warp-preview').hidden = false;
-    } catch {
-      // 矫正失败（四角退化等）时隐藏预览
-      document.getElementById('warp-preview').hidden = true;
-    }
-  }, 200);
 }
 
 function syncToolbar(page) {
@@ -220,6 +223,8 @@ function syncToolbar(page) {
   document.getElementById('btn-rotate-right').disabled = !hasPage || isWorking;
   document.getElementById('btn-detect').disabled = !hasPage || isWorking;
   document.getElementById('btn-reset-corners').disabled = !hasPage || isWorking;
+  // 只有识别出四角（画布显示的是矫正结果）时，按住对比才有意义
+  document.getElementById('btn-compare').disabled = !hasPage || isWorking || !page.corners;
 }
 
 /* ========== 导入 ========== */
@@ -352,7 +357,7 @@ async function eraseCurrentPage() {
       if (cancelRequested) break;
       const res = await mod.eraseHandwriting(p, type, (stage, ratio) => {
         const prefix = allPages.length > 1 ? `第 ${done + 1}/${allPages.length} 页 · ` : '';
-        setBusy(`${prefix}${stage}... ${Math.round(ratio * 100)}%`);
+        setBusy(`${prefix}${stage}...`, ratio);
       });
       // 用修复后的图替换原图；保留当前滤镜设置（滤镜是视图层偏好，不该被静默丢弃），
       // 旋转与四角保持不变（输出与输入同尺寸，几何关系未变）
@@ -420,7 +425,7 @@ async function onExportPdf() {
   setBusy('生成 PDF...');
   try {
     await exportMergedPdf(snapshot, (i, total) => {
-      setBusy(`生成 PDF ${i + 1}/${total}...`);
+      setBusy(`生成 PDF ${i + 1}/${total}...`, (i + 1) / total);
     });
   } catch (err) {
     showToast('导出失败：' + err.message, 'error');
@@ -442,11 +447,10 @@ function escapeAttr(s) {
 export function initScanDoc() {
   canvas = document.getElementById('scan-canvas');
   overlay = new CornerOverlay(document.getElementById('corner-layer'), canvas, () => {
-    // 拖拽结束：更新缩略图角点状态 + 实时预览
+    // 拖拽结束：更新角点并重渲染（矫正结果随之变化）
     const page = getSelected();
     if (page) {
       updatePage(page.id, { corners: page.corners });
-      if (document.getElementById('chk-live-preview').checked) scheduleWarpPreview(page);
     }
   });
 
@@ -554,8 +558,10 @@ export function initScanDoc() {
       // 滤镜是同步计算（会占住主线程），必须先让浏览器把「处理中」画出来，
       // 否则在大图上点按钮会像没反应。同时禁掉按钮避免连点排队。
       const label = filterLabel(next);
-      showBusyOverlay(true, `正在应用「${label}」...`);
+      showBusyOverlay(true, `正在应用「${label}」...`, 0);
       btn.disabled = true;
+      // 编辑器渲染是「即发即忘」的，这里挂一个进度回调把分块进度透出来
+      editorProgress = (ratio) => setBusyProgress(ratio);
       const t0 = performance.now();
       try {
         // 让出一帧，等遮罩真正渲染出来再开始计算
@@ -576,6 +582,7 @@ export function initScanDoc() {
           await new Promise((r) => setTimeout(r, 220 - elapsed));
         }
         btn.disabled = false;
+        editorProgress = null;
         showBusyOverlay(false);
       }
     });
@@ -608,16 +615,29 @@ export function initScanDoc() {
     updatePage(page.id, { corners: defaultCorners(page), cornersDetected: false });
   });
 
-  // 实时预览开关
-  document.getElementById('chk-live-preview').addEventListener('change', (e) => {
-    const page = getSelected();
-    if (e.target.checked && page) {
-      scheduleWarpPreview(page);
-    } else {
-      clearTimeout(warpTimer);
-      document.getElementById('warp-preview').hidden = true;
-    }
-  });
+  // 按住看原图：按下时切到未矫正原图（四角手柄可用），松开回到矫正结果
+  const cmpBtn = document.getElementById('btn-compare');
+  const holdOn = (e) => {
+    if (e && e.type === 'keydown' && e.key !== ' ' && e.key !== 'Enter') return;
+    if (compareMode) return;
+    compareMode = true;
+    cmpBtn.classList.add('is-holding');
+    renderEditor();
+  };
+  const holdOff = () => {
+    if (!compareMode) return;
+    compareMode = false;
+    cmpBtn.classList.remove('is-holding');
+    renderEditor();
+  };
+  cmpBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); holdOn(e); });
+  cmpBtn.addEventListener('pointerup', holdOff);
+  cmpBtn.addEventListener('pointerleave', holdOff);
+  cmpBtn.addEventListener('pointercancel', holdOff);
+  // 键盘可达：空格/回车等同按住
+  cmpBtn.addEventListener('keydown', holdOn);
+  cmpBtn.addEventListener('keyup', holdOff);
+  cmpBtn.addEventListener('blur', holdOff);
 
   // 导出
   document.getElementById('btn-export-one').addEventListener('click', onExportOne);
