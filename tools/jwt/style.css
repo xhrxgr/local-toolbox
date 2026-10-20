@@ -355,3 +355,11 @@
     justify-content: flex-end;
   }
 }
+
+/* 签名未验证提示 */
+.jwt-banner__note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.85;
+}

@@ -46,9 +46,11 @@ function formatBytes(bytes) {
 function loadImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('图片加载失败'));
-    img.src = URL.createObjectURL(file);
+    // 图片解码完成后 objectURL 即可回收，否则每次换文件都漏一份完整 Blob
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
+    img.src = url;
   });
 }
 

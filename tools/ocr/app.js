@@ -4,6 +4,14 @@
  * 识别过程完全本地，图片不上传
  */
 
+// tesseract 运行时与 core 的外部来源：版本锁定，避免库升级后默认值漂移。
+// 语言包也走 CDN（按语言分别下载，自托管会让仓库体积不可接受）；
+// 用户图片始终在本地 Worker 内解码识别，不产生任何上传。
+const TESSERACT_VERSION = '7.0.0';
+const TESSERACT_CORE_VERSION = '7.0.0';
+const CDN_WORKER = `https://cdn.jsdelivr.net/npm/tesseract.js@${TESSERACT_VERSION}/dist/worker.min.js`;
+const CDN_CORE = `https://cdn.jsdelivr.net/npm/tesseract.js-core@${TESSERACT_CORE_VERSION}`;
+
 /* ========== 通用：复制到剪贴板 ========== */
 async function copyText(text) {
   try {

@@ -234,14 +234,26 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+/** 轻量提示：复用页面的 warning-toast 元素 */
+let warnTimer = null;
+function showWarn(msg, ms = 5000) {
+  const el = document.getElementById('warning-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(warnTimer);
+  warnTimer = setTimeout(() => { el.hidden = true; }, ms);
+}
+
 /* ========== 多文件管理 ========== */
 
 function addFiles(newFiles) {
   for (const f of newFiles) {
     if (f.size > 200 * 1024 * 1024) {
-      const toast = document.getElementById('warning-toast');
-      toast.hidden = false;
-      setTimeout(() => { toast.hidden = true; }, 5000);
+      // 必须真正拦下：转码时整文件会进 JS 堆、再复制进 wasm 的 MEMFS、输出再一份，
+      // 峰值约为文件体积的 3 倍，只提示不拦等于放任标签页崩溃
+      showWarn(`「${f.name}」${formatBytes(f.size)} 超过 200MB 上限，已跳过。浏览器内转码建议先裁剪或分段`, 6000);
+      continue;
     }
     const dup = files.find(e => e.name === f.name && e.size === f.size && e.lastModified === f.lastModified);
     if (dup) {
@@ -694,6 +706,9 @@ async function executeConvert(file, onStage) {
   try {
     await ffmpeg.exec(args);
   } catch (err) {
+    // 失败路径也要清理（MEMFS 只增不减，详见 executeConvert 的注释）
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
     if (taskQueue.abortRequested) {
       return { cancelled: true };
     }
@@ -758,6 +773,10 @@ async function executeImageConvert(file, onStage) {
   try {
     await ffmpeg.exec(args);
   } catch (err) {
+    // 失败路径也要清理：MEMFS 只增不减，原写法把 deleteFile 放在函数末尾，
+    // throw 之前根本走不到，每次失败都留下一份完整输入副本，连续失败会撑爆 wasm 堆
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
     if (taskQueue.abortRequested) return { cancelled: true };
     throw err;
   }
@@ -849,6 +868,10 @@ async function executeVideoFormatConvert(file, onStage) {
   try {
     await ffmpeg.exec(args);
   } catch (err) {
+    // 失败路径也要清理：MEMFS 只增不减，原写法把 deleteFile 放在函数末尾，
+    // throw 之前根本走不到，每次失败都留下一份完整输入副本，连续失败会撑爆 wasm 堆
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
     if (taskQueue.abortRequested) return { cancelled: true };
     throw err;
   } finally {
@@ -910,6 +933,10 @@ async function executeVideoFrameExtract(file, onStage) {
   try {
     await ffmpeg.exec(args);
   } catch (err) {
+    // 失败路径也要清理：MEMFS 只增不减，原写法把 deleteFile 放在函数末尾，
+    // throw 之前根本走不到，每次失败都留下一份完整输入副本，连续失败会撑爆 wasm 堆
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
     if (taskQueue.abortRequested) return { cancelled: true };
     throw err;
   }
@@ -986,6 +1013,10 @@ async function executeAudioConvert(file, onStage) {
   try {
     await ffmpeg.exec(args);
   } catch (err) {
+    // 失败路径也要清理：MEMFS 只增不减，原写法把 deleteFile 放在函数末尾，
+    // throw 之前根本走不到，每次失败都留下一份完整输入副本，连续失败会撑爆 wasm 堆
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
     if (taskQueue.abortRequested) return { cancelled: true };
     throw err;
   } finally {
@@ -1049,19 +1080,25 @@ async function executeExtract(file, onStage) {
   }
   args.push(outputName);
 
-  ffmpeg.on('progress', ({ progress }) => {
+  // 必须把回调保存下来：ffmpeg.off('progress') 不传回调时是 filter(f => f !== undefined)，
+  // 一个都删不掉，批量处理时监听器会线性累积，同一事件触发 N 次回调互相覆盖进度
+  const onProgress = ({ progress }) => {
     if (!isFinite(progress)) return;
     const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
     onStage(Stage.CONVERT, `正在提取音频...`, pct);
-  });
+  };
+  ffmpeg.on('progress', onProgress);
   onStage(Stage.CONVERT, `开始提取 → ${format.toUpperCase()}`, 10);
+  // 局部引用：用户点「放弃」会 terminate 并把模块级 ffmpeg 置 null，
+  // finally 里若用 ffmpeg.off(...) 会抛 TypeError，把 catch 里的「已取消」语义覆盖成失败
+  const ff = ffmpeg;
   try {
-    await ffmpeg.exec(args);
+    await ff.exec(args);
   } catch (err) {
     if (taskQueue.abortRequested) return { cancelled: true };
     throw err;
   } finally {
-    ffmpeg.off('progress');
+    try { ff.off('progress', onProgress); } catch (e) {}
   }
 
   onStage(Stage.READ_RESULT, '正在读取结果...', 96);
@@ -1155,15 +1192,20 @@ async function executeTrim(file, onStage) {
     args.push(outputName);
   }
 
-  ffmpeg.on('progress', ({ progress }) => {
+  const onProgress = ({ progress }) => {
     if (!isFinite(progress)) return;
     const pct = Math.min(95, 10 + Math.max(0, Math.min(1, progress)) * 85);
     onStage(Stage.CONVERT, `正在裁剪...`, pct);
-  });
+  };
+  ffmpeg.on('progress', onProgress);
   onStage(Stage.CONVERT, `开始裁剪 → ${format.toUpperCase()}`, 10);
   try {
     await ffmpeg.exec(args);
   } catch (err) {
+    // 失败路径也要清理：MEMFS 只增不减，原写法把 deleteFile 放在函数末尾，
+    // throw 之前根本走不到，每次失败都留下一份完整输入副本，连续失败会撑爆 wasm 堆
+    try { await ffmpeg.deleteFile(inputName); } catch {}
+    try { await ffmpeg.deleteFile(outputName); } catch {}
     if (taskQueue.abortRequested) return { cancelled: true };
     throw err;
   } finally {

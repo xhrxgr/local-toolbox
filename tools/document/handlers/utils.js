@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 /**
  * 文档转换工具：共享工具函数
  */
@@ -55,6 +56,16 @@ export async function htmlToPdfBlob(html, filename) {
     background: #ffffff; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.6; font-size: 14px;
   `;
+  // 用户 HTML 必须先消毒再挂到 document.body：
+  // 事件处理器属性（<img onerror>、<svg onload>）在 innerHTML 注入后是会执行的，
+  // 粘贴一段带 onerror 的 HTML 就能以本页上下文跑脚本、读 localStorage。
+  // <script> 标签本身不会被 innerHTML 执行，但保留它没有意义。
+  const safeHtml = DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta', 'base'],
+    FORBID_ATTR: ['srcdoc', 'formaction'],
+  });
+
   // 内嵌基础样式让渲染效果接近标准 HTML
   container.innerHTML = `
     <style>
@@ -72,13 +83,21 @@ export async function htmlToPdfBlob(html, filename) {
       ul, ol { padding-left: 24px; }
       img { max-width: 100%; }
     </style>
-    ${html}
+    ${safeHtml}
   `;
   document.body.appendChild(container);
 
   try {
+    // canvas 单边上限（Chrome 约 16384px）。整篇文档渲染成一张图时，
+    // 超限会静默返回空白/损坏的图，导出的 PDF 全黑且不报错——提前拦下并说明。
+    const contentH = container.scrollHeight;
+    if (contentH * 2 > 16000) {
+      throw new Error(`文档渲染高度约 ${Math.round(contentH * 2)}px，超过浏览器画布上限，请拆分成多份后分别转换`);
+    }
+
     const canvas = await html2canvas(container, {
       scale: 2,
+      // 文档里的远程图片需要跨域读取才能入图；注意这会向图片所在服务器发起请求
       useCORS: true,
       backgroundColor: '#ffffff',
     });

@@ -96,7 +96,10 @@ function escapeHtml(s) {
 }
 
 /* ========== AES 加解密 ========== */
-const PBKDF2_ITERATIONS = 100000;
+// OWASP Password Storage Cheat Sheet 推荐的 PBKDF2-HMAC-SHA256 迭代数。
+// 原为 10 万并标注「推荐」，低于现行建议。代价是大文本加密明显变慢，
+// 换来的是口令派生强度到位。
+const PBKDF2_ITERATIONS = 600000;
 const SALT_LEN = 16;
 const GCM_IV_LEN = 12;
 const CBC_IV_LEN = 16;
@@ -307,6 +310,9 @@ function clearAes() {
   document.getElementById('aes-file-name').textContent = '点击选择文件';
   document.getElementById('aes-dropzone-primary').textContent = '或拖入文件作为输入（任意类型）';
   document.getElementById('aes-file').value = '';
+  // 口令与密钥框是 type=text（明文显示），不清就会留在页面上
+  document.getElementById('aes-password').value = '';
+  document.getElementById('aes-key-hex').value = '';
   aesCurrentFile = null;
   aesResultBytes = null;
 }

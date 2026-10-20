@@ -198,7 +198,9 @@ function parseInput(text) {
         allOtps.push(otp);
       }
     } catch (e) {
-      console.error('解析失败:', line, e);
+      // 不打印 line：迁移链接里 data= 参数就是 base64 编码的 2FA 密钥，
+      // 任何一次格式轻微不匹配都会把全部密钥喷进 DevTools 控制台
+      console.error('迁移链接解析失败（已跳过一行）:', e.message);
       errors.push({ line: line.slice(0, 60) + (line.length > 60 ? '...' : ''), msg: e.message });
     }
   }
@@ -511,6 +513,14 @@ function clearAll() {
   document.getElementById('accounts-list').innerHTML = '';
   document.getElementById('results-actions').hidden = true;
   document.getElementById('input-text').value = '';
+  // 二维码区域里存着完整的 otpauth:// 链接（含密钥），清空时必须一并清掉
+  const qrText = document.getElementById('qr-url-text');
+  if (qrText) qrText.textContent = '';
+  const qrCanvas = document.getElementById('qr-canvas');
+  if (qrCanvas) {
+    const ctx = qrCanvas.getContext('2d');
+    ctx.clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+  }
 }
 
 /* ========== 初始化 ========== */

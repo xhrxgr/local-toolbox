@@ -89,9 +89,13 @@ function loadState() {
 
 /* ========== 渲染 ========== */
 function getZoneInfo(tzId) {
-  // 先查常用预设
+  // 先查常用预设。注意只沿用它的 id/name，
+  // offset 必须现算——预设里写死的是某个时区的标准偏移，
+  // 夏令时期间（如 Europe/London 冬令时 +00:00 / 夏令时 +01:00）会整片显示错误
   const common = COMMON_TIMEZONES.find(z => z.id === tzId);
-  if (common) return common;
+  if (common) {
+    return { id: common.id, name: common.name, offset: getCurrentOffset(tzId) };
+  }
   // 否则生成友好名
   let cityName = tzId.split('/').pop().replace(/_/g, ' ');
   // 浏览器时区标记
@@ -299,7 +303,12 @@ function removeZone(tzId) {
 function populateTzSelect() {
   // 收集所有可用时区：常用预设 + 浏览器时区（如果不在常用中）
   const all = new Map();
-  COMMON_TIMEZONES.forEach(z => all.set(z.id, z));
+  // 偏移一律实时计算：预设里写死的是标准偏移，夏令时期间整列都是错的
+  COMMON_TIMEZONES.forEach(z => all.set(z.id, {
+    id: z.id,
+    name: z.name,
+    offset: getCurrentOffset(z.id),
+  }));
   if (state.browserTz && !all.has(state.browserTz)) {
     const cityName = state.browserTz.split('/').pop().replace(/_/g, ' ') + ' (本机)';
     all.set(state.browserTz, { id: state.browserTz, name: cityName, offset: getCurrentOffset(state.browserTz) });

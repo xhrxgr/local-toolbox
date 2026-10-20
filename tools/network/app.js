@@ -881,8 +881,9 @@ function initNetwork() {
   document.getElementById('btn-info-refresh').addEventListener('click', loadNetInfo);
   document.getElementById('btn-exit-compare').addEventListener('click', loadExitCompare);
 
-  // 首次加载网络信息（后台静默）
-  loadNetInfo();
+  // 不在页面加载时自动查询：本机 IP 归属地要并发请求 12 个第三方端点，
+  // 打开页面就把访客 IP 泄露给它们，且与「全部本地处理」的表述冲突。
+  // 改为用户主动点击「查询」后才发起。
 }
 
 export { initNetwork };

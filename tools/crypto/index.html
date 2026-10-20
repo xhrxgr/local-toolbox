@@ -22,7 +22,7 @@
 
     <!-- ========== AES 加解密 ========== -->
     <section class="mode-panel mode-panel--active glass" id="panel-aes">
-      <div class="panel-desc">AES 加解密，使用浏览器原生 Web Crypto API，支持 AES-GCM（含认证，推荐）与 AES-CBC。密钥可由密码经 PBKDF2 派生（10 万次迭代，SHA-256），或直接输入 hex 密钥。全部本地运行，密钥不离开浏览器。</div>
+      <div class="panel-desc">AES 加解密，使用浏览器原生 Web Crypto API，支持 AES-GCM（含认证，推荐）与 AES-CBC（CBC 无完整性校验，密文可被篡改，仅用于兼容旧系统）。密钥可由密码经 PBKDF2 派生（60 万次迭代，SHA-256，对齐 OWASP 现行建议；大文本加密会明显变慢），或直接输入 hex 密钥。全部本地运行，密钥不离开浏览器。</div>
 
       <!-- 算法 + 模式 -->
       <div class="aes-controls">

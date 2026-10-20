@@ -131,7 +131,32 @@ function judgeStatus(payload) {
   if (remaining < 86400) {
     return { type: 'yellow', text: '即将过期', detail: '剩余 ' + formatDuration(remaining) + '（不足 24 小时）' };
   }
-  return { type: 'green', text: '有效', detail: '剩余 ' + formatDuration(remaining) };
+  // 只校验了 exp，没做签名验证（浏览器端无公钥/密钥，做不了），
+  // 文案必须说清，否则用户会以为这个 token 是可信的
+  return {
+    type: 'green',
+    text: '未过期（签名未验证）',
+    detail: '剩余 ' + formatDuration(remaining) + ' · 本工具仅解析内容，未验证签名',
+  };
+}
+
+/** 签名相关的风险提示：工具不做验签，必须把「无法确认可信」讲清楚 */
+function warnUnsigned(header) {
+  const el = document.getElementById('jwt-banner');
+  if (!el) return;
+  const alg = header && typeof header.alg === 'string' ? header.alg : '';
+  let msg = '';
+  if (!alg) {
+    msg = '未声明签名算法（alg），无法判断该 token 是否有签名';
+  } else if (alg.toLowerCase() === 'none') {
+    msg = 'alg 为 none：无签名 token，任何人都能伪造，不能用于鉴权';
+  } else {
+    msg = `签名算法 ${alg}，但本工具未验证签名（浏览器端缺少密钥/公钥），请勿据此判断 token 可信`;
+  }
+  const p = document.createElement('p');
+  p.className = 'jwt-banner__note';
+  p.textContent = msg;
+  el.appendChild(p);
 }
 
 /* ========== 渲染 ========== */
@@ -293,6 +318,7 @@ function parseAndRender() {
   renderPartCard('card-payload', 'Payload', payloadStr, payloadStr);
   renderPartCard('card-signature', 'Signature（hex）', sigHex, sigHex);
   renderBanner(judgeStatus(payload));
+  warnUnsigned(header);
   renderClaims(payload);
   bindCopy();
 }
