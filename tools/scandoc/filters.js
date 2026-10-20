@@ -25,8 +25,21 @@ export async function applyFilter(imageData, mode, onProgress) {
  *  处理期间浏览器能画出更多帧，遮罩与进度条才是活的。 */
 const BAND_PIXELS = 150000;
 
+// 让出主线程用 MessageChannel 而不是 setTimeout：
+// 浏览器对嵌套 setTimeout 有 4ms 节流钳制，分块越细被钳得越久
+// （实测用 setTimeout 时总耗时 276ms → 1266ms，全浪费在等待上）
+const yieldChannel = new MessageChannel();
+let yieldResolve = null;
+yieldChannel.port1.onmessage = () => {
+  const r = yieldResolve;
+  yieldResolve = null;
+  if (r) r();
+};
 function yieldToBrowser() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => {
+    yieldResolve = resolve;
+    yieldChannel.port2.postMessage(0);
+  });
 }
 
 /** 把逐像素处理按横向条带切开执行，条带之间让出主线程 */
@@ -353,22 +366,34 @@ function downscaleGray(src, w, h, dw, dh) {
 async function applyEnhance(imageData, onProgress) {
   const { data, width, height } = imageData;
   const n = width * height;
+  // 各阶段占整体耗时的经验权重：白平衡是抽样统计很便宜，
+  // 光照估计与模糊最贵，主循环次之。用于把进度映射到 0~1
+  const W_WB = 0.05, W_ILLUM = 0.3, W_GRAY = 0.15, W_BLUR = 0.2;
+  const base = { wb: 0, illum: W_WB, gray: W_WB + W_ILLUM, blur: W_WB + W_ILLUM + W_GRAY, main: W_WB + W_ILLUM + W_GRAY + W_BLUR };
 
-  // 1. 白平衡：估计纸张白点，把纸面拉回中性
+  // 1. 白平衡：估计纸张白点，把纸面拉回中性（抽样统计，很快）
   const gains = estimateWhiteBalance(data, n);
+  onProgress?.(base.wb + W_WB);
 
   // 2. 光照均匀化：大半径估计背景光照后相除，消除阴影与暗角
-  const illum = estimateIllumination(imageData, width, height);
+  const illum = await estimateIllumination(imageData, width, height,
+    (r) => onProgress?.(base.illum + W_ILLUM * r));
 
   // 3. 校正后的亮度（白平衡 + 光照都算进去），后面分位数与锐化都用它
   const gray = new Float32Array(n);
-  for (let j = 0; j < n; j++) {
-    const i = j * 4;
-    const r = data[i] * gains[0];
-    const g = data[i + 1] * gains[1];
-    const b = data[i + 2] * gains[2];
-    gray[j] = (r * 0.299 + g * 0.587 + b * 0.114) * (illum[j] / 127.5);
-  }
+  await inBands(height, width, (y0, y1) => {
+    for (let y = y0; y < y1; y++) {
+      const row = y * width;
+      for (let x = 0; x < width; x++) {
+        const j = row + x;
+        const i = j * 4;
+        const r = data[i] * gains[0];
+        const g = data[i + 1] * gains[1];
+        const b = data[i + 2] * gains[2];
+        gray[j] = (r * 0.299 + g * 0.587 + b * 0.114) * (illum[j] / 127.5);
+      }
+    }
+  }, (r) => onProgress?.(base.gray + W_GRAY * r));
 
   // 4. 对比度：按「校正后」的亮度分位拉伸
   //    （必须在校正之后统计，否则阴影会把分位点拉偏，导致亮区被压暗）
@@ -376,7 +401,8 @@ async function applyEnhance(imageData, onProgress) {
   const range = Math.max(1, hi - lo);
 
   // 5. 锐化（USM）：与 3×3 模糊的差值放大
-  const blur = boxBlur3(gray, width, height);
+  const blur = await boxBlur3(gray, width, height,
+    (r) => onProgress?.(base.blur + W_BLUR * r));
   const SHARP = 0.7;
 
   await inBands(height, width, (y0, y1) => {
@@ -399,7 +425,8 @@ async function applyEnhance(imageData, onProgress) {
         data[i + 2] = clamp255(data[i + 2] * gains[2] * il * k);
       }
     }
-  }, onProgress);
+  }, (r) => onProgress?.(base.main + (1 - base.main) * r));
+  onProgress?.(1);
   return imageData;
 }
 
@@ -449,7 +476,7 @@ function estimateWhiteBalance(data, n) {
  * 再用 canvas 双线性放大回原尺寸，逐像素相除做归一化。
  * 重活在小图上做、放大交给 GPU，12MP 也只要百来毫秒。
  */
-function estimateIllumination(imageData, width, height) {
+async function estimateIllumination(imageData, width, height, onProgress) {
   const n = width * height;
   const LONG = 96;
   const scale = Math.min(1, LONG / Math.max(width, height));
@@ -524,6 +551,9 @@ function estimateIllumination(imageData, width, height) {
   }
   rctx.putImageData(rData, 0, 0);
 
+  // 小图上的统计已完成（很快），把进度推到 75%
+  onProgress?.(0.75);
+
   const bigCanvas = document.createElement('canvas');
   bigCanvas.width = width;
   bigCanvas.height = height;
@@ -533,9 +563,15 @@ function estimateIllumination(imageData, width, height) {
   bctx.drawImage(ratioCanvas, 0, 0, width, height);
   const up = bctx.getImageData(0, 0, width, height).data;
 
-  // 还原为逐像素系数（用 Uint8 存，12MP 时省下约 36MB 内存）
+  // 还原为逐像素系数（用 Uint8 存，12MP 时省下约 36MB 内存）。
+  // 逐像素阶段分块，否则这里会连续阻塞几十毫秒。
   const out = new Uint8Array(n);
-  for (let j = 0; j < n; j++) out[j] = up[j * 4];
+  await inBands(height, width, (y0, y1) => {
+    for (let y = y0; y < y1; y++) {
+      const row = y * width;
+      for (let x = 0; x < width; x++) out[row + x] = up[(row + x) * 4];
+    }
+  }, (r) => onProgress?.(0.75 + 0.25 * r));
   return out;
 }
 
@@ -562,26 +598,32 @@ function percentilesOf(values) {
 }
 
 /** 3×3 可分离盒式模糊（USM 的模糊项） */
-function boxBlur3(src, width, height) {
+async function boxBlur3(src, width, height, onProgress) {
   const tmp = new Float32Array(src.length);
   const out = new Float32Array(src.length);
-  for (let y = 0; y < height; y++) {
-    const row = y * width;
-    for (let x = 0; x < width; x++) {
-      const a = src[row + (x > 0 ? x - 1 : 0)];
-      const b = src[row + x];
-      const c = src[row + (x < width - 1 ? x + 1 : width - 1)];
-      tmp[row + x] = (a + b + c) / 3;
+  // 横向：每行独立，可按行分块让出主线程
+  await inBands(height, width, (y0, y1) => {
+    for (let y = y0; y < y1; y++) {
+      const row = y * width;
+      for (let x = 0; x < width; x++) {
+        const a = src[row + (x > 0 ? x - 1 : 0)];
+        const b = src[row + x];
+        const c = src[row + (x < width - 1 ? x + 1 : width - 1)];
+        tmp[row + x] = (a + b + c) / 3;
+      }
     }
-  }
-  for (let y = 0; y < height; y++) {
-    const row = y * width;
-    const up = (y > 0 ? y - 1 : 0) * width;
-    const dn = (y < height - 1 ? y + 1 : height - 1) * width;
-    for (let x = 0; x < width; x++) {
-      out[row + x] = (tmp[up + x] + tmp[row + x] + tmp[dn + x]) / 3;
+  }, (r) => onProgress?.(0.5 * r));
+  // 纵向：同样每行独立（只依赖 tmp 的上一行/本行/下一行）
+  await inBands(height, width, (y0, y1) => {
+    for (let y = y0; y < y1; y++) {
+      const row = y * width;
+      const up = (y > 0 ? y - 1 : 0) * width;
+      const dn = (y < height - 1 ? y + 1 : height - 1) * width;
+      for (let x = 0; x < width; x++) {
+        out[row + x] = (tmp[up + x] + tmp[row + x] + tmp[dn + x]) / 3;
+      }
     }
-  }
+  }, (r) => onProgress?.(0.5 + 0.5 * r));
   return out;
 }
 
