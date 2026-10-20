@@ -6,13 +6,13 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-CjmS0Qvd.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-BV9vELb_.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-C9_m-HWA.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-CtUKsQen.css">
 </head>
 <body>
   <main class="scan-app">
@@ -107,10 +107,8 @@
             <button class="btn btn-sm btn-secondary" id="btn-detect" type="button">自动识别</button>
             <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button">重置</button>
           </div>
-          <label class="scan-toolbar__check">
-            <input type="checkbox" id="chk-live-preview" checked />
-            <span>实时查看矫正结果</span>
-          </label>
+          <button class="btn btn-sm btn-secondary" id="btn-compare" type="button"
+            disabled title="按住查看未矫正的原图，松开回到矫正结果">按住看原图</button>
         </div>
 
         <div class="scan-canvas-wrap glass" id="canvas-wrap">
@@ -124,10 +122,18 @@
             <p>导入图片后在此编辑</p>
             <p class="scan-empty__hint">自动识别文档四角 · 黑白 / 增强滤镜 · 曲面矫正 · 合并导出 PDF</p>
           </div>
-          <div class="scan-busy" id="scan-busy" hidden><span class="scan-busy__spinner"></span><span id="scan-busy-text">处理中...</span><button class="scan-busy__cancel" id="btn-cancel" type="button" hidden>取消</button></div>
-          <div class="warp-preview" id="warp-preview" hidden>
-            <span class="warp-preview__label">按四角矫正后</span>
-            <img id="warp-preview-img" alt="四角矫正后的效果预览" />
+          <div class="scan-busy" id="scan-busy" hidden>
+            <div class="scan-busy__box">
+              <div class="scan-busy__head">
+                <span class="scan-busy__spinner"></span>
+                <span id="scan-busy-text">处理中...</span>
+                <span class="scan-busy__pct" id="scan-busy-pct" hidden>0%</span>
+              </div>
+              <div class="scan-busy__bar" id="scan-busy-bar" hidden>
+                <div class="scan-busy__fill" id="scan-busy-fill"></div>
+              </div>
+              <button class="scan-busy__cancel" id="btn-cancel" type="button" hidden>取消</button>
+            </div>
           </div>
         </div>
       </section>
