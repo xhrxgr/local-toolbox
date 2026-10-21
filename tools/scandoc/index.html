@@ -6,13 +6,13 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-rdDbgXW9.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-C6lQdwW2.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-CtUKsQen.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-M7b_tKju.css">
 </head>
 <body>
   <main class="scan-app">
@@ -107,13 +107,18 @@
             <button class="btn btn-sm btn-secondary" id="btn-detect" type="button">自动识别</button>
             <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button">重置</button>
           </div>
-          <button class="btn btn-sm btn-secondary" id="btn-compare" type="button"
-            disabled title="按住查看未矫正的原图，松开回到矫正结果">按住看原图</button>
         </div>
 
         <div class="scan-canvas-wrap glass" id="canvas-wrap">
           <canvas id="scan-canvas" hidden></canvas>
           <svg class="corner-layer" id="corner-layer" hidden></svg>
+          <button class="canvas-compare" id="btn-compare" type="button" hidden
+            title="按住查看未矫正的原图，松开回到矫正结果" aria-label="按住查看未矫正的原图">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
           <div class="scan-empty" id="editor-empty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
