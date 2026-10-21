@@ -58,8 +58,14 @@ export class CornerOverlay {
     this.handles.forEach(h => this.svg.appendChild(h));
   }
 
-  /** 更新显示的页面与角点 */
-  setPage(page) {
+  /**
+   * 更新显示的页面与角点。
+   * @param raw true 表示画布显示的是「未旋转未矫正的原图」，
+   *   此时角点本身就是原图相对坐标，直接用即可（省掉旋转换算）；
+   *   默认 false 走旋转后的显示坐标。
+   */
+  setPage(page, raw = false) {
+    this.raw = raw;
     this.page = page;
     this.redraw();
   }
@@ -85,9 +91,14 @@ export class CornerOverlay {
     this.svg.style.width = `${w}px`;
     this.svg.style.height = `${h}px`;
 
-    // 角点 → 显示坐标（旋转后画布绝对坐标 × 显示缩放）
-    const abs = cornersToRotated(page.corners, page);
-    const { w: rw, h: rh } = { w: canvasRotatedWidth(page), h: canvasRotatedHeight(page) };
+    // 角点 → 显示坐标。
+    // raw 模式（原图视图）下角点就是原图相对坐标；
+    // 否则先换算到旋转后画布坐标，再乘显示缩放。
+    const abs = this.raw
+      ? page.corners.map(c => ({ x: c.x, y: c.y }))
+      : cornersToRotated(page.corners, page);
+    const rw = this.raw ? page.img.naturalWidth : canvasRotatedWidth(page);
+    const rh = this.raw ? page.img.naturalHeight : canvasRotatedHeight(page);
     const sx = w / rw;
     const sy = h / rh;
     const pts = abs.map(p => `${(p.x * sx).toFixed(1)},${(p.y * sy).toFixed(1)}`);
@@ -141,11 +152,20 @@ export class CornerOverlay {
     const { w: rw, h: rh } = { w: canvasRotatedWidth(this.page), h: canvasRotatedHeight(this.page) };
     const viewPoint = { x: vx * rw, y: vy * rh };
     // → 原图相对坐标
-    const [orig] = rotatedToCorners([viewPoint], this.page);
-    // 手柄是按「旋转后的显示顺序」绘制的，而角点按原图顺序存储，
-    // 两者在 rotation≠0 时不是同一套下标，必须换算后再写入，
-    // 否则会出现「抓住左上角、却把右下的角拖走」
-    const target = rotatedIndexToCornerIndex(this.page.rotation, this.dragIndex);
+    // raw 模式（原图视图）下，指针位置就是原图相对坐标，直接写；
+    // 否则要经过「旋转后坐标 → 原图坐标」的逆变换，并且手柄顺序也要换算
+    let orig;
+    let target = this.dragIndex;
+    if (this.raw) {
+      orig = { x: vx, y: vy };
+    } else {
+      const [back] = rotatedToCorners([{ x: vx * canvasRotatedWidth(this.page), y: vy * canvasRotatedHeight(this.page) }], this.page);
+      orig = back;
+      // 手柄是按「旋转后的显示顺序」绘制的，而角点按原图顺序存储，
+      // 两者在 rotation≠0 时不是同一套下标，必须换算后再写入，
+      // 否则会出现「抓住左上角、却把右下的角拖走」
+      target = rotatedIndexToCornerIndex(this.page.rotation, this.dragIndex);
+    }
     const corners = this.page.corners.map((c, i) => (i === target ? orig : c));
     this.page.corners = corners;
     this.redraw();

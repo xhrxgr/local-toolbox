@@ -683,3 +683,48 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ========== 「按住看原图」浮动图标 ==========
+   放在画布角落而不是工具栏：工具栏里做成按钮会很突兀，
+   而它本质是「看一眼矫正前的对比」，应该贴着画面、可随手按住。 */
+.canvas-compare {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 20; /* 低于四角覆盖层(25)，避免盖住可拖拽的手柄 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--card);
+  color: var(--text-secondary);
+  opacity: 0.72;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast), transform var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+}
+
+.canvas-compare:hover {
+  opacity: 1;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.canvas-compare.is-holding {
+  opacity: 1;
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: scale(0.94);
+}
+
+.canvas-compare:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

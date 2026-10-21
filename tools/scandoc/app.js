@@ -182,25 +182,53 @@ async function doRenderEditor() {
   empty.hidden = true;
   canvas.hidden = false;
 
-  // 有四角且不在「按住看原图」状态时，主画布直接显示矫正结果——
-  // 浮动小窗会被用户挡住，反而看不清效果。改为整屏显示 + 按住对比。
-  const showOriginal = !page.corners || compareMode;
+  // 按住「看原图」时，画布显示的是**导入时的原图**：不旋转、不加滤镜、不矫正。
+  // 这样才能和默认的「修改后」视图形成真正的对比（只去掉矫正的话，
+  // 只改了旋转或滤镜的用户按下去画面会一模一样）。
+  if (compareMode) {
+    const raw = renderRaw(page, EDITOR_MAX_SIZE);
+    if (token !== editorRenderToken || getSelected() !== page) return;
+    paintCanvas(raw);
+    overlay.setPage(page, true); // 原图视图：角点即原图坐标，可直接拖拽调整
+    syncToolbar(page);
+    return;
+  }
+
+  // 默认视图：旋转 + 滤镜 + 矫正的结果
   const source = await renderPage(page, {
     maxSize: EDITOR_MAX_SIZE,
-    applyWarp: !showOriginal,
+    applyWarp: true,
     onProgress: editorProgress,
   });
   // 滤镜是分块异步的，等待期间用户可能又切了页/改了滤镜，过期结果直接丢弃
   if (token !== editorRenderToken || getSelected() !== page) return;
   paintCanvas(source);
-
-  if (showOriginal) {
-    // 只有原图视图才需要四角手柄（矫正结果里角点已被拉直，手柄无处对齐）
-    overlay.setPage(page);
-  } else {
-    overlay.hide();
-  }
+  // 矫正结果里角点已被拉直，手柄无处对齐，默认视图不显示
+  overlay.hide();
   syncToolbar(page);
+}
+
+/** 渲染导入时的原图：不旋转、不加滤镜、不矫正 */
+function renderRaw(page, maxSize) {
+  const iw = page.img.naturalWidth;
+  const ih = page.img.naturalHeight;
+  const s = Math.min(1, maxSize / Math.max(iw, ih));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(iw * s));
+  c.height = Math.max(1, Math.round(ih * s));
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(page.img, 0, 0, c.width, c.height);
+  return c;
+}
+
+/** 图像是否相对导入时有过修改（决定角落图标是否显示） */
+function hasEdits(page) {
+  return !!page && (
+    page.filter !== 'original' ||
+    page.rotation !== 0 ||
+    !!page.corners ||
+    !!page.erased
+  );
 }
 
 function paintCanvas(source) {
@@ -223,8 +251,16 @@ function syncToolbar(page) {
   document.getElementById('btn-rotate-right').disabled = !hasPage || isWorking;
   document.getElementById('btn-detect').disabled = !hasPage || isWorking;
   document.getElementById('btn-reset-corners').disabled = !hasPage || isWorking;
-  // 只有识别出四角（画布显示的是矫正结果）时，按住对比才有意义
-  document.getElementById('btn-compare').disabled = !hasPage || isWorking || !page.corners;
+  // 图像相对原图有过任何修改（滤镜/旋转/裁剪/擦除）时才显示这个角落图标
+  const cmp = document.getElementById('btn-compare');
+  const canCompare = hasEdits(page) && !isWorking;
+  cmp.hidden = !canCompare;
+  cmp.disabled = !canCompare;
+  // 若图标在隐藏时仍处于按住态（例如处理中去手写），要退出按住
+  if (!canCompare && compareMode) {
+    compareMode = false;
+    cmp.classList.remove('is-holding');
+  }
 }
 
 /* ========== 导入 ========== */
@@ -361,7 +397,9 @@ async function eraseCurrentPage() {
       });
       // 用修复后的图替换原图；保留当前滤镜设置（滤镜是视图层偏好，不该被静默丢弃），
       // 旋转与四角保持不变（输出与输入同尺寸，几何关系未变）
-      updatePage(p.id, { img: res.img, thumb: null });
+      // 标记为已擦除：原图已被替换，属于「有异于原图的修改」，
+      // 即使没旋转/滤镜/四角，也要让角落的对比图标显示出来
+      updatePage(p.id, { img: res.img, thumb: null, erased: true });
       await refreshThumb(p);
       totalMs += res.ms;
       lastCoverage = res.coverage;
