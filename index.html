@@ -81,6 +81,8 @@
       flex-direction: column;
       gap: var(--space-md);
       padding: var(--space-xl);
+      /* grid 子项默认 min-width:auto，长串无空格文本会把卡片撑破 */
+      min-width: 0;
       border-radius: var(--radius-lg);
       transition: transform var(--transition-normal), box-shadow var(--transition-normal),
         border-color var(--transition-normal);
@@ -120,6 +122,9 @@
       font-size: var(--text-sm);
       color: var(--text-secondary);
       line-height: 1.5;
+      /* 描述里常有 PDF/Word/Excel 这类无空格长串，
+         URL 式断行失败时会横向溢出卡片，这里允许在必要处断开 */
+      overflow-wrap: break-word;
     }
 
     .tool-card__tags {
