@@ -6,13 +6,13 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-C6lQdwW2.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-Bm_qU4hZ.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-M7b_tKju.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-pMcjHWHj.css">
 </head>
 <body>
   <main class="scan-app">
@@ -104,6 +104,8 @@
           </div>
           <div class="scan-toolbar__group" role="group" aria-label="四角裁剪">
             <span class="scan-toolbar__label" title="拖动四个角定义文档边界，导出图片与 PDF 时会按这四角自动透视矫正拉直">四角</span>
+            <button class="btn btn-sm btn-secondary" id="btn-adjust" type="button"
+              title="进入四角调整：画布切到原图，拖动四个角定义矫正范围">调整</button>
             <button class="btn btn-sm btn-secondary" id="btn-detect" type="button">自动识别</button>
             <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button">重置</button>
           </div>
@@ -112,6 +114,10 @@
         <div class="scan-canvas-wrap glass" id="canvas-wrap">
           <canvas id="scan-canvas" hidden></canvas>
           <svg class="corner-layer" id="corner-layer" hidden></svg>
+          <div class="canvas-adjust-bar" id="adjust-bar" hidden>
+            <span>拖动四角定义矫正范围</span>
+            <button class="btn btn-sm btn-primary" id="btn-adjust-done" type="button">完成</button>
+          </div>
           <button class="canvas-compare" id="btn-compare" type="button" hidden
             title="按住查看未矫正的原图，松开回到矫正结果" aria-label="按住查看未矫正的原图">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
