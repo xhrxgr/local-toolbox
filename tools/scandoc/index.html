@@ -6,13 +6,13 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-Bm_qU4hZ.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-D6kEcj9S.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/es-DInUeCLG.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-pMcjHWHj.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scandoc-CyyuQ8HB.css">
 </head>
 <body>
   <main class="scan-app">
@@ -102,12 +102,19 @@
               </svg>
             </button>
           </div>
-          <div class="scan-toolbar__group" role="group" aria-label="四角裁剪">
-            <span class="scan-toolbar__label" title="拖动四个角定义文档边界，导出图片与 PDF 时会按这四角自动透视矫正拉直">四角</span>
+          <!-- 四角：只是定义边界的控制点，本身不产生结果 -->
+          <div class="scan-toolbar__group" role="group" aria-label="四角">
+            <span class="scan-toolbar__label" title="四个控制点，用于圈定文档边界">四角</span>
+            <button class="btn btn-sm btn-secondary" id="btn-detect" type="button"
+              title="自动识别文档的四个角">自动识别</button>
+            <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button"
+              title="四角恢复为整图范围">重置</button>
+          </div>
+          <!-- 曲面矫正：用四角把页面透视拉直，是独立的一道工序 -->
+          <div class="scan-toolbar__group" role="group" aria-label="曲面矫正">
+            <span class="scan-toolbar__label" title="按四角做透视变换，把斜拍的页面拉直；导出图片与 PDF 时生效">曲面矫正</span>
             <button class="btn btn-sm btn-secondary" id="btn-adjust" type="button"
-              title="进入四角调整：画布切到原图，拖动四个角定义矫正范围">调整</button>
-            <button class="btn btn-sm btn-secondary" id="btn-detect" type="button">自动识别</button>
-            <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button">重置</button>
+              title="进入矫正调整：画布切到原图，拖动四角微调矫正范围">调整</button>
           </div>
         </div>
 
