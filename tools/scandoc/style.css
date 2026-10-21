@@ -728,3 +728,23 @@
   opacity: 0.35;
   cursor: default;
 }
+
+/* 四角调整模式提示条 */
+.canvas-adjust-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--card);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+}

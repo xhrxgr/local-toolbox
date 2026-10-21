@@ -18,6 +18,7 @@ const EDITOR_MAX_SIZE = 1400;
 let canvas;
 let overlay;
 let compareMode = false;      // 按住「看原图」中
+let adjustMode = false;       // 四角调整模式（停留式，可松手拖角点）
 let editorProgress = null;  // 编辑器渲染的进度回调（滤镜分块时上报）
 let isWorking = false;
 
@@ -182,14 +183,17 @@ async function doRenderEditor() {
   empty.hidden = true;
   canvas.hidden = false;
 
-  // 按住「看原图」时，画布显示的是**导入时的原图**：不旋转、不加滤镜、不矫正。
-  // 这样才能和默认的「修改后」视图形成真正的对比（只去掉矫正的话，
-  // 只改了旋转或滤镜的用户按下去画面会一模一样）。
-  if (compareMode) {
+  // 按住「看原图」或处于「四角调整」模式时，画布显示**导入时的原图**：
+  // 不旋转、不加滤镜、不矫正。前者用于快速对比，后者用于拖角点调整。
+  const showRaw = compareMode || adjustMode;
+  document.getElementById('adjust-bar').hidden = !adjustMode;
+  if (showRaw) {
     const raw = renderRaw(page, EDITOR_MAX_SIZE);
     if (token !== editorRenderToken || getSelected() !== page) return;
     paintCanvas(raw);
-    overlay.setPage(page, true); // 原图视图：角点即原图坐标，可直接拖拽调整
+    // 原图视图：角点即原图相对坐标，省掉旋转换算，且能直接拖拽
+    if (page.corners) overlay.setPage(page, true);
+    else overlay.hide();
     syncToolbar(page);
     return;
   }
@@ -251,11 +255,15 @@ function syncToolbar(page) {
   document.getElementById('btn-rotate-right').disabled = !hasPage || isWorking;
   document.getElementById('btn-detect').disabled = !hasPage || isWorking;
   document.getElementById('btn-reset-corners').disabled = !hasPage || isWorking;
-  // 图像相对原图有过任何修改（滤镜/旋转/裁剪/擦除）时才显示这个角落图标
+  // 调整模式下已经看着原图，角落的对比图标该退让
   const cmp = document.getElementById('btn-compare');
-  const canCompare = hasEdits(page) && !isWorking;
+  const canCompare = hasEdits(page) && !isWorking && !adjustMode;
   cmp.hidden = !canCompare;
   cmp.disabled = !canCompare;
+  const adj = document.getElementById('btn-adjust');
+  adj.disabled = !hasPage || isWorking;
+  adj.classList.toggle('btn-primary', adjustMode);
+  adj.classList.toggle('btn-secondary', !adjustMode);
   // 若图标在隐藏时仍处于按住态（例如处理中去手写），要退出按住
   if (!canCompare && compareMode) {
     compareMode = false;
@@ -643,6 +651,21 @@ export function initScanDoc() {
   });
 
   // 自动识别 / 重置四角
+  // 四角调整：进入后画布切原图 + 显示手柄，可松手逐个拖角点；
+  // 再点一次或点「完成」退出，回到矫正结果视图
+  const toggleAdjust = () => {
+    if (!getSelected()) return;
+    adjustMode = !adjustMode;
+    if (adjustMode) compareMode = false;
+    renderEditor();
+  };
+  document.getElementById('btn-adjust').addEventListener('click', toggleAdjust);
+  document.getElementById('btn-adjust-done').addEventListener('click', () => {
+    if (!adjustMode) return;
+    adjustMode = false;
+    renderEditor();
+  });
+
   document.getElementById('btn-detect').addEventListener('click', () => {
     const page = getSelected();
     if (page) autoDetect(page);
