@@ -592,6 +592,15 @@
   #scan-canvas {
     max-height: 60vh;
   }
+
+  /* 窄屏隐藏分组标签：按钮自带 title/aria-label，省下的高度留给画布 */
+  .scan-toolbar__label {
+    display: none;
+  }
+
+  .scan-toolbar {
+    gap: var(--space-sm);
+  }
 }
 
 /* 去手写：笔迹类型下拉 */
