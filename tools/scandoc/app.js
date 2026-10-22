@@ -150,7 +150,9 @@ function filterLabel(f) {
 /* ========== 缩略图 ========== */
 async function refreshThumb(page) {
   try {
-    const c = await renderPage(page, { maxSize: THUMB_SIZE, applyWarp: false });
+    // 缩略图也要走矫正：否则列表里是斜的、编辑器里是直的，
+    // 与「所见即所得」相悖（编辑器/导出都带矫正）
+    const c = await renderPage(page, { maxSize: THUMB_SIZE, applyWarp: true });
     const url = c.toDataURL('image/png');
     updatePage(page.id, { thumb: url });
   } catch {
@@ -198,7 +200,7 @@ async function doRenderEditor() {
     return;
   }
 
-  // 默认视图：旋转 + 滤镜 + 矫正的结果
+  // 默认视图：旋转 → 曲面矫正 → 滤镜 的结果
   const source = await renderPage(page, {
     maxSize: EDITOR_MAX_SIZE,
     applyWarp: true,

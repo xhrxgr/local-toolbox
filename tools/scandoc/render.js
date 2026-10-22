@@ -1,5 +1,5 @@
 /**
- * 渲染管线：旋转 → 滤镜 → 曲面矫正，组合为最终画布
+ * 渲染管线：旋转 → 降采样 → 曲面矫正 → 滤镜，组合为最终画布
  * 用于编辑器画布、缩略图、导出，保证所见即所得
  */
 import { applyFilter } from './filters.js';
@@ -125,8 +125,13 @@ export async function renderPage(page, opts = {}) {
     );
     if (inside) {
       try {
+        const pre = work;
         work = warpPerspective(work, absCorners, Infinity);
         rctxWork = work.getContext('2d', { willReadFrequently: true });
+        // 矫正成功后，矫正前那张中间画布已经没人用了。
+        // iOS 上光靠 GC 不及时，置 0 才能立刻把内存还给系统
+        // （warpPerspective 退化时会返回原画布，此时不能释放）
+        if (work !== pre) { pre.width = 0; pre.height = 0; }
       } catch (err) {
         // 四角退化（共线等）时退回未矫正图；留日志便于排查
         console.warn('[scandoc] 透视矫正失败，本次输出未拉直：', err);
@@ -141,6 +146,8 @@ export async function renderPage(page, opts = {}) {
     rctxWork.putImageData(imageData, 0, 0);
   }
 
+  // 全尺寸的旋转中间画布到此没人用了（无降采样时它就是返回值，不能释放）
+  if (work !== rotated) { rotated.width = 0; rotated.height = 0; }
   return work;
 }
 
