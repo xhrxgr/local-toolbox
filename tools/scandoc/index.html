@@ -6,7 +6,7 @@
   <meta name="description" content="扫描文档 —— 图片转文档，批量导入、文档滤镜、曲面矫正、四角裁剪、合并导出 PDF，全部本地处理" />
   <title>扫描文档 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-D6kEcj9S.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/scandoc-Ct1dloKO.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
@@ -56,14 +56,7 @@
       <!-- 右侧：编辑区 -->
       <section class="scan-editor">
         <div class="scan-toolbar glass" id="scan-toolbar">
-          <div class="scan-toolbar__group" role="group" aria-label="文档效果">
-            <span class="scan-toolbar__label">效果</span>
-            <div class="segmented" id="filter-segmented">
-              <button class="segmented__btn segmented__btn--active" data-filter="original" type="button">原图</button>
-              <button class="segmented__btn" data-filter="bw" type="button">黑白</button>
-              <button class="segmented__btn" data-filter="enhance" type="button">增强</button>
-            </div>
-          </div>
+          
           <div class="scan-toolbar__group" role="group" aria-label="旋转">
             <span class="scan-toolbar__label">旋转</span>
             <button class="btn btn-sm btn-secondary" id="btn-rotate-left" type="button" title="左转 90 度">
@@ -76,6 +69,26 @@
                 <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
               </svg>
             </button>
+          </div>
+          <div class="scan-toolbar__group" role="group" aria-label="四角">
+            <span class="scan-toolbar__label" title="四个控制点，用于圈定文档边界">四角</span>
+            <button class="btn btn-sm btn-secondary" id="btn-detect" type="button"
+              title="自动识别文档的四个角">自动识别</button>
+            <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button"
+              title="四角恢复为整图范围">重置</button>
+          </div>
+          <div class="scan-toolbar__group" role="group" aria-label="曲面矫正">
+            <span class="scan-toolbar__label" title="按四角做透视变换，把斜拍的页面拉直；导出图片与 PDF 时生效">曲面矫正</span>
+            <button class="btn btn-sm btn-secondary" id="btn-adjust" type="button"
+              title="进入矫正调整：画布切到原图，拖动四角微调矫正范围">调整</button>
+          </div>
+          <div class="scan-toolbar__group" role="group" aria-label="文档效果">
+            <span class="scan-toolbar__label">效果</span>
+            <div class="segmented" id="filter-segmented">
+              <button class="segmented__btn segmented__btn--active" data-filter="original" type="button">原图</button>
+              <button class="segmented__btn" data-filter="bw" type="button">黑白</button>
+              <button class="segmented__btn" data-filter="enhance" type="button">增强</button>
+            </div>
           </div>
           <div class="scan-toolbar__group" role="group" aria-label="去除手写">
             <span class="scan-toolbar__label" title="自动识别彩色笔迹并用本地 AI 修复背景，仅支持红笔与蓝笔">去手写</span>
@@ -102,20 +115,13 @@
               </svg>
             </button>
           </div>
+          
+          
+          
           <!-- 四角：只是定义边界的控制点，本身不产生结果 -->
-          <div class="scan-toolbar__group" role="group" aria-label="四角">
-            <span class="scan-toolbar__label" title="四个控制点，用于圈定文档边界">四角</span>
-            <button class="btn btn-sm btn-secondary" id="btn-detect" type="button"
-              title="自动识别文档的四个角">自动识别</button>
-            <button class="btn btn-sm btn-secondary" id="btn-reset-corners" type="button"
-              title="四角恢复为整图范围">重置</button>
-          </div>
+          
           <!-- 曲面矫正：用四角把页面透视拉直，是独立的一道工序 -->
-          <div class="scan-toolbar__group" role="group" aria-label="曲面矫正">
-            <span class="scan-toolbar__label" title="按四角做透视变换，把斜拍的页面拉直；导出图片与 PDF 时生效">曲面矫正</span>
-            <button class="btn btn-sm btn-secondary" id="btn-adjust" type="button"
-              title="进入矫正调整：画布切到原图，拖动四角微调矫正范围">调整</button>
-          </div>
+          
         </div>
 
         <div class="scan-canvas-wrap glass" id="canvas-wrap">
