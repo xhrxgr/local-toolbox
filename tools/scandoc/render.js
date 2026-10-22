@@ -113,14 +113,9 @@ export async function renderPage(page, opts = {}) {
     rctxWork = wctx;
   }
 
-  // 3. 滤镜（跑在目标分辨率上）
-  if (page.filter && page.filter !== 'original') {
-    const imageData = rctxWork.getImageData(0, 0, work.width, work.height);
-    await applyFilter(imageData, page.filter, opts.onProgress);
-    rctxWork.putImageData(imageData, 0, 0);
-  }
-
-  // 4. 曲面矫正（有四角时）。角点按同一比例缩放到工作画布坐标
+  // 3. 曲面矫正（有四角时）。角点按同一比例缩放到工作画布坐标。
+  //    矫正放在滤镜之前：滤镜的白平衡与光照估计作用在「已拉直」的纸面上，
+  //    比在带透视畸变的图上估计更准；也顺带让工具栏顺序与处理顺序一致。
   if (applyWarp && page.corners) {
     const absCorners = cornersToRotated(page.corners, page)
       .map(c => ({ x: c.x * scale, y: c.y * scale }));
@@ -130,12 +125,20 @@ export async function renderPage(page, opts = {}) {
     );
     if (inside) {
       try {
-        return warpPerspective(work, absCorners, Infinity);
+        work = warpPerspective(work, absCorners, Infinity);
+        rctxWork = work.getContext('2d', { willReadFrequently: true });
       } catch (err) {
         // 四角退化（共线等）时退回未矫正图；留日志便于排查
         console.warn('[scandoc] 透视矫正失败，本次输出未拉直：', err);
       }
     }
+  }
+
+  // 4. 滤镜（跑在目标分辨率上）
+  if (page.filter && page.filter !== 'original') {
+    const imageData = rctxWork.getImageData(0, 0, work.width, work.height);
+    await applyFilter(imageData, page.filter, opts.onProgress);
+    rctxWork.putImageData(imageData, 0, 0);
   }
 
   return work;

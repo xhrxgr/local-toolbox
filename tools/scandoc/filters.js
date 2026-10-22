@@ -455,8 +455,16 @@ function estimateWhiteBalance(data, n) {
   let sr = 0, sg = 0, sb = 0, sn = 0;
   for (let j = 0; j < n; j += step) {
     const i = j * 4;
-    const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
-    if (lum >= thresh) { sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; sn++; }
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const lum = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
+    if (lum < thresh) continue;
+    // 跳过本身已接近中性的像素：矫正会在四角之外填纯白，
+    // 那些填充区没有色偏信息，若混进样本会把「纸面均色」拉成中性，
+    // 增益算出来等于 1，泛黄的纸就再也去不掉黄。
+    // （纸面若真是中性，全部跳过后 sn=0 → 增益 [1,1,1]，结果同样正确）
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    if (spread < 8) continue;
+    sr += r; sg += g; sb += b; sn++;
   }
   if (sn === 0) return [1, 1, 1];
   const mr = sr / sn;
