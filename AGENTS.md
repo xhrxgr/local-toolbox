@@ -84,6 +84,20 @@
 - 验证方法：iframe 审计页（媒体查询按 iframe 宽度生效），在 390/768/1024 三档测量
   横向溢出、触控目标 <40px、字号 <12px、内容被裁四项
 
+**2026-10-25 真机审查结论（agent-browser 截图 + 脚本测量，60 张全页截图）**：
+- 页面级横向溢出 0、字号 <12px 0、内容裁切 0（`overflow-x: clip` 生效）
+- **触控目标是最大盲区**：global.css 的 40px 规则只覆盖 `.btn`/`.btn-sm` 与头部外壳，
+  工具自己的控件类完全没抬升——390px 实测 mode-tab 25~36px（unicode 最矮，
+  其 640px 查询还把 padding 改小了）、codec-select/scan-select/tz-select 28~36px、
+  field-input/json-path-input 35px、preset-btn 38px、view-btn 28px、flag-chip 29px、
+  qr-ecl__item 29px、segmented__btn 32px、btn-copy 32px、form-input--sm 27px；
+  复选框外层 label 22~29px（.chk / .diff-checkbox / .ms-toggle / .checkbox /
+  .hmac-toggle / .qr-ecl__item / .flag-chip），违反上面「label 必须 36px」的规矩；
+  slider 轨道 6px。**新增控件类时必须在 640px 查询里同步抬升**
+- color（6 tab）与 unit（7 tab）的 tab 行是 `overflow-x:auto` 可滑动的，
+  可达但无渐变遮罩/箭头提示，用户不易发现还有隐藏 tab
+- 测量脚本与截图在 `.workbuddy/audit-2026-10-25/`（audit.js + m390/m768 目录）
+
 ## 界面符号规范
 用户明确要求**界面里不用 emoji，也不用装饰性状态符号**。范围包括聊天回复、文档与网页内容本身。
 
@@ -97,6 +111,11 @@
 2026-10-24 已清理的存量：color 的 WCAG 徽章（✓/✗ → 通过/不通过）、
 ffmpeg 的队列状态（✓⊘✗●○ → 5 个内联 SVG，按状态着色）、
 timestamp 的复制失败（✗ → 叉号 SVG + `btn-copy--fail` 样式）。
+
+**2026-10-25 审查新发现的存量违规（待修，清单见「输入校验一致性」节）**：
+json 的 `✓ JSON 有效` / `✗ ` 前缀、diff 与 network 与 otp-migration 的 `⚠` 前缀、
+ffmpeg 文件列表的 27 个 emoji 图标（🎬📹🎵🖼📄，`getFileIcon`）——
+document 工具早已改用文字标签（PDF/DOC/XLS），ffmpeg 是漏网。
 颜色徽章改用文字后，原先靠字符形状区分状态的地方要补颜色区分（ffmpeg 的 `.task-item__icon` 各状态配色）。
 
 **状态色的兜底样式放在 `assets/css/global.css`**（`.meta-btn--success` / `.meta-btn--danger`）——
@@ -127,6 +146,49 @@ timestamp 的复制失败（✗ → 叉号 SVG + `btn-copy--fail` 样式）。
   还有些区域整个带 `hidden`（crypto 的 AES 结果区要加密后才显示）。
   判断可见性不能只看 `offsetParent`——祖先有 transform 时它也会是 null，
   要同时看 `getBoundingClientRect()` 的宽高。
+
+## 输入校验一致性（2026-10-25 穷举审查后立）
+
+30 个工具逐一核对后的现状：反馈机制分五档，同类问题文案分七种说法。
+**新增校验或改错误提示时按下面的统一规矩办；存量差异见文末清单，随各工具维护时收敛。**
+
+### 统一规矩
+1. **禁止 `alert()`**：阻塞模态，移动端 iOS 是全屏对话框，与毛玻璃 UI 割裂，
+   且错误详情不可复制。存量 6 个工具 13 处（network 3 / image 6 / chmod 1 /
+   countdown 1 / worldclock 2 / stopwatch 1）待替换为 toast 或行内提示
+2. **空输入与失败分开措辞**：空输入说「请输入 X」；失败说「X 失败：原因」。
+   不要把空输入包成「解密失败：请输入密文」——未输入不是失败
+3. **空输入文案统一为「请输入 X」**（sqlcron/timestamp 模式），
+   与「请先选择文件」「请先执行」（复制前置）各司其职：前者要用户提供输入，
+   后者要用户先产生结果
+4. **第三方库错误必须过中英映射再显示**，不裸透传。document 的 `friendlyError()`
+   是唯一正确的样板（加密 PDF / 文件损坏 / 内存不足 / 库加载失败）。
+   json 的 JSON.parse 错误、radix 的「Base32 字符无效: x」中英混排都是反例
+5. **错误色一律用 class**，不硬编码 `#ef4444`（radix ×2、sqlcron ×2 是反例）；
+   行内错误态参考 timestamp 的 `.convert-result--error`（文案具体 + 错误态样式）
+6. **错误码**：目前无统一体系，跨模块传递错误只用 `err.code === 'NO_INK'`
+   （scandoc 去手写）。新增错误码进 `assets/js/` 下的共享常量，不要在工具里私造
+7. **实时型工具（输入即算）的非法输入要给提示**，不能静默清空另一侧——
+   unit 输入 `abc` 把结果侧清成空白且零提示，用户分不清是没算出来还是工具坏了
+
+### 反馈机制选型（按场景）
+- 一次性操作结果（转换/解析/导入导出）：toast 或行内区域文字
+- 复制/下载前置检查：`flashHint()` 按钮文字（共享 clipboard.js，已统一）
+- 实时计算的字段级错误：字段旁行内文字（timestamp/color 模式）
+- toast 现有 4 套实现：document `showToast(msg,type,duration)`、scandoc 同名同接口、
+  otp-migration `flashToast(msg,type)`（无 warning 级）、ffmpeg `showWarn(msg,ms)`
+  （无类型分级）。**下一工具做 toast 时把这四套收敛成共享模块**
+
+### 存量差异清单（2026-10-25 快照，随工具维护时收敛）
+- alert：network / image / chmod / countdown / worldclock / stopwatch
+- 空输入说法不统一：「请输入目标地址」「请先选择图片」「输入为空」
+  「请先粘贴迁移链接或拖入二维码截图」等七种
+- 英文透传：json（V8 JSON 错误）、radix（中英混排）
+- 硬编码错误色：radix、sqlcron
+- 无错误样式：text 的 meta、diff 的 warning 文字
+- 静默无反馈：unit（非法输入）、text/radix（空输入）、hash（count 非法钳位）、
+  markdown（导出空文档）
+- 符号违规（同时违反界面符号规范）：json ✓/✗、diff/network/otp-migration ⚠
 
 ## 首页搜索栏（核心功能）
 **位置**：标题下方，分类筛选上方，最大宽度 720px 居中。
