@@ -34,6 +34,9 @@
     /* 分类筛选 */
     .filter {
       display: flex;
+      /* 必须允许换行：7 个分类按钮在 390px 手机上排一行会溢出 74px，
+         原来没有 flex-wrap，超出的按钮被直接裁掉点不到 */
+      flex-wrap: wrap;
       gap: var(--space-sm);
       padding: 0 var(--space-lg) var(--space-lg);
       max-width: 1200px;
@@ -41,6 +44,7 @@
     }
 
     .filter__item {
+      min-height: 36px;
       padding: var(--space-xs) var(--space-md);
       border-radius: var(--radius-xl);
       font-size: var(--text-sm);
@@ -502,9 +506,9 @@
       }
     }
   </style>
-  <script type="module" crossorigin src="/local-toolbox/assets/main-CPzu9O2t.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-fvDkMcza.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BF3WOA9q.css">
+  <script type="module" crossorigin src="/local-toolbox/assets/main-D8BkCI43.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-BlwJrHso.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BXFaHrIb.css">
 </head>
 <body>
   <div class="bg-decoration"></div>
