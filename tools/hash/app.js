@@ -4,7 +4,7 @@
  * 全部本地运行，无任何网络请求
  */
 
-import { copyText } from '/assets/js/clipboard.js';
+import { copyText, flashHint } from '/assets/js/clipboard.js';
 
 /* ========== Tab 切换 ========== */
 function switchTab(mode) {
@@ -474,13 +474,13 @@ function initHash() {
   // 结果复制按钮
   document.getElementById('btn-copy-hex').addEventListener('click', async (e) => {
     const v = document.getElementById('hash-hex').value;
-    if (!v) return;
+    if (!v) { flashHint(e.currentTarget, '请先计算'); return; }
     const ok = await copyText(v);
     if (ok) flashCopyBtn(e.currentTarget);
   });
   document.getElementById('btn-copy-b64').addEventListener('click', async (e) => {
     const v = document.getElementById('hash-b64').value;
-    if (!v) return;
+    if (!v) { flashHint(e.currentTarget, '请先计算'); return; }
     const ok = await copyText(v);
     if (ok) flashCopyBtn(e.currentTarget);
   });

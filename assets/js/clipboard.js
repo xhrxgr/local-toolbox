@@ -87,3 +87,24 @@ export async function copyWithFeedback(text, btn, okText = '已复制', failText
 
   return ok;
 }
+
+/**
+ * 按钮上闪一段提示文字，然后恢复原样
+ *
+ * 用于「没有可复制的内容」这类情况：原先直接 return，
+ * 用户点了按钮界面毫无反应，无法判断是自己没输入还是按钮坏了。
+ *
+ * @param {HTMLElement} btn 目标按钮
+ * @param {string} text 提示文案
+ * @param {number} [duration] 提示持续时间（毫秒）
+ */
+export function flashHint(btn, text, duration = 1500) {
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.textContent = text;
+  btn.classList.add('meta-btn--danger');
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.classList.remove('meta-btn--danger');
+  }, duration);
+}

@@ -2,7 +2,7 @@
  * 文本工具集
  * 全部本地处理，无依赖
  */
-import { copyText } from '/assets/js/clipboard.js';
+import { copyText, flashHint } from '/assets/js/clipboard.js';
 
 function initText() {
   const $ = (id) => document.getElementById(id);
@@ -195,7 +195,10 @@ function initText() {
     metaEl.textContent = '';
   });
   $('btn-copy').addEventListener('click', async () => {
-    if (!outputEl.value) return;
+    if (!outputEl.value) {
+      flashHint($('btn-copy'), '请先执行');
+      return;
+    }
     // 走共享实现：原先只调 clipboard API，非安全上下文下点了没反应
     // （失败时弹 alert 也很突兀，改为按钮文字提示）
     const ok = await copyText(outputEl.value);

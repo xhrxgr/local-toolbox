@@ -66,17 +66,26 @@ function initSqlCron() {
     $('sql-meta').textContent = '';
   });
   $('btn-sql-copy').addEventListener('click', async () => {
-    if (!$('sql-output').value) return;
-    // 走共享实现：原先只调 clipboard API，非安全上下文下点了没反应也无提示
-    const ok = await copyText($('sql-output').value);
     const btn = $('btn-sql-copy');
     const orig = btn.textContent;
-    btn.textContent = ok ? '已复制' : '复制失败';
-    btn.classList.add(ok ? 'meta-btn--success' : 'meta-btn--danger');
-    setTimeout(() => {
-      btn.textContent = orig;
-      btn.classList.remove('meta-btn--success', 'meta-btn--danger');
-    }, 1500);
+    const flash = (text, cls) => {
+      btn.textContent = text;
+      btn.classList.add(cls);
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('meta-btn--success', 'meta-btn--danger');
+      }, 1500);
+    };
+
+    if (!$('sql-output').value) {
+      // 常见情形：sql-formatter 还在按需加载，或用户没点过「格式化」。
+      // 原先直接 return，点了毫无反应，这里给明确提示。
+      flash('请先格式化', 'meta-btn--danger');
+      return;
+    }
+    // 走共享实现：原先只调 clipboard API，非安全上下文下点了没反应也无提示
+    const ok = await copyText($('sql-output').value);
+    flash(ok ? '已复制' : '复制失败', ok ? 'meta-btn--success' : 'meta-btn--danger');
   });
   $('sql-input').addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.key === 'Enter') formatSql();

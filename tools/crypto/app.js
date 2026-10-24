@@ -4,7 +4,7 @@
  * 全部本地运行，无任何网络请求，不引入第三方库
  */
 
-import { copyText } from '/assets/js/clipboard.js';
+import { copyText, flashHint } from '/assets/js/clipboard.js';
 import { downloadBlob } from '/assets/js/download.js';
 
 /* ========== Tab 切换 ========== */
@@ -794,7 +794,7 @@ function initCrypto() {
   // AES 结果复制
   document.getElementById('btn-copy-aes').addEventListener('click', async (e) => {
     const v = document.getElementById('aes-output').value;
-    if (!v) return;
+    if (!v) { flashHint(e.currentTarget, '请先加密'); return; }
     const ok = await copyText(v);
     if (ok) flashCopyBtn(e.currentTarget);
   });
@@ -812,7 +812,7 @@ function initCrypto() {
   });
   document.getElementById('btn-copy-classical').addEventListener('click', async (e) => {
     const v = document.getElementById('classical-output').value;
-    if (!v) return;
+    if (!v) { flashHint(e.currentTarget, '请先运算'); return; }
     const ok = await copyText(v);
     if (ok) flashCopyBtn(e.currentTarget);
   });
@@ -829,7 +829,7 @@ function initCrypto() {
   });
   document.getElementById('btn-copy-encoding').addEventListener('click', async (e) => {
     const v = document.getElementById('encoding-output').value;
-    if (!v) return;
+    if (!v) { flashHint(e.currentTarget, '请先运算'); return; }
     const ok = await copyText(v);
     if (ok) flashCopyBtn(e.currentTarget);
   });
