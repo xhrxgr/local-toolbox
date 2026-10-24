@@ -5,6 +5,7 @@
  * 三组权限：owner / group / other × r(4) / w(2) / x(1)
  * 特殊位：setuid(4000) / setgid(2000) / sticky(1000)
  */
+import { copyText } from '/assets/js/clipboard.js';
 
 function initChmod() {
   const $ = (id) => document.getElementById(id);
@@ -161,18 +162,18 @@ function initChmod() {
 
   // 复制按钮
   ['num', 'sym', 'cmd'].forEach(k => {
-    $('btn-copy-' + k).addEventListener('click', () => {
+    $('btn-copy-' + k).addEventListener('click', async () => {
       const text = $('chmod-' + k).textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = $('btn-copy-' + k);
-        const orig = btn.textContent;
-        btn.textContent = '已复制';
-        btn.classList.add('meta-btn--success');
-        setTimeout(() => {
-          btn.textContent = orig;
-          btn.classList.remove('meta-btn--success');
-        }, 1500);
-      });
+      // 走共享实现：原先只调 clipboard API，非安全上下文下点了没反应也无提示
+      const ok = await copyText(text);
+      const btn = $('btn-copy-' + k);
+      const orig = btn.textContent;
+      btn.textContent = ok ? '已复制' : '复制失败';
+      btn.classList.add(ok ? 'meta-btn--success' : 'meta-btn--danger');
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('meta-btn--success', 'meta-btn--danger');
+      }, 1500);
     });
   });
 

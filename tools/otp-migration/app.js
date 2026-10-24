@@ -5,6 +5,8 @@
  */
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
+import { copyText } from '/assets/js/clipboard.js';
+import { downloadBlob } from '/assets/js/download.js';
 
 let accounts = [];
 let rafId = null;
@@ -406,27 +408,8 @@ function hideQrModal() {
 }
 
 /* ========== 复制到剪贴板 ========== */
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand('copy');
-      return true;
-    } catch {
-      return false;
-    } finally {
-      document.body.removeChild(ta);
-    }
-  }
-}
+// 用共享实现：原先这里不检查 execCommand 的返回值，
+// 复制失败也会返回 true，用户看到"已复制"但剪贴板里还是旧内容。
 
 /* ========== 截图识别 (jsQR) ========== */
 async function decodeImageFile(file) {
@@ -505,16 +488,8 @@ function downloadTxt() {
   }
   const content = valid.map((a) => a._url).join('\n');
   const blob = new Blob(['\uFEFF' + content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'totp-accounts.txt';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  const skipped = accounts.length - valid.length;
-  if (skipped > 0) {
+  downloadBlob(blob, 'totp-accounts.txt');
+  const skipped = accounts.length - valid.length;  if (skipped > 0) {
     flashToast(`已导出 ${valid.length} 个账号（跳过 ${skipped} 个无效）`, 'info');
   }
 }

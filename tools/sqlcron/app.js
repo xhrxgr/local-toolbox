@@ -3,6 +3,7 @@
  * SQL：sql-formatter（按需 dynamic import）
  * CRON：cronstrue（按需 dynamic import）+ 自实现下次运行时间计算
  */
+import { copyText } from '/assets/js/clipboard.js';
 
 function initSqlCron() {
   const $ = (id) => document.getElementById(id);
@@ -64,14 +65,18 @@ function initSqlCron() {
     $('sql-output').value = '';
     $('sql-meta').textContent = '';
   });
-  $('btn-sql-copy').addEventListener('click', () => {
+  $('btn-sql-copy').addEventListener('click', async () => {
     if (!$('sql-output').value) return;
-    navigator.clipboard.writeText($('sql-output').value).then(() => {
-      const btn = $('btn-sql-copy');
-      const orig = btn.textContent;
-      btn.textContent = '已复制';
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    });
+    // 走共享实现：原先只调 clipboard API，非安全上下文下点了没反应也无提示
+    const ok = await copyText($('sql-output').value);
+    const btn = $('btn-sql-copy');
+    const orig = btn.textContent;
+    btn.textContent = ok ? '已复制' : '复制失败';
+    btn.classList.add(ok ? 'meta-btn--success' : 'meta-btn--danger');
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove('meta-btn--success', 'meta-btn--danger');
+    }, 1500);
   });
   $('sql-input').addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.key === 'Enter') formatSql();

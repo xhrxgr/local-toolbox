@@ -98,6 +98,12 @@
   background: rgba(34, 197, 94, 0.1);
 }
 
+.btn-copy--fail {
+  color: var(--danger, #ef4444);
+  border-color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* ========== 转换区 ========== */
 .convert-row {
   display: flex;

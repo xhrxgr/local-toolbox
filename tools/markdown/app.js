@@ -6,6 +6,7 @@
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { downloadBlob } from '/assets/js/download.js';
 
 /* ========== Marked 配置 ========== */
 marked.setOptions({ gfm: true, breaks: false });
@@ -340,14 +341,7 @@ function exportHtml(state) {
   const title = (state.preview.querySelector('h1')?.textContent || 'Markdown 文档').trim() || 'Markdown 文档';
   const full = buildExportDoc(title, bodyHtml);
   const blob = new Blob([full], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${title}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `${title}.html`);
 }
 
 /* ========== 初始化 ========== */

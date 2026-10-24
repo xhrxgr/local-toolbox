@@ -8,6 +8,8 @@
  * 全部本地运行，无任何网络请求
  */
 
+import { downloadBlob } from '/assets/js/download.js';
+
 /* ========== 模块状态 ========== */
 let leftTA, rightTA, warningEl, statsEl, statAdd, statDel, statEq, emptyEl, viewContainer;
 let currentLineDiff = null;
@@ -353,14 +355,7 @@ function exportPatch() {
   }
   const patch = generatePatch(currentLineDiff, '原文', '修改后', 3);
   const blob = new Blob([patch], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'changes.patch';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, 'changes.patch');
 }
 
 /* ========== 选项 / 状态 ========== */

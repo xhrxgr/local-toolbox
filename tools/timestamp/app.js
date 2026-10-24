@@ -5,6 +5,7 @@
  * - 日期 → 时间戳（秒/毫秒）
  * - 一键复制
  */
+import { copyText } from '/assets/js/clipboard.js';
 
 const PAGE_TITLE = '时间戳 - 网页工具箱';
 
@@ -109,31 +110,13 @@ function convertDateToTs() {
 
 /* ========== 复制 ========== */
 async function copyToClipboard(text, btn) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
+  // 统一走共享实现（assets/js/clipboard.js）：原先这里在非安全上下文下
+  // 直接 execCommand 而不检查返回值，复制失败也会显示成功图标。
+  const ok = await copyText(text);
+  if (ok) {
     showCopyFeedback(btn);
-  } catch (e) {
-    console.warn('复制失败:', e);
-    if (btn) {
-      const original = btn.textContent;
-      btn.textContent = '✗';
-      btn.style.color = 'var(--danger, #ef4444)';
-      setTimeout(() => {
-        btn.textContent = original;
-        btn.style.color = '';
-      }, 1200);
-    }
+  } else if (btn) {
+    showCopyFailed(btn);
   }
 }
 
@@ -144,6 +127,19 @@ function showCopyFeedback(btn) {
   setTimeout(() => {
     btn.innerHTML = original;
     btn.classList.remove('btn-copy--success');
+  }, 1200);
+}
+
+/** 复制失败：显示叉号图标并标红，提示用户手动复制 */
+function showCopyFailed(btn) {
+  const original = btn.innerHTML;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  btn.classList.add('btn-copy--fail');
+  btn.title = '复制失败，请手动复制';
+  setTimeout(() => {
+    btn.innerHTML = original;
+    btn.classList.remove('btn-copy--fail');
+    btn.title = '';
   }, 1200);
 }
 

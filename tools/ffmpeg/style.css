@@ -889,7 +889,21 @@
 .task-item--done { opacity: 0.6; }
 .task-item--cancelled { opacity: 0.5; text-decoration: line-through; }
 
-.task-item__icon { font-size: 14px; min-width: 16px; }
+/* 状态图标配色（原来靠 ✓/✗ 等字符形状区分，改用 SVG 后靠颜色区分） */
+.task-item__icon { color: var(--text-secondary); }
+.task-item--done .task-item__icon { color: #22c55e; }
+.task-item--cancelled .task-item__icon { color: var(--text-secondary); }
+.task-item--current .task-item__icon { color: var(--accent); }
+.task-item__icon--failed { color: #ef4444; }
+
+.task-item__icon {
+  font-size: 14px;
+  min-width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.task-item__icon svg { display: block; }
 .task-item__name {
   flex: 1;
   overflow: hidden;

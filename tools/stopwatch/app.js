@@ -6,6 +6,7 @@
  * - CSV 导出
  * - localStorage 持久化（刷新恢复）
  */
+import { downloadBlob } from '/assets/js/download.js';
 
 const STORAGE_KEY = 'stopwatch-state-v1';
 const MAX_LAPS = 999;
@@ -273,15 +274,8 @@ function exportCsv() {
   });
   const csv = '\ufeff' + rows.map(r => r.join(',')).join('\n'); // BOM 防 Excel 乱码
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  a.download = `stopwatch-laps-${ts}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `stopwatch-laps-${ts}.csv`);
 }
 
 /* ========== 键盘快捷键 ========== */

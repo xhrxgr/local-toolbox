@@ -2,6 +2,8 @@
  * 文本工具集
  * 全部本地处理，无依赖
  */
+import { copyText } from '/assets/js/clipboard.js';
+
 function initText() {
   const $ = (id) => document.getElementById(id);
   const inputEl = $('text-input');
@@ -192,14 +194,19 @@ function initText() {
     statsEl.hidden = true;
     metaEl.textContent = '';
   });
-  $('btn-copy').addEventListener('click', () => {
+  $('btn-copy').addEventListener('click', async () => {
     if (!outputEl.value) return;
-    navigator.clipboard.writeText(outputEl.value).then(() => {
-      const btn = $('btn-copy');
-      const orig = btn.textContent;
-      btn.textContent = '已复制';
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    }).catch(() => alert('复制失败，请手动选择'));
+    // 走共享实现：原先只调 clipboard API，非安全上下文下点了没反应
+    // （失败时弹 alert 也很突兀，改为按钮文字提示）
+    const ok = await copyText(outputEl.value);
+    const btn = $('btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = ok ? '已复制' : '复制失败';
+    btn.classList.add(ok ? 'meta-btn--success' : 'meta-btn--danger');
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.classList.remove('meta-btn--success', 'meta-btn--danger');
+    }, 1500);
   });
 
   // Ctrl+Enter 执行

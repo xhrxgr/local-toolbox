@@ -4,6 +4,8 @@
  * 全部本地运行，无任何网络请求
  */
 
+import { copyText } from '/assets/js/clipboard.js';
+
 /* ========== Tab 切换 ========== */
 function switchTab(mode) {
   document.querySelectorAll('.mode-tab').forEach((t) => {
@@ -143,29 +145,7 @@ function contrastRatio(rgb1, rgb2) {
 }
 
 /* ========== 通用：复制到剪贴板 ========== */
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try {
-      // 必须检查返回值：execCommand 失败时返回 false 而不抛错，
-      // 原实现恒 return true，用户会看到「已复制」但剪贴板里还是旧内容
-      ok = document.execCommand('copy');
-    } catch {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
+// 复制实现见共享模块 assets/js/clipboard.js
 
 // 复制并给出按钮反馈
 async function copyAndFeedback(text, btn) {
@@ -300,14 +280,15 @@ function setWcagBadge(id, pass) {
   const mark = el.querySelector('.wcag-badge__mark');
   el.classList.remove('wcag-badge--pass', 'wcag-badge--fail');
   if (pass === null) {
-    mark.textContent = '—';
+    mark.textContent = '未计算';
     return;
   }
+  // 用文字而不是 ✓/✗ 符号：状态含义要明确，也不依赖符号表意
   if (pass) {
-    mark.textContent = '✓';
+    mark.textContent = '通过';
     el.classList.add('wcag-badge--pass');
   } else {
-    mark.textContent = '✗';
+    mark.textContent = '不通过';
     el.classList.add('wcag-badge--fail');
   }
 }

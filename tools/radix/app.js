@@ -6,6 +6,7 @@
  * - 数值模式：把输入当作大整数，支持 2/8/10/16 进制
  * - 字节模式：把输入当作字节序列，支持 text/hex/base32/58/62/64 编码
  */
+import { copyText } from '/assets/js/clipboard.js';
 
 /* ========== Base32 实现（RFC 4648，无 padding） ========== */
 const B32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -322,13 +323,22 @@ function initRadix() {
 
   // 复制按钮（每个输出框双击复制）
   document.querySelectorAll('.radix-output').forEach(el => {
-    el.addEventListener('dblclick', () => {
+    el.addEventListener('dblclick', async () => {
       if (!el.value) return;
-      navigator.clipboard.writeText(el.value).then(() => {
-        const orig = el.style.background;
+      // 走共享实现：原先只调 clipboard API，非安全上下文下双击没反应也无提示
+      const ok = await copyText(el.value);
+      const orig = el.style.background;
+      if (ok) {
         el.style.background = 'rgba(34, 197, 94, 0.15)';
         setTimeout(() => { el.style.background = orig; }, 600);
-      });
+      } else {
+        el.style.background = 'rgba(239, 68, 68, 0.15)';
+        el.title = '复制失败，请手动选中复制';
+        setTimeout(() => {
+          el.style.background = orig;
+          el.title = '';
+        }, 1500);
+      }
     });
   });
 }

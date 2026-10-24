@@ -361,9 +361,10 @@
 }
 
 .wcag-badge__mark {
-  font-size: var(--text-lg);
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .wcag-badge--pass {

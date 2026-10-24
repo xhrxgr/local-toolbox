@@ -4,6 +4,9 @@
  * 识别过程完全本地，图片不上传
  */
 
+import { copyText } from '/assets/js/clipboard.js';
+import { downloadBlob } from '/assets/js/download.js';
+
 // tesseract 运行时与 core 的外部来源：版本锁定，避免库升级后默认值漂移。
 // 语言包也走 CDN（按语言分别下载，自托管会让仓库体积不可接受）；
 // 用户图片始终在本地 Worker 内解码识别，不产生任何上传。
@@ -13,29 +16,7 @@ const CDN_WORKER = `https://cdn.jsdelivr.net/npm/tesseract.js@${TESSERACT_VERSIO
 const CDN_CORE = `https://cdn.jsdelivr.net/npm/tesseract.js-core@${TESSERACT_CORE_VERSION}`;
 
 /* ========== 通用：复制到剪贴板 ========== */
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try {
-      // 必须检查返回值：execCommand 失败时返回 false 而不抛错，
-      // 原实现恒 return true，用户会看到「已复制」但剪贴板里还是旧内容
-      ok = document.execCommand('copy');
-    } catch {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
+// 复制实现见共享模块 assets/js/clipboard.js
 
 function flashCopyBtn(btn) {
   const original = btn.textContent;
@@ -281,14 +262,7 @@ function downloadTxt() {
   // UTF-8 BOM 防乱码
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + text], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ocr-result.txt';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, 'ocr-result.txt');
 }
 
 function clearResult() {

@@ -123,6 +123,24 @@ button {
   box-shadow: none;
 }
 
+/* ========== 复制反馈状态 ==========
+   复制成功/失败的按钮状态。放在全局是因为多个工具共用同一套复制逻辑
+   （assets/js/clipboard.js），而 .meta-btn--success 此前是各工具各自定义，
+   复制失败态则完全没有对应样式。加在这里做统一兜底。 */
+.meta-btn--success,
+.btn--success {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.meta-btn--danger,
+.btn--danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
 /* 公共头部 */
 .tool-header {
   display: flex;

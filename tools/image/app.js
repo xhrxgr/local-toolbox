@@ -4,6 +4,8 @@
  * 全部本地运行，无任何网络请求
  */
 
+import { downloadBlob } from '/assets/js/download.js';
+
 /* ========== 全局状态 ========== */
 const state = {
   file: null,        // 当前文件
@@ -78,16 +80,7 @@ function getBaseName(filename) {
   return dot > 0 ? filename.slice(0, dot) : filename;
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 200);
-}
+// 下载实现见共享模块 assets/js/download.js
 
 function revoke(obj) {
   if (obj) URL.revokeObjectURL(obj);

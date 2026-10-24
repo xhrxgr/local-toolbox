@@ -4,6 +4,8 @@
  * 全部本地运行，无任何网络请求
  */
 
+import { copyText } from '/assets/js/clipboard.js';
+
 /* ========== Tab 切换 ========== */
 function switchTab(mode) {
   document.querySelectorAll('.mode-tab').forEach((t) => {
@@ -15,29 +17,7 @@ function switchTab(mode) {
 }
 
 /* ========== 通用：复制到剪贴板 ========== */
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try {
-      // 必须检查返回值：execCommand 失败时返回 false 而不抛错，
-      // 原实现恒 return true，用户会看到「已复制」但剪贴板里还是旧内容
-      ok = document.execCommand('copy');
-    } catch {
-      ok = false;
-    }
-    document.body.removeChild(ta);
-    return ok;
-  }
-}
+// 复制实现见共享模块 assets/js/clipboard.js
 
 function flashCopyBtn(btn) {
   const original = btn.textContent;

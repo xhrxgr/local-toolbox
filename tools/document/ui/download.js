@@ -2,18 +2,11 @@
  * 文件下载：单文件下载 + 多文件 ZIP 打包
  */
 import { showToast } from './toast.js';
+import { downloadBlob as sharedDownloadBlob } from '/assets/js/download.js';
 
+// 下载实现统一走共享模块（assets/js/download.js），撤销时机与全站一致
 export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  // 撤销太早（200ms）会让部分浏览器在大文件下载时中断；
-  // 延后到 10 秒后再回收，页面关闭时浏览器会自动释放
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  sharedDownloadBlob(blob, filename);
 }
 
 /** 多文件打包为单个 ZIP 下载，避免浏览器拦截连续下载 */

@@ -95,6 +95,14 @@ const FFMPEG_CORE_FILES = [
   { name: 'ffmpeg-core.wasm', mime: 'application/wasm' },
 ];
 
+/* ========== 任务队列状态图标（内联 SVG，不用装饰符号） ========== */
+const ICON_SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"';
+const ICON_DONE = `<svg ${ICON_SVG_ATTRS}><polyline points="20 6 9 17 4 12"/></svg>`;
+const ICON_CANCELLED = `<svg ${ICON_SVG_ATTRS}><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>`;
+const ICON_FAILED = `<svg ${ICON_SVG_ATTRS}><circle cx="12" cy="12" r="9"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="12" y1="16.5" x2="12" y2="16.6"/></svg>`;
+const ICON_RUNNING = `<svg ${ICON_SVG_ATTRS}><circle cx="12" cy="12" r="9" stroke-dasharray="42 14" opacity="0.9"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg>`;
+const ICON_PENDING = `<svg ${ICON_SVG_ATTRS}><circle cx="12" cy="12" r="9" opacity="0.35"/></svg>`;
+
 // 运行时检测 FFmpeg 内核支持的编码器/复用器（用于动态启用/禁用 AMV 等特殊格式）
 let availableEncoders = null;
 let availableMuxers = null;
@@ -486,11 +494,14 @@ function renderTaskQueue() {
   listEl.innerHTML = taskQueue.items.map((item, i) => {
     const isCurrent = i === taskQueue.currentIndex;
     const cls = isCurrent ? 'task-item--current' : item.status === 'done' ? 'task-item--done' : item.status === 'cancelled' ? 'task-item--cancelled' : '';
-    // 状态图标（不使用 ▶ 避免误导可展开）
-    const icon = item.status === 'done' ? '✓' : item.status === 'cancelled' ? '⊘' : item.status === 'failed' ? '✗' : isCurrent ? '●' : '○';
+    // 状态图标用内联 SVG（不用 ✓ ⊘ ✗ ● ○ 这类装饰符号）
+    const icon = item.status === 'done' ? ICON_DONE
+      : item.status === 'cancelled' ? ICON_CANCELLED
+      : item.status === 'failed' ? ICON_FAILED
+      : isCurrent ? ICON_RUNNING : ICON_PENDING;
     const statusText = item.status === 'done' ? '完成' : item.status === 'cancelled' ? '已放弃' : item.status === 'failed' ? `失败：${escapeHtml(item.error || '未知错误')}` : isCurrent ? `${Math.round((item.progress || 0) * 100)}%` : '等待';
     return `<li class="task-item ${cls}">
-      <span class="task-item__icon">${icon}</span>
+      <span class="task-item__icon${item.status === 'failed' ? ' task-item__icon--failed' : ''}">${icon}</span>
       <span class="task-item__name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</span>
       <span class="task-item__status">${statusText}</span>
     </li>`;
