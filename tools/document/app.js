@@ -110,7 +110,14 @@ function switchTab(tab) {
 }
 
 /* ========== 文本类操作：从文件导入 ========== */
+// 文本导入上限：超大会把整个文件读进内存并塞进 textarea，页面会卡住
+const MAX_TEXT_IMPORT_SIZE = 20 * 1024 * 1024;
+
 function importTextFile(file) {
+  if (file.size > MAX_TEXT_IMPORT_SIZE) {
+    showToast(`文件过大（超过 20MB），未导入：${file.name}`, 'error');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     document.getElementById('text-input').value = String(reader.result ?? '');

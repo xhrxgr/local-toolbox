@@ -417,6 +417,9 @@ function medianCut(pixels, count) {
 
 let paletteImage = null; // 缓存当前图片，色块数量变化时重新提取
 
+// 提取配色时的图片大小上限（readAsDataURL 会把文件转成 base64，内存放大约 33%）
+const MAX_PALETTE_FILE_SIZE = 20 * 1024 * 1024;
+
 function extractPalette(img, count) {
   const canvas = document.createElement('canvas');
   const size = 100;
@@ -484,6 +487,12 @@ function loadImageFile(file) {
   const status = document.getElementById('palette-status');
   if (!file || !file.type.startsWith('image/')) {
     status.textContent = '请选择有效的图片文件';
+    return;
+  }
+  // readAsDataURL 会把整个文件转成 base64 字符串（内存放大约 33%），
+  // 超大图片会直接把标签页撑爆，所以这里先卡一道
+  if (file.size > MAX_PALETTE_FILE_SIZE) {
+    status.textContent = '图片过大（超过 20MB），无法提取配色';
     return;
   }
   const reader = new FileReader();

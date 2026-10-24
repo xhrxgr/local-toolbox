@@ -122,8 +122,15 @@ let originalSvg = '';   // 当前 textarea 中的原始 SVG（用于"还原"参�
 let optimizedSvg = '';  // 最近一次优化结果
 
 /* ========== 文件读取 ========== */
+// SVG 文本本身不该很大，超大文件多半不是 SVG，先卡一道避免读进内存
+const MAX_SVG_FILE_SIZE = 10 * 1024 * 1024;
+
 function readFileAsText(file) {
   return new Promise((resolve, reject) => {
+    if (file.size > MAX_SVG_FILE_SIZE) {
+      reject(new Error('文件过大（超过 10MB）'));
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(reader.error || new Error('读取文件失败'));
