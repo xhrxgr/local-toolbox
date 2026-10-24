@@ -39,10 +39,17 @@
 - **媒体 (media)**：ffmpeg（多媒体转换）、image（图片处理）、svg（SVG 优化器）、ocr（OCR 图片识字）
 - **时间 (time)**：countdown、stopwatch、timestamp、worldclock
 - **网络 (network)**：network（5 Tab 网络工具）、cert（证书解析）
-- **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）
+- **编码 (encoding)**：encoding（Base64/URL/ASCII/Unicode）、radix（进制转换）、qrcode（二维码生成/识别）
+- **颜色 (color)**：color（颜色工具）
+- **换算 (unit)**：unit（单位转换）
 - **开发 (dev)**：json、regex、jwt、hash（UUID+哈希）、diff、markdown、text（文本工具）、chmod（权限计算器）、sqlcron（SQL/CRON）、unicode（Unicode 查看器）、crypto（加解密）
-- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/去手写/合并 PDF）
-- **实用 (util)**：qrcode、color、password、unit、otp-migration
+- **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/去手写/合并 PDF）
+- **安全 (security)**：password（密码生成）、otp-migration（TOTP 迁移）
+
+> 2026-10-25：取消「实用 (util)」杂项分类。**分类名一律用具体主题名词，不用「转换」这类泛动作词**——
+> qrcode 归「编码」（图形编解码），color 单开「颜色」，unit 单开「换算」，
+> password/otp-migration 归「安全」。单工具分类不强行合并：直观优先于分类数量。
+> 改动位置：tools.js 的 `category` 字段与 `CATEGORY_LABELS`、index.html 的筛选按钮、README 分类表。
 
 ## 安全与性能约束（2026-10-24 审查后立的）
 - **用户正则必须跑在 Worker 里**（tools/regex/match-worker.js）：
