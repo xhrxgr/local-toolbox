@@ -23,8 +23,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
-  flex: 1;
-  min-width: 0;
+  /* flex:1 + min-width:0 会让它在窄屏被压成 12px 宽、内容整排被裁。
+     改成可换行到独立一行，并给一个合理的最小宽度 */
+  flex: 1 1 220px;
+  min-width: 220px;
 }
 
 .json-path {

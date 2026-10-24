@@ -25,6 +25,9 @@ body {
   background-color: var(--bg);
   line-height: 1.6;
   min-height: 100vh;
+  /* 装饰层（.bg-decoration 宽 200%）会把页面撑出横向滚动条。
+     用 clip 而不是 hidden：clip 不产生滚动容器，position:sticky 的头部不受影响 */
+  overflow-x: clip;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
@@ -88,10 +91,18 @@ button {
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
+  /* 最小触控高度：各工具原来的 padding 算出来 35~38px 参差，且都低于舒适区 */
+  min-height: 36px;
   padding: var(--space-sm) var(--space-lg);
   border-radius: var(--radius-md);
   font-weight: 500;
   transition: all var(--transition-fast);
+}
+
+/* .btn-sm 由各工具自行定义 padding（算出来 33~36px 参差），这里统一兜底最小高度。
+   没有工具为自己的 .btn-sm 设过 height/min-height，不会被覆盖。 */
+.btn-sm {
+  min-height: 34px;
 }
 
 .btn-primary {
@@ -131,6 +142,10 @@ button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
+  /* 触控区域：原为 62x22，手指很难点中 */
+  min-height: 36px;
+  padding-right: var(--space-sm);
+  margin-left: calc(var(--space-sm) * -1);
   font-size: var(--text-sm);
   color: var(--text-secondary);
   transition: color var(--transition-fast);
@@ -154,7 +169,8 @@ button {
   border-radius: var(--radius-md);
   font-size: var(--text-xl);
   transition: background var(--transition-fast);
-}
+  min-height: 36px;
+  min-width: 36px;}
 
 .theme-toggle:hover {
   background: var(--bg-secondary);
@@ -165,4 +181,44 @@ button {
   display: inline-block;
   width: 16px;
   height: 16px;
+}
+/* ========== 窄屏适配（手机）==========
+   此前 global.css 没有任何媒体查询，共享外壳（头部/导航/容器）完全没适配，
+   31 处断点全散在各工具里，改一处漏一片。这里补上外壳的基础适配。 */
+@media (max-width: 640px) {
+  .tool-header {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .tool-header h1 {
+    font-size: var(--text-base);
+    /* 长标题在窄屏截断，避免把返回按钮和主题切换挤出屏幕 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .container {
+    padding: 0 var(--space-md);
+  }
+
+  /* 触控目标在窄屏进一步放大 */
+  .btn,
+  .btn-sm {
+    min-height: 40px;
+  }
+
+  .tool-header .back,
+  .theme-toggle {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+/* ========== 平板 ========== */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container {
+    padding: 0 var(--space-lg);
+  }
 }

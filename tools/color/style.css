@@ -24,9 +24,13 @@
 }
 
 .mode-tab {
-  flex: 1;
+  /* flex:1 会让每个 tab 平分宽度，5 个 tab 在 390px 手机上被挤出容器
+     （实测 right=415，溢出 25px）。改成内容宽度 + 允许横向滚动 */
+  flex: 0 0 auto;
+  min-height: 36px;
   padding: var(--space-sm) var(--space-md);
   font-size: var(--text-sm);
+  white-space: nowrap;
   font-weight: 500;
   color: var(--text-secondary);
   border-radius: var(--radius-md);

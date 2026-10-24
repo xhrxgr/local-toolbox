@@ -27,6 +27,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
+  /* 复选框只有 16px，手指点不中。给 label 加内边距把点击区撑到 36px 以上 */
+  min-height: 36px;
+  padding: 0 var(--space-sm);
+  margin-left: calc(var(--space-sm) * -1);
   font-size: var(--text-sm);
   color: var(--text-secondary);
   cursor: pointer;
@@ -136,8 +140,8 @@
 }
 
 .clock-card__remove {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;

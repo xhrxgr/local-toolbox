@@ -322,6 +322,8 @@
 }
 
 .segmented__btn {
+  /* 触控高度：原来 padding 只有 space-xs，实测 25px 高，手指难点中 */
+  min-height: 32px;
   padding: var(--space-xs) var(--space-md);
   font-size: var(--text-xs);
   font-weight: 500;

@@ -44,6 +44,16 @@
 - **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/去手写/合并 PDF）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
+## 移动端 / 平板适配规范（2026-10-24 全面优化后确立）
+- **断点**：`≤640px` 手机、`641~1024px` 平板。全局外壳规则在 `assets/css/global.css`（那里原先一个媒体查询都没有，31 处断点全散在各工具里，改一处漏一片——新增共享样式优先放全局）
+- **触控目标**：`.btn` / `.btn-sm` 桌面基准 `min-height:34~36px`，窄屏媒体查询统一抬到 `40px`；
+  纯图标按钮 ≥36px。复选框保持 16px 视觉尺寸，但**外层 label 必须加 `min-height:36px` + padding** 把点击区撑起来
+- **禁止横向溢出**：`body { overflow-x: clip }`（用 clip 不用 hidden，否则会创建滚动容器、破坏 `position:sticky` 头部）。
+  flex 容器默认就要写 `flex-wrap: wrap`；`flex:1` + `min-width:0` 的组合在窄屏会被压成接近 0 宽，改用 `flex: 1 1 220px`
+- **字号下限 12px**（`--text-xs`）；`font-size:10px` 一律不允许
+- 验证方法：iframe 审计页（媒体查询按 iframe 宽度生效），在 390/768/1024 三档测量
+  横向溢出、触控目标 <40px、字号 <12px、内容被裁四项
+
 ## 首页搜索栏（核心功能）
 **位置**：标题下方，分类筛选上方，最大宽度 720px 居中。
 

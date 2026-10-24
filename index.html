@@ -37,6 +37,9 @@
     /* 分类筛选 */
     .filter {
       display: flex;
+      /* 必须允许换行：7 个分类按钮在 390px 手机上排一行会溢出 74px，
+         原来没有 flex-wrap，超出的按钮被直接裁掉点不到 */
+      flex-wrap: wrap;
       gap: var(--space-sm);
       padding: 0 var(--space-lg) var(--space-lg);
       max-width: 1200px;
@@ -44,6 +47,7 @@
     }
 
     .filter__item {
+      min-height: 36px;
       padding: var(--space-xs) var(--space-md);
       border-radius: var(--radius-xl);
       font-size: var(--text-sm);
