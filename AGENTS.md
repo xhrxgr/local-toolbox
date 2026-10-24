@@ -51,6 +51,33 @@
 > password/otp-migration 归「安全」。单工具分类不强行合并：直观优先于分类数量。
 > 改动位置：tools.js 的 `category` 字段与 `CATEGORY_LABELS`、index.html 的筛选按钮、README 分类表。
 
+## 静态资源缓存（Service Worker，2026-10-25 上线）
+
+部署在 GitHub Pages，中国访问首屏慢。用 SW 把静态资源缓存到本地，
+二次访问（含离线）直接读本地；**同时保证线上更新后用户拿到的永远是最新内容**。
+
+- **注册位置**：`assets/js/common.js`（首页与 30 个工具页全都加载它）。
+  仅 `import.meta.env.PROD` 注册——dev 模式模块 URL 带时间戳参数，缓存无意义
+- **SW 本体**：`public/sw.js`（Vite 原样拷到站点根，**不能加 hash**，
+  否则浏览器按新文件对待、旧 SW 永远不退场）
+- **策略（按请求类型分流，改策略时升 `SW_VERSION` 全量刷新缓存）**：
+  1. 页面导航（HTML）：**网络优先**，失败才回退缓存 → 部署后刷新即最新，
+     离线可打开已访问过的页面；深层页面无缓存时回退缓存的首页
+  2. 同源 hash 资源（`assets/main-xxx.js`、`migan-xxx.onnx`）：**缓存优先**，
+     不发网络请求。hash 即内容寻址，永不过期
+  3. 同源无 hash 资源（favicon.svg）：stale-while-revalidate，后台换新
+  4. 跨域 CDN（ffmpeg core / tesseract worker·core·语言数据）：**缓存优先**，
+     代码按版本号锁 URL，内容不可变
+- **缓存上限**：`MAX_ENTRIES = 250`，按插入序淘汰最旧条目，
+  防反复部署产生的新 hash 无限堆积
+- **与 `public/tools/ffmpeg/coi-serviceworker.js` 的关系**：后者是清理脚本，
+  给装着旧版 coi SW 的历史浏览器用（自删缓存 + 自我注销），
+  新访客不会安装它，与全局缓存 SW 不冲突
+- **实测结论**（preview + agent-browser）：二次访问 3 个资源 0 流量全走缓存；
+  断网后工具页完整可用；改 HTML 后刷新立刻拿到新版本（网络优先验证）
+- **部署**：`npm run build` 后 dist/ 根目录带 sw.js，
+  随 gh-pages 分支发布即生效（无需额外配置）
+
 ## 安全与性能约束（2026-10-24 审查后立的）
 - **用户正则必须跑在 Worker 里**（tools/regex/match-worker.js）：
   JS 正则无法从外部中断，灾难性回溯会永久冻结标签页，只能杀页。
@@ -123,6 +150,7 @@ timestamp 的复制失败（✗ → 叉号 SVG + `btn-copy--fail` 样式）。
 json 的 `✓ JSON 有效` / `✗ ` 前缀、diff 与 network 与 otp-migration 的 `⚠` 前缀、
 ffmpeg 文件列表的 27 个 emoji 图标（🎬📹🎵🖼📄，`getFileIcon`）——
 document 工具早已改用文字标签（PDF/DOC/XLS），ffmpeg 是漏网。
+同日已修：common.js 主题切换按钮的 ☀️/🌙 → 内联 SVG（太阳/月亮，lucide 风格）。
 颜色徽章改用文字后，原先靠字符形状区分状态的地方要补颜色区分（ffmpeg 的 `.task-item__icon` 各状态配色）。
 
 **状态色的兜底样式放在 `assets/css/global.css`**（`.meta-btn--success` / `.meta-btn--danger`）——
