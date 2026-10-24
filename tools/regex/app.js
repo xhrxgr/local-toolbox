@@ -186,7 +186,6 @@ function updateAll() {
   const text = document.getElementById('regex-text').value;
   const flags = getFlags();
 
-  // 同步标志位显示
   document.getElementById('regex-flags-display').textContent = flags;
 
   const highlightEl = document.getElementById('highlight-output');
@@ -194,7 +193,6 @@ function updateAll() {
   const replaceOut = document.getElementById('replace-output');
   const countEl = document.getElementById('result-count');
 
-  // 空正则：不执行匹配，清空结果
   if (!pattern) {
     clearError();
     highlightEl.innerHTML = '<div class="empty-state">请输入正则表达式</div>';
@@ -204,7 +202,6 @@ function updateAll() {
     return;
   }
 
-  // 构建正则（捕获异常，无效时不崩溃）
   let regex;
   try {
     regex = buildRegex(pattern, flags);
@@ -216,23 +213,43 @@ function updateAll() {
     countEl.textContent = '';
     return;
   }
+
+  // 文本上限：超长文本既是 ReDoS 的放大器，也会让高亮渲染卡死
+  if (text.length > REGEX_MAX_TEXT) {
+    showError('文本过长（' + text.length.toLocaleString() + ' 字符），超出 ' +
+      REGEX_MAX_TEXT.toLocaleString() + ' 上限，请缩小或分段测试');
+    highlightEl.innerHTML = '<div class="empty-state">文本过长</div>';
+    listEl.innerHTML = '<div class="empty-state">文本过长</div>';
+    replaceOut.value = '';
+    countEl.textContent = '';
+    return;
+  }
   clearError();
 
-  const matches = getAllMatches(regex, text);
+  // 交给 Worker 执行，主线程不被阻塞
+  runMatch({ pattern: pattern, flags: flags, text: text, op: 'match' }).then((res) => {
+    if (!res.ok) {
+      showError(res.error);
+      highlightEl.innerHTML = '<div class="empty-state">' + (res.timedOut ? '匹配超时' : '匹配失败') + '</div>';
+      listEl.innerHTML = '<div class="empty-state">' + (res.timedOut ? '匹配超时' : '匹配失败') + '</div>';
+      replaceOut.value = '';
+      countEl.textContent = '';
+      return;
+    }
+    const matches = res.matches || [];
 
-  // 匹配数统计
-  if (!text) {
-    countEl.textContent = '';
-  } else if (matches.length === 0) {
-    countEl.textContent = '无匹配结果';
-  } else {
-    countEl.textContent = `共 ${matches.length} 个匹配`;
-  }
+    if (!text) {
+      countEl.textContent = '';
+    } else if (matches.length === 0) {
+      countEl.textContent = '无匹配结果';
+    } else {
+      countEl.textContent = '共 ' + matches.length + ' 个匹配';
+    }
 
-  renderHighlight(text, matches);
-  renderMatchList(matches);
-  // 复用已构建的正则（exec 循环结束后 lastIndex 已归零；replace 也会重置）
-  renderReplace(regex, text);
+    renderHighlight(text, matches);
+    renderMatchList(matches);
+    renderReplace(regex, text);
+  });
 }
 
 /* 仅更新替换预览（替换字符串变化时调用，避免重算匹配） */
@@ -249,7 +266,77 @@ function updateReplace() {
   } catch {
     return;
   }
-  renderReplace(regex, text);
+  if (text.length > REGEX_MAX_TEXT) {
+    document.getElementById('replace-output').value = '';
+    return;
+  }
+  runMatch({
+    pattern: pattern,
+    flags: getFlags(),
+    text: text,
+    op: 'replace',
+    replacement: document.getElementById('replace-pattern').value,
+  }).then((res) => {
+    document.getElementById('replace-output').value = res.ok ? (res.replace || '') : '';
+  });
+}
+
+/* ========== 匹配执行：Worker + 超时终止 ==========
+ * 灾难性回溯的正则（如 (a+)+$ 配长串 a）会让单个 exec() 指数级耗时，
+ * 而 JS 正则无法从外部中断——主线程卡住后整个标签页冻结，只能杀页。
+ * 放进 Worker 后超时即可 terminate，页面始终保持可交互。
+ */
+const REGEX_MAX_TEXT = 500000;   // 单次匹配的文本上限（50 万字符）
+const REGEX_TIMEOUT = 3000;      // 3 秒无响应即终止
+let matchWorker = null;
+let matchSeq = 0;
+
+function getWorker() {
+  if (!matchWorker) {
+    matchWorker = new Worker(new URL('./match-worker.js', import.meta.url), { type: 'module' });
+  }
+  return matchWorker;
+}
+
+/** 终止并丢弃当前 Worker（下次调用会重建） */
+function killWorker() {
+  if (matchWorker) {
+    matchWorker.terminate();
+    matchWorker = null;
+  }
+}
+
+/**
+ * 在 Worker 中执行匹配/替换。
+ * @returns {Promise<{ok:boolean, matches?:Array, replace?:string|null, error?:string, timedOut?:boolean}>}
+ */
+function runMatch(payload) {
+  const id = ++matchSeq;
+  return new Promise((resolve) => {
+    const worker = getWorker();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      killWorker();
+      resolve({ ok: false, timedOut: true, error: '匹配超时（' + REGEX_TIMEOUT / 1000 + ' 秒）' });
+    }, REGEX_TIMEOUT);
+
+    worker.onmessage = (e) => {
+      if (settled || e.data.id !== id) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(e.data);
+    };
+    worker.onerror = (e) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      killWorker();
+      resolve({ ok: false, error: e.message || 'Worker 内部错误' });
+    };
+    worker.postMessage(Object.assign({ id: id }, payload));
+  });
 }
 
 /* ========== 初始化 ========== */
@@ -269,8 +356,14 @@ function initRegex() {
   });
 
   // 实时输入
-  document.getElementById('regex-pattern').addEventListener('input', updateAll);
-  document.getElementById('regex-text').addEventListener('input', updateAll);
+  // 防抖：原来每敲一个键就全量重算一遍（大文本下即使正则会安全也很卡）
+  let debounceTimer = null;
+  const debouncedUpdate = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(updateAll, 150);
+  };
+  document.getElementById('regex-pattern').addEventListener('input', debouncedUpdate);
+  document.getElementById('regex-text').addEventListener('input', debouncedUpdate);
   document.getElementById('replace-pattern').addEventListener('input', updateReplace);
   document.querySelectorAll('#regex-flags input[type="checkbox"]').forEach((cb) => {
     cb.addEventListener('change', updateAll);

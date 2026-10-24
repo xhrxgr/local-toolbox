@@ -118,6 +118,19 @@ async function handleFile(file) {
   }
   state.originalURL = URL.createObjectURL(file);
 
+  // 尺寸上限：超过浏览器 canvas 上限时 drawImage 会静默失败，
+  // 用户看到的是"压缩后变成空白图"而没有任何报错。
+  // 限制：单边 ≤ 16384（Chrome canvas 上限），总像素 ≤ 1 亿（RGBA 约 400MB）
+  const CANVAS_MAX_EDGE = 16384;
+  const CANVAS_MAX_PIXELS = 100000000;
+  const iw = state.img.naturalWidth, ih = state.img.naturalHeight;
+  if (iw > CANVAS_MAX_EDGE || ih > CANVAS_MAX_EDGE || iw * ih > CANVAS_MAX_PIXELS) {
+    alert('图片尺寸过大（' + iw + '×' + ih + '），超出浏览器处理上限。' +
+      '请先缩小到 ' + CANVAS_MAX_EDGE + 'px 以内再试。');
+    clearFile();
+    return;
+  }
+
   // 更新拖放区文件信息
   const infoEl = document.getElementById('dropzone-info');
   const innerEl = document.getElementById('dropzone-inner');

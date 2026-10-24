@@ -49,12 +49,15 @@ function base58Encode(bytes) {
   let num = 0n;
   for (const b of bytes) num = (num << 8n) | BigInt(b);
   let str = '';
+  // 先按正序收集再翻转：原来的 str = ch + str 前插拼接是 O(n^2)，
+  // 长输入下（如 10 万位二进制）会卡死页面
+  const parts = [];
   while (num > 0n) {
     const rem = num % 58n;
     num = num / 58n;
-    str = B58_ALPHABET[Number(rem)] + str;
+    parts.push(B58_ALPHABET[Number(rem)]);
   }
-  return '1'.repeat(zeros) + str;
+  return '1'.repeat(zeros) + parts.reverse().join('');
 }
 function base58Decode(str) {
   const cleaned = str.replace(/\s/g, '');
@@ -82,13 +85,14 @@ function base62Encode(bytes) {
   let num = 0n;
   for (const b of bytes) num = (num << 8n) | BigInt(b);
   if (num === 0n) return '0';
-  let str = '';
+  // 同上：改为数组收集 + 翻转，避免 O(n^2) 前插
+  const parts = [];
   while (num > 0n) {
     const rem = num % 62n;
     num = num / 62n;
-    str = B62_ALPHABET[Number(rem)] + str;
+    parts.push(B62_ALPHABET[Number(rem)]);
   }
-  return str;
+  return parts.reverse().join('');
 }
 function base62Decode(str) {
   const cleaned = str.replace(/\s/g, '');
@@ -293,7 +297,26 @@ function initRadix() {
   });
 
   // 实时转换（输入或源类型变化时）
-  inputEl.addEventListener('input', convert);
+  // 防抖 + 长度上限：原来每敲一个键就全量重算（BigInt 逐位乘除），
+  // 而且没有任何长度限制，粘进去一深度二进制就会卡死
+  let radixTimer = null;
+  const RADIX_MAX_INPUT = 100000; // 10 万字符
+  inputEl.addEventListener('input', () => {
+    clearTimeout(radixTimer);
+    radixTimer = setTimeout(() => {
+      if (inputEl.value.length > RADIX_MAX_INPUT) {
+        const meta = document.getElementById('radix-meta');
+        if (meta) {
+          meta.textContent = '输入过长（' + inputEl.value.length.toLocaleString() +
+            ' 字符），超出 ' + RADIX_MAX_INPUT.toLocaleString() +
+            ' 上限。转换耗时随长度指数上升，请分段处理';
+          meta.style.color = '#ef4444';
+        }
+        return;
+      }
+      convert();
+    }, 200);
+  });
   sourceSel.addEventListener('change', convert);
   treatAsNum.addEventListener('change', convert);
 

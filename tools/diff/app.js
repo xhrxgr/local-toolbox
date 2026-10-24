@@ -36,34 +36,85 @@ function normalizeLine(line, options) {
  * aRaw / bRaw 为原始数组，keyFn 提取比较键（支持忽略空白/大小写）
  * 返回 [{type:'equal'|'delete'|'insert', value}]，value 为原始元素
  */
+/**
+ * LCS 行级对比。
+ *
+ * 内存与性能防护（原来是 O(m×n) 的 JS 二维数组 + 无上限，5000×5000 约 191MB，
+ * 直接把标签页崩掉，而调用方的守卫只弹警告并不阻止执行）：
+ *   1. 先剥掉首尾相同的前缀/后缀——绝大多数编辑是局部的，剥完往往只剩一小块；
+ *   2. DP 表改用扁平 Uint32Array（每格 4 字节，比 JS 数组省约 4 倍）；
+ *   3. 超过安全规模直接抛错，由调用方转成用户可读的提示，不再硬算。
+ */
+const DIFF_MAX_CELLS = 4000000; // 约 16MB DP 表，对应 2000×2000 行
+
 function diffLcs(aRaw, bRaw, keyFn) {
   const aKey = aRaw.map(keyFn);
   const bKey = bRaw.map(keyFn);
-  const m = aKey.length, n = bKey.length;
-  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (aKey[i - 1] === bKey[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
-      else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+  let m = aKey.length, n = bKey.length;
+
+  // 1. 剥公共前缀
+  let pre = 0;
+  while (pre < m && pre < n && aKey[pre] === bKey[pre]) pre++;
+  // 2. 剥公共后缀
+  let suf = 0;
+  while (suf < m - pre && suf < n - pre && aKey[m - 1 - suf] === bKey[n - 1 - suf]) suf++;
+
+  const head = [];
+  for (let k = 0; k < pre; k++) head.push({ type: 'equal', value: aRaw[k] });
+  const tail = [];
+  for (let k = 0; k < suf; k++) tail.push({ type: 'equal', value: aRaw[m - 1 - k] });
+  tail.reverse();
+
+  // 中间真正需要 DP 的部分
+  const am = m - pre - suf;
+  const bn = n - pre - suf;
+  if (am === 0 || bn === 0) {
+    const mid = [];
+    for (let k = 0; k < am; k++) mid.push({ type: 'delete', value: aRaw[pre + k] });
+    for (let k = 0; k < bn; k++) mid.push({ type: 'insert', value: bRaw[pre + k] });
+    return head.concat(mid, tail);
+  }
+  if (am * bn > DIFF_MAX_CELLS) {
+    throw new Error(
+      `待对比区域过大（${am} × ${bn} 行 ≈ ${(am * bn / 10000).toFixed(0)} 万格），` +
+      `已超过 ${DIFF_MAX_CELLS / 10000} 万格上限。请缩小范围或分批对比`
+    );
+  }
+
+  // 3. 扁平 DP 表（Uint32，每格 4 字节）
+  const W = bn + 1;
+  const dp = new Uint32Array((am + 1) * W);
+  for (let i = 1; i <= am; i++) {
+    const row = i * W;
+    const prev = (i - 1) * W;
+    const ak = aKey[pre + i - 1];
+    for (let j = 1; j <= bn; j++) {
+      if (ak === bKey[pre + j - 1]) dp[row + j] = dp[prev + j - 1] + 1;
+      else {
+        const up = dp[prev + j], left = dp[row + j - 1];
+        dp[row + j] = up >= left ? up : left;
+      }
     }
   }
-  const result = [];
-  let i = m, j = n;
+
+  const mid = [];
+  let i = am, j = bn;
   while (i > 0 && j > 0) {
-    if (aKey[i - 1] === bKey[j - 1]) {
-      result.unshift({ type: 'equal', value: aRaw[i - 1] });
+    if (aKey[pre + i - 1] === bKey[pre + j - 1]) {
+      mid.push({ type: 'equal', value: aRaw[pre + i - 1] });
       i--; j--;
-    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-      result.unshift({ type: 'delete', value: aRaw[i - 1] });
+    } else if (dp[(i - 1) * W + j] >= dp[i * W + j - 1]) {
+      mid.push({ type: 'delete', value: aRaw[pre + i - 1] });
       i--;
     } else {
-      result.unshift({ type: 'insert', value: bRaw[j - 1] });
+      mid.push({ type: 'insert', value: bRaw[pre + j - 1] });
       j--;
     }
   }
-  while (i > 0) { result.unshift({ type: 'delete', value: aRaw[i - 1] }); i--; }
-  while (j > 0) { result.unshift({ type: 'insert', value: bRaw[j - 1] }); j--; }
-  return result;
+  while (i > 0) { mid.push({ type: 'delete', value: aRaw[pre + i - 1] }); i--; }
+  while (j > 0) { mid.push({ type: 'insert', value: bRaw[pre + j - 1] }); j--; }
+  mid.reverse();
+  return head.concat(mid, tail);
 }
 
 /* ========== 构建 segments（带行号 + 逐字增强） ==========
@@ -364,12 +415,21 @@ function compare() {
 
   const maxLines = Math.max(aLines.length, bLines.length);
   if (maxLines > 5000) {
-    showWarning('⚠ 文本过大（' + maxLines + ' 行），可能影响性能');
+    showWarning('⚠ 文本较大（' + maxLines + ' 行），对比可能稍慢');
   } else {
     hideWarning();
   }
 
-  const lineDiff = diffLcs(aLines, bLines, (l) => normalizeLine(l, options));
+  let lineDiff;
+  try {
+    lineDiff = diffLcs(aLines, bLines, (l) => normalizeLine(l, options));
+  } catch (err) {
+    // 超过安全规模时给出明确原因，而不是硬算到标签页崩溃
+    showWarning('⚠ ' + err.message);
+    statsEl.hidden = true;
+    showEmpty();
+    return;
+  }
   currentLineDiff = lineDiff;
   currentOptions = options;
 

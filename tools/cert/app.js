@@ -14,10 +14,20 @@ function pemToDer(pem) {
   if (pemMatch && pemMatch[1] !== 'CERTIFICATE') {
     throw new Error(`输入的是 ${pemMatch[1]}，不是证书（CERTIFICATE）。请粘贴 X.509 证书的 PEM 内容`);
   }
-  const match = pem.match(/-----BEGIN CERTIFICATE-----(?:[\s\S]*?)-----END CERTIFICATE-----/);
-  if (!match) {
+  // 用 indexOf 切分而不是正则：原来的惰性正则 [\s\S]*? 在每个 BEGIN 起点
+  // 都要扫到文件尾去找 END，含大量 BEGIN 而无匹配 END 的长输入是 O(n²)
+  // （实测 5MB 输入要跑约 7 分钟）。indexOf 是线性扫描，且能顺便校验配对。
+  const BEGIN = '-----BEGIN CERTIFICATE-----';
+  const END = '-----END CERTIFICATE-----';
+  const beginIdx = pem.indexOf(BEGIN);
+  if (beginIdx < 0) {
     throw new Error('未找到有效的 PEM 证书块（需包含 -----BEGIN CERTIFICATE----- 和 -----END CERTIFICATE-----）');
   }
+  const endIdx = pem.indexOf(END, beginIdx + BEGIN.length);
+  if (endIdx < 0) {
+    throw new Error('PEM 证书块不完整：找到了 BEGIN 标记但没有对应的 END 标记');
+  }
+  const match = [pem.slice(beginIdx, endIdx + END.length)];
   const b64 = match[0]
     .replace(/-----BEGIN CERTIFICATE-----/, '')
     .replace(/-----END CERTIFICATE-----/, '')
@@ -252,7 +262,26 @@ function parseSanExtension(extBytes) {
   while (offset < seq.value.length) {
     const tlv = parseTlv(seq.value, offset);
     const tag = tlv.tag & 0x1F; // context-specific tag number
-    const val = new TextDecoder('utf-8').decode(tlv.value);
+    // iPAddress(tag 7) 是 4/16 字节的二进制地址，不是文本。
+    // 之前一律按 UTF-8 解码，192.168.1.1 会变成乱码（实测 "\ufffd\ufffd\u0001\u0001"）。
+    let val;
+    if (tag === 7) {
+      const b = tlv.value;
+      if (b.length === 4) {
+        val = `${b[0]}.${b[1]}.${b[2]}.${b[3]}`;
+      } else if (b.length === 16) {
+        // IPv6：按 16 字节分组输出
+        const parts = [];
+        for (let i = 0; i < 16; i += 2) {
+          parts.push(((b[i] << 8) | b[i + 1]).toString(16));
+        }
+        val = parts.join(':');
+      } else {
+        val = b.length ? `(${b.length} 字节)` : '';
+      }
+    } else {
+      val = new TextDecoder('utf-8').decode(tlv.value);
+    }
     let type;
     switch (tag) {
       case 1: type = 'email'; break;
@@ -515,7 +544,7 @@ function renderCertInfo(certInfo) {
   let statusHtml;
   if (certInfo.notBefore && isNaN(certInfo.notBefore.getTime())) {
     // 有效性无法判断
-    statusHtml = `<div class="status-banner--valid">有效期信息不完整</div>`;
+    statusHtml = `<div class="status-banner--warning">有效期信息不完整</div>`;
   } else if (certInfo.notBefore && now < certInfo.notBefore) {
     const days = daysBetween(now, certInfo.notBefore);
     statusHtml = `<div class="status-banner--pending">证书尚未生效 · 还有 ${days} 天生效</div>`;
@@ -530,7 +559,7 @@ function renderCertInfo(certInfo) {
       statusHtml = `<div class="${cls}">证书有效 · 还有 ${days} 天过期</div>`;
     }
   } else {
-    statusHtml = `<div class="status-banner--valid">有效期信息不完整</div>`;
+    statusHtml = `<div class="status-banner--warning">有效期信息不完整</div>`;
   }
   document.getElementById('cert-status').innerHTML = statusHtml;
 

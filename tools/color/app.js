@@ -154,14 +154,16 @@ async function copyText(text) {
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
+    let ok = false;
     try {
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      return true;
+      // 必须检查返回值：execCommand 失败时返回 false 而不抛错，
+      // 原实现恒 return true，用户会看到「已复制」但剪贴板里还是旧内容
+      ok = document.execCommand('copy');
     } catch {
-      document.body.removeChild(ta);
-      return false;
+      ok = false;
     }
+    document.body.removeChild(ta);
+    return ok;
   }
 }
 

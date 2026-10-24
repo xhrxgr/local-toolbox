@@ -11,7 +11,9 @@ export function downloadBlob(blob, filename) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 200);
+  // 撤销太早（200ms）会让部分浏览器在大文件下载时中断；
+  // 延后到 10 秒后再回收，页面关闭时浏览器会自动释放
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 /** 多文件打包为单个 ZIP 下载，避免浏览器拦截连续下载 */

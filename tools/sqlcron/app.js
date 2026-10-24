@@ -166,30 +166,103 @@ function initSqlCron() {
     now.setMilliseconds(0);
     now = new Date(now.getTime() + 1000); // 从下一秒开始
 
+    // 跳跃查找：原来每秒 +1s 地试，最多 50 万次迭代（要新建 50 万个 Date 对象），
+    // 对稀疏表达式（如 0 0 29 2 *，四年才一次）几乎必然空转到上限。
+    // 改成按「月 → 日 → 时 → 分 → 秒」逐级进位跳到下一个可能时刻，
+    // 迭代次数从「秒数级」降到「结果个数级」。
+    const secArr = [...seconds].sort((a, b) => a - b);
+    const minArr = [...minutes].sort((a, b) => a - b);
+    const hourArr = [...hours].sort((a, b) => a - b);
+    const monthArr = [...months].sort((a, b) => a - b);
+
+    // 在允许值集合里找严格大于 from 的下一个值；没有则返回 null（需要向上进位）
+    function nextAllowed(arr, from, max) {
+      if (!arr || arr.length === 0) return null;
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] > from && arr[i] <= max) return arr[i];
+      }
+      return null;
+    }
+    // 用构造器做日期推进，自动处理跨月/跨年/夏令时（不要用 +86400000 加毫秒，
+    // 夏令时切换那天会差一小时）
+    const at = (y, mo, d, h, mi, s) => new Date(y, mo, d, h, mi, s);
+    const yOf = (dt) => dt.getFullYear();
+    const moOf = (dt) => dt.getMonth();
+    const dOf = (dt) => dt.getDate();
+
     let attempts = 0;
-    const maxAttempts = 500000;
+    const maxAttempts = 20000; // 跳跃后每轮都有实质进展，2 万轮足够覆盖数百个结果
 
     while (results.length < count && attempts < maxAttempts) {
       attempts++;
-      const monthOK = months.has(now.getMonth() + 1);
-      const dayOK = days.has(now.getDate());
+      const year = yOf(now), month = moOf(now) + 1, day = dOf(now);
+      const hour = now.getHours(), minute = now.getMinutes(), second = now.getSeconds();
+      const monthOK = months.has(month);
+      const dayOK = days.has(day);
       const weekdayOK = weekdays.has(now.getDay());
       // CRON 中日和周是 OR 关系（如果两者都不是 *）；这里简化为：如果两者都不是 *，则任一满足即可
       const dayOrWeekOK = (dayField !== '*' && weekField !== '*')
         ? (dayOK || weekdayOK)
         : (dayOK && weekdayOK);
 
-      if (monthOK && dayOrWeekOK && hours.has(now.getHours()) && minutes.has(now.getMinutes()) && seconds.has(now.getSeconds())) {
+      if (monthOK && dayOrWeekOK && hours.has(hour) && minutes.has(minute) && seconds.has(second)) {
         results.push(new Date(now));
         now = new Date(now.getTime() + 1000);
         continue;
       }
-      // 跳到下一个可能的时刻
-      now = new Date(now.getTime() + 1000);
+
+      // ① 月份不匹配：跳到本年下一个可用月的 1 号；本年没有就顺延到明年
+      if (!monthOK) {
+        const nm = nextAllowed(monthArr, month, 12);
+        if (nm != null) { now = at(year, nm - 1, 1, 0, 0, 0); continue; }
+        const ny = monthArr.length ? monthArr[0] : null;
+        if (ny == null) break; // 表达式里没有任何合法月份
+        now = at(year + 1, ny - 1, 1, 0, 0, 0);
+        continue;
+      }
+
+      // ② 日/周不匹配：先回到当天 00:00 看时段是否可行，否则次日
+      if (!dayOrWeekOK) {
+        if (hour !== 0 || minute !== 0 || second !== 0) {
+          now = at(year, moOf(now), day, 0, 0, 0);
+          continue;
+        }
+        now = at(year, moOf(now), day + 1, 0, 0, 0); // 构造器自动跨月/跨年
+        continue;
+      }
+
+      // ③ 小时不匹配：跳到本小时内的下一个可用小时；本小时没有就进位到次日
+      if (!hours.has(hour)) {
+        const nh = nextAllowed(hourArr, hour, 23);
+        if (nh != null) { now = at(year, moOf(now), day, nh, 0, 0); continue; }
+        now = at(year, moOf(now), day + 1, 0, 0, 0);
+        continue;
+      }
+
+      // ④ 分钟不匹配：跳到本小时内下一个可用分钟；没有就进位到下一小时
+      if (!minutes.has(minute)) {
+        const nmi = nextAllowed(minArr, minute, 59);
+        if (nmi != null) { now = at(year, moOf(now), day, hour, nmi, 0); continue; }
+        const nh = nextAllowed(hourArr, hour, 23);
+        if (nh != null) { now = at(year, moOf(now), day, nh, 0, 0); continue; }
+        now = at(year, moOf(now), day + 1, 0, 0, 0);
+        continue;
+      }
+
+      // ⑤ 秒不匹配：跳到本分钟内下一个可用秒；本分钟没有就进位到下一分钟/小时/日
+      const ns = nextAllowed(secArr, second, 59);
+      if (ns != null) { now = at(year, moOf(now), day, hour, minute, ns); continue; }
+      const nmi = nextAllowed(minArr, minute, 59);
+      if (nmi != null) { now = at(year, moOf(now), day, hour, nmi, 0); continue; }
+      const nh = nextAllowed(hourArr, hour, 23);
+      if (nh != null) { now = at(year, moOf(now), day, nh, 0, 0); continue; }
+      now = at(year, moOf(now), day + 1, 0, 0, 0);
     }
-    if (results.length === 0) throw new Error('未找到匹配时刻（表达式可能无效）');
+
+    if (results.length === 0) throw new Error('未找到匹配时刻（表达式可能无效，或时间范围内无解）');
     return results;
   }
+
 
   function parseField(field, min, max) {
     const set = new Set();

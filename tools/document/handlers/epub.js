@@ -122,6 +122,21 @@ async function parseEpub(file, setProgress) {
   setProgress('读取 EPUB 文件...', '', 10);
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
 
+  // ZIP 炸弹防护：EPUB 是高压缩率容器，几十 KB 的文件解出几 GB 是常态攻击手法。
+  // 逐个文件累加解压后体积，超过上限立即中止（JSZip 无法在 loadAsync 阶段判断）
+  let uncompressed = 0;
+  const ZIP_LIMIT = 512 * 1024 * 1024; // 512MB
+  zip.forEach((_, file) => {
+    if (file.dir) return;
+    uncompressed += file._data ? file._data.uncompressedSize || 0 : 0;
+  });
+  if (uncompressed > ZIP_LIMIT) {
+    throw new Error(
+      `EPUB 解压后体积约 ${(uncompressed / 1024 / 1024).toFixed(0)}MB，超过 ${ZIP_LIMIT / 1024 / 1024}MB 安全上限，` +
+      '可能是压缩包炸弹或异常文件'
+    );
+  }
+
   setProgress('解析目录结构...', '', 25);
   const containerFile = zip.file('META-INF/container.xml');
   if (!containerFile) throw new Error('不是有效的 EPUB：缺少 META-INF/container.xml');

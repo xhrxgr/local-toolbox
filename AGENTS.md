@@ -44,6 +44,22 @@
 - **文档 (document)**：document（PDF/Word/Excel/MD/HTML/TXT/RTF/EPUB 本地互转，6 Tab）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/合并 PDF）、scandoc（扫描文档：图片转文档，滤镜/曲面矫正/四角裁剪/去手写/合并 PDF）
 - **实用 (util)**：qrcode、color、password、unit、otp-migration
 
+## 安全与性能约束（2026-10-24 审查后立的）
+- **用户正则必须跑在 Worker 里**（tools/regex/match-worker.js）：
+  JS 正则无法从外部中断，灾难性回溯会永久冻结标签页，只能杀页。
+  Worker + 3 秒超时 terminate 才能断。配合文本长度上限（50 万）与输入防抖
+- **算法先别用 JS 数组做二维 DP**：换成扁平 `Uint32Array`（每格 4 字节，省 4 倍），
+  并先剥掉公共前缀/后缀——大多数编辑是局部的，剥完只剩小块。tools/diff 已做（还加了硬上限）
+- **跳跃搜索代替逐纲扫描**：稀疏条件（如 `0 0 29 2 *`）逐秒扫描会空转到上限。
+  tools/sqlcron 已改为逐级进位（月→日→时→分→秒）
+- **扫描文件要用 `indexOf` 而不是惰性正则**：`[\s\S]*?` 会在每个 BEGIN 起点扫到文件尾，O(n²)（cert 的 PEM 提取已改）
+- **压缩包需要解压后体积上限**（epub）；**图片需要尺寸上限**（image/ocr），
+  超限时给出明确原因，不能静默失败
+- **剪贴板降级必须检查返回值**：`document.execCommand('copy')` 失败时返回 false 而不抛错，
+  不检查就会恐向用户显示「已复制」但实际没复制到
+- **异步流程要有序号守卫**：await 期间用户可能切 Tab/改选项，过期结果不得写回界面
+  （document 的 convertSeq、scandoc 的 renderToken）
+
 ## 移动端 / 平板适配规范（2026-10-24 全面优化后确立）
 - **断点**：`≤640px` 手机、`641~1024px` 平板。全局外壳规则在 `assets/css/global.css`（那里原先一个媒体查询都没有，31 处断点全散在各工具里，改一处漏一片——新增共享样式优先放全局）
 - **触控目标**：`.btn` / `.btn-sm` 桌面基准 `min-height:34~36px`，窄屏媒体查询统一抬到 `40px`；

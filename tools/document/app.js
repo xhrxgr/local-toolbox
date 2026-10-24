@@ -28,6 +28,8 @@ import { refreshSheetOptions, refreshPdfPageHint } from './ui/metadata.js';
 // 状态
 let currentTab = 'pdf';
 let isConverting = false;
+/** 转换序号：await 期间 UI 可能已变化，过期结果不写回 */
+let convertSeq = 0;
 
 /* ========== 获取当前操作 ========== */
 function getCurrentOp() {
@@ -174,6 +176,10 @@ async function convert() {
   const opId = getCurrentOpId();
   const op = OPERATIONS[opId];
   if (!op) return;
+  // 本次转换的序号：await 期间用户可能切 Tab / 改下拉框，
+  // 过期序号的结果不允许写回界面（此前 op/opId 虽在 await 前快照，
+  // 但 buildContext() 在 await 之后才调用，读到的是新值配旧 handler）
+  const mySeq = ++convertSeq;
 
   // 校验输入
   if (op.inputType === 'file' && getFiles().length === 0) {
@@ -195,20 +201,29 @@ async function convert() {
   setProgress('加载处理模块...', '', 5);
   setConvertBusy(true);
 
+  // 上下文在 await 之前构建：保证与当前 UI 状态一致
+  const ctx = buildContext();
+
   try {
     const module = await TAB_MODULE_LOADERS[op.tab]();
+    if (mySeq !== convertSeq) return; // 已切 Tab 或又发起一次转换
     const handler = module.HANDLERS[opId];
     if (!handler) throw new Error('未实现的操作: ' + opId);
 
-    const result = await handler(buildContext());
+    const result = await handler(ctx);
+    if (mySeq !== convertSeq) return; // 结果过期，不写回
     showProgress(false);
     showResult(op, result);
   } catch (err) {
+    // 过期转换的失败不提示（用户已经切走或重新发起了）
+    if (mySeq !== convertSeq) return;
     console.error('[文档转换失败]', err);
     showProgress(false);
     showToast('转换失败：' + friendlyError(err), 'error', 6000);
   } finally {
-    setConvertBusy(false);
+    // 只有「最后一次」转换才复位忙碌状态。
+    // 否则过期转换提前 return 时会把正在进行的新转换解锁，导致可重复提交
+    if (mySeq === convertSeq) setConvertBusy(false);
   }
 }
 
@@ -227,7 +242,10 @@ function friendlyError(err) {
   for (const [pattern, text] of rules) {
     if (pattern.test(msg)) return text;
   }
-  return msg;
+  // 未命中规则时不要直接透传第三方库的英文报错：
+  // 里面常带内部路径、对象结构，看着像技术报错。保留原文但明确标注来源，
+  // 用户若需要排查仍能从控制台拿到完整信息。
+  return /[一-龥]/.test(msg) ? msg : '处理失败：' + msg + '（详细信息见浏览器控制台）';
 }
 
 /* ========== 结果展示 ========== */

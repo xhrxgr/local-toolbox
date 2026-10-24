@@ -6,6 +6,16 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
+/** HTML 转义：文件名、错误信息会进 innerHTML，必须转义 */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 let ffmpeg = null;
 let loadingSectionVisible = false;
 let files = [];                // 所有文件
@@ -456,10 +466,10 @@ function renderTaskQueue() {
     const cls = isCurrent ? 'task-item--current' : item.status === 'done' ? 'task-item--done' : item.status === 'cancelled' ? 'task-item--cancelled' : '';
     // 状态图标（不使用 ▶ 避免误导可展开）
     const icon = item.status === 'done' ? '✓' : item.status === 'cancelled' ? '⊘' : item.status === 'failed' ? '✗' : isCurrent ? '●' : '○';
-    const statusText = item.status === 'done' ? '完成' : item.status === 'cancelled' ? '已放弃' : item.status === 'failed' ? `失败：${item.error || '未知错误'}` : isCurrent ? `${Math.round((item.progress || 0) * 100)}%` : '等待';
+    const statusText = item.status === 'done' ? '完成' : item.status === 'cancelled' ? '已放弃' : item.status === 'failed' ? `失败：${escapeHtml(item.error || '未知错误')}` : isCurrent ? `${Math.round((item.progress || 0) * 100)}%` : '等待';
     return `<li class="task-item ${cls}">
       <span class="task-item__icon">${icon}</span>
-      <span class="task-item__name" title="${item.file.name}">${item.file.name}</span>
+      <span class="task-item__name" title="${escapeHtml(item.file.name)}">${escapeHtml(item.file.name)}</span>
       <span class="task-item__status">${statusText}</span>
     </li>`;
   }).join('');
@@ -1252,9 +1262,9 @@ function showResults() {
     const url = URL.createObjectURL(r.blob);
     const dlName = r.file.name.replace(/\.[^.]+$/, '') + `_converted.${r.format}`;
     return `<li class="result-item">
-      <span class="result-item__name" title="${r.file.name}">${dlName}</span>
+      <span class="result-item__name" title="${escapeHtml(r.file.name)}">${escapeHtml(dlName)}</span>
       <span class="result-item__size">${sizeMB} MB</span>
-      <a class="result-item__dl" href="${url}" download="${dlName}">下载</a>
+      <a class="result-item__dl" href="${url}" download="${escapeHtml(dlName)}">下载</a>
       <button class="result-item__skip" data-i="${i}">放弃</button>
     </li>`;
   }).join('');

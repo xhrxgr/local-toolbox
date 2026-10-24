@@ -24,14 +24,16 @@ async function copyText(text) {
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
+    let ok = false;
     try {
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      return true;
+      // 必须检查返回值：execCommand 失败时返回 false 而不抛错，
+      // 原实现恒 return true，用户会看到「已复制」但剪贴板里还是旧内容
+      ok = document.execCommand('copy');
     } catch {
-      document.body.removeChild(ta);
-      return false;
+      ok = false;
     }
+    document.body.removeChild(ta);
+    return ok;
   }
 }
 
@@ -213,6 +215,23 @@ async function startOcr() {
     const { createWorker } = await import('tesseract.js');
     const langs = document.getElementById('ocr-lang').value;
     const oem = parseInt(document.getElementById('ocr-oem').value, 10);
+    // 尺寸上限：tesseract 会在 Worker 里把整图解为 RGBA，
+    // 1 亿像素的图要约 400MB，直接把 Worker 崩掉，
+    // 而 catch 里只显示"识别失败"。提前拦下并说明原因。
+    const OCR_MAX_PIXELS = 60000000; // 6000 万像素（约 240MB RGBA）
+    if (file.type.startsWith('image/')) {
+      const bmp = await createImageBitmap(file).catch(() => null);
+      if (bmp) {
+        if (bmp.width * bmp.height > OCR_MAX_PIXELS) {
+          showError('图片尺寸过大（' + bmp.width + '×' + bmp.height + '），' +
+            '识别前请缩小到 6000 万像素以内，否则会占用过多内存导致失败');
+          bmp.close();
+          return;
+        }
+        bmp.close();
+      }
+    }
+
     currentWorker = await createWorker(langs, oem, {
       logger: (m) => updateProgress(m),
     });
