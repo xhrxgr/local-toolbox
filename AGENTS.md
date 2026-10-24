@@ -8,7 +8,24 @@
 - **本地仓库名**：local-toolbox（package.json name 同步）
 - **远程历史已重置**为单一 `Initial commit`
 - **AGENTS.md 已纳入 git 版本管理**（用户 2026-07-21 起改为跟踪），用于跨对话保留上下文
-- **GitHub Pages 部署**：`dist/` 目录是 `gh-pages` 分支的 git worktree，构建后 `git -C dist add -A && git -C dist commit && git -C dist push origin gh-pages` 即可发布
+- **GitHub Pages 部署**：`dist/` 只是构建产物目录（在 .gitignore 里，**不是** worktree），
+  发布用「临时索引」方式把 dist 内容推到 gh-pages 分支（2026-10-25 起）：
+  ```bash
+  npm run build
+  GIT_DIR=$PWD/.git GIT_WORK_TREE=$PWD/dist GIT_INDEX_FILE=/tmp/deploy-index \
+    git read-tree --empty
+  (cd dist && GIT_DIR=$PWD/../.git GIT_WORK_TREE=$PWD GIT_INDEX_FILE=/tmp/deploy-index \
+    git add -A -f .)
+  tree=$(GIT_DIR=$PWD/.git GIT_INDEX_FILE=/tmp/deploy-index git write-tree)
+  commit=$(git commit-tree "$tree" -p origin/gh-pages -m "deploy: <master 提交 sha>")
+  git push origin "$commit:refs/heads/gh-pages"
+  ```
+  **坑（2026-10-25 踩过）**：索引里的路径永远是「相对仓库根」的，
+  在仓库里 `cd dist && git add .` 会把文件录成 `dist/index.html`，
+  Pages 根目录找不到 index.html → 整站 404。必须用 `GIT_WORK_TREE` 指向 dist，
+  让 dist 成为逻辑上的工作树根，路径才会是根级的。
+  `public/.nojekyll` 随构建进入 dist 根目录（Vite 不生成它，
+  缺了它 Pages 会走 Jekyll 处理，行为不可控）
 
 ## 技术栈
 - 构建：Vite（多页面 `rollupOptions.input`）
@@ -761,11 +778,11 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 
 ## 部署
 ### GitHub Pages（主要）
-1. `npm run build` → `dist/`（dist 是 gh-pages worktree）
-2. `git -C dist add -A`
-3. `git -C dist commit -m "deploy: ..."`
-4. `git -C dist push origin gh-pages`
-5. 几分钟后 https://xhrxgr.github.io/local-toolbox/ 自动更新
+1. `npm run build` → `dist/`
+2. 用「临时索引」把 dist 推到 gh-pages（完整命令见开头「开源信息」节，
+   关键是 `GIT_WORK_TREE` 指向 dist，否则路径带 dist/ 前缀导致整站 404）
+3. `git push origin <commit>:refs/heads/gh-pages`
+4. 几分钟后 https://xhrxgr.github.io/local-toolbox/ 自动更新
 
 ### Nginx（备选）
 - 仅 `/tools/ffmpeg/` 设置 COOP/COEP
@@ -775,12 +792,12 @@ EPUB(zip) → META-INF/container.xml → 找到 OPF 路径
 ## 开发命令
 - `npm run dev` — 开发服务器（5173，conditional COEP 插件自动只对 /tools/ffmpeg 设置头）
 - `npm run build` — 构建
-- `npm run preview` — 预览构建产物
+- `npm run preview` — 预览构建产物（SW 在 preview 下即可实测，注册仅限 production 构建）
 
 ## Git 工作流
 - 每个独立改动单独 commit，commit message 用中文简洁描述"做了什么"
 - AGENTS.md 纳入 git 跟踪，每次代码改动后必须更新本文件
-- 部署用 `git -C dist` 操作 gh-pages worktree 分支
+- 部署见「开源信息」节的临时索引命令（dist 不是 worktree，勿再 `git -C dist`）
 
 ## ⚠️ AGENTS.md 维护规范（强制）
 - **每次代码改动后必须更新本文件**
