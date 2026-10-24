@@ -63,17 +63,26 @@ export async function pdfToImage(ctx) {
   for (let i = 1; i <= pdf.numPages; i++) {
     setProgress(`渲染第 ${i}/${pdf.numPages} 页`, '', 5 + (i / pdf.numPages) * 90);
     const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: 2 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx2d = canvas.getContext('2d');
-    await page.render({ canvasContext: ctx2d, viewport }).promise;
+    try {
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx2d = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx2d, viewport }).promise;
 
-    const mime = imgFormat === 'jpg' ? 'image/jpeg' : 'image/png';
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, 0.92));
-    const filename = `${getBaseName(file.name)}_page_${String(i).padStart(3, '0')}.${imgFormat}`;
-    results.push({ blob, filename });
+      const mime = imgFormat === 'jpg' ? 'image/jpeg' : 'image/png';
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, 0.92));
+      const filename = `${getBaseName(file.name)}_page_${String(i).padStart(3, '0')}.${imgFormat}`;
+      results.push({ blob, filename });
+      // 画布尺寸置 0 立刻归还显存，否则累积到全部渲染完
+      canvas.width = 0;
+      canvas.height = 0;
+    } finally {
+      // 每页都要 destroy()：pdf.js 会缓存页面资源（字体、位图、注解），
+      // 不释放的话 200 页的文档能把内存吃到几百 MB
+      page.destroy();
+    }
   }
 
   setProgress('完成', '', 100);
@@ -124,11 +133,16 @@ export async function pdfToText(ctx) {
   let text = '';
 
   for (let i = 1; i <= pdf.numPages; i++) {
-    setProgress(`提取文本 ${i}/${pdf.numPages}`, '', 5 + (i / pdf.numPages) * 90);
+    setProgress(`提取文本第 ${i}/${pdf.numPages} 页`, '', 5 + (i / pdf.numPages) * 90);
     const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items.map(item => item.str).join(' ');
-    text += `--- 第 ${i} 页 ---\n${pageText}\n\n`;
+    try {
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => item.str).join(' ');
+      text += `--- 第 ${i} 页 ---\n${pageText}\n\n`;
+    } finally {
+      // 逐页释放，避免长文档累积内存
+      page.destroy();
+    }
   }
 
   setProgress('完成', '', 100);

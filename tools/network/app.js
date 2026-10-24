@@ -28,6 +28,77 @@ function normalizeUrl(input) {
   return url;
 }
 
+/**
+ * 判断主机名是否指向私有/保留地址段。
+ *
+ * 为什么要拦：工具会让访客的浏览器去请求任意地址。虽然同源策略挡住读取响应，
+ * 但「有没有响应、响应有多快」本身就是个 oracle——访客可以拿这个页面逐个试
+ * 192.168.1.1:80、10.0.0.5:8080，靠时间差判断内网哪些服务开着；
+ * no-cors 的 HEAD 请求还会真的打到内网设备上。
+ */
+function isPrivateHost(hostname) {
+  if (!hostname) return true;
+  let host = hostname.toLowerCase();
+  // 去掉 IPv6 字面量的方括号
+  if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+
+  // 主机名（非 IP）：localhost 与常见的内网后缀
+  if (host === 'localhost' || host.endsWith('.localhost') ||
+      host.endsWith('.local') || host.endsWith('.internal') ||
+      host.endsWith('.home.arpa') || host === 'ip6-localhost' ||
+      host === 'ip6-loopback') {
+    return true;
+  }
+
+  // IPv6
+  if (host.includes(':')) {
+    if (host === '::1' || host === '::') return true;
+    // fc00::/7 唯一本地地址，fe80::/10 链路本地
+    if (/^f[cd][0-9a-f]{2}:/.test(host)) return true;
+    if (/^fe[89ab][0-9a-f]:/.test(host)) return true;
+    // IPv4 映射的 IPv6（::ffff:192.168.1.1）要按 IPv4 判
+    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isPrivateHost(mapped[1]);
+    return false;
+  }
+
+  // IPv4
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false; // 不是字面量 IP，交给浏览器解析
+  const [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
+  if (a === 0) return true;                 // 0.0.0.0/8
+  if (a === 10) return true;                // 10.0.0.0/8
+  if (a === 127) return true;               // 127.0.0.0/8 回环
+  if (a === 169 && b === 254) return true;  // 169.254.0.0/16 链路本地
+  if (a === 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
+  if (a === 192 && b === 168) return true;  // 192.168.0.0/16
+  if (a === 192 && b === 0) return true;    // 192.0.0.0/24（IETF 协议保留）
+  if (a === 100 && b >= 64 && b <= 127) return true;  // 100.64.0.0/10 CGNAT
+  if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 基准测试
+  if (a >= 224) return true;               // 组播 + 保留（含 240.0.0.0/4）
+  return false;
+}
+
+/** 取 URL 里的主机名（统一走 http/https） */
+function hostOf(url) {
+  try {
+    return new URL(/^https?:\/\//i.test(url) ? url : 'https://' + url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+/** 私有地址拦截检查：命中时返回提示文案，否则返回 null */
+function checkPrivateTarget(url) {
+  const host = hostOf(url);
+  if (!host) return '无法解析目标地址';
+  if (isPrivateHost(host)) {
+    return `已阻止对内网/保留地址的探测（${host}）。` +
+      '该页面由访客的浏览器直接发起请求，探测内网会造成信息泄露。';
+  }
+  return null;
+}
+
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
@@ -129,6 +200,8 @@ const pingState = { running: false, samples: [], sent: 0, recv: 0 };
 let pingAbortController = null;
 
 async function pingOnce(url, timeoutMs) {
+  const blocked = checkPrivateTarget(url);
+  if (blocked) return { ok: false, rtt: 0, error: blocked };
   const controller = new AbortController();
   pingAbortController = controller;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -250,6 +323,12 @@ async function runDiag() {
   noteEl.textContent = '';
   performance.clearResourceTimings();
 
+  const blocked = checkPrivateTarget(url);
+  if (blocked) {
+    resultEl.innerHTML = `<div class="empty-state">${blocked}</div>`;
+    noteEl.textContent = '';
+    return;
+  }
   const sep = url.includes('?') ? '&' : '?';
   const target = url + sep + '_t=' + Date.now();
   const t0 = performance.now();

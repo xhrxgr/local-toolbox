@@ -8,6 +8,7 @@ import jsQR from 'jsqr';
 
 let accounts = [];
 let rafId = null;
+let tickTimer = null; // 1 秒刷新定时器
 let lastEpoch = -1;
 
 /* ========== Protobuf Varint 解析 ========== */
@@ -116,7 +117,11 @@ function buildOtpauthUrl(otp) {
   if (otp.algorithm === 4) {
     throw new Error('MD5 算法不被 Web Crypto 支持，无法生成可用 URL');
   }
-  const type = otp.type === 1 ? 'hotp' : 'totp';
+  // 规范（AOSP MigrationPayloadReader）：OtpType { HOTP = 0; TOTP = 1 }。
+  // 原来写成 type === 1 ? 'hotp'，正好反了——真实导出里 TOTP 条目是 1，
+  // 会被当成 HOTP：不自动刷新、otpauth URL 还带上无意义的 counter。
+  // 字段缺失（undefined）按 TOTP 处理，是这类链接的常见形态。
+  const type = otp.type === 0 ? 'hotp' : 'totp';
   const name = otp.name || '';
   const label = otp.issuer
     ? encodeURIComponent(otp.issuer) + ':' + encodeURIComponent(name)
@@ -247,7 +252,7 @@ function renderAccounts() {
           <span class="acct-card__name">${escapeHtml(acct.name)}</span>
         </div>
         <div class="acct-card__meta">
-          <span class="acct-card__type">${acct.type === 1 ? 'HOTP' : 'TOTP'}</span>
+          <span class="acct-card__type">${acct.type === 0 ? 'HOTP' : 'TOTP'}</span>
           <span class="acct-card__info">${acct._digits}位 · ${escapeHtml(acct._algo)}</span>
         </div>
       </div>
@@ -306,7 +311,7 @@ async function tick() {
       lastEpoch = epoch;
       // 重新计算所有 TOTP 验证码（并行加速，账号多时不卡帧）
       await Promise.all(accounts.map(async (acct, i) => {
-        if (acct.type === 1) return; // HOTP 不自动刷新
+        if (acct.type === 0) return; // HOTP 不自动刷新（type 0 才是 HOTP）
         if (!acct._url) return; // 错误账号不计算
         try {
           const code = await computeTotp(acct);
@@ -340,16 +345,26 @@ async function tick() {
   } catch (e) {
     console.error('tick 异常:', e);
   }
-  rafId = requestAnimationFrame(tick);
+  // 由 setInterval 统一调度，这里不再自己续期
 }
 
+/**
+ * 刷新节奏用 1 秒定时器，而不是 requestAnimationFrame。
+ * 倒计时环与剩余秒数每秒才变一次，rAF（60 次/秒）会让 60 份冗余的
+ * DOM 写入（strokeDashoffset / textContent）白白跑，是纯 CPU 浪费。
+ */
 function startTick() {
   lastEpoch = -1;
-  if (rafId) cancelAnimationFrame(rafId);
-  rafId = requestAnimationFrame(tick);
+  stopTick();
+  tick(); // 立即跑一次，不等第一个周期
+  tickTimer = setInterval(tick, 1000);
 }
 
 function stopTick() {
+  if (tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = null;
+  }
   if (rafId) {
     cancelAnimationFrame(rafId);
     rafId = null;
@@ -552,6 +567,9 @@ function initTotpMigration() {
       flashToast(`解析出 ${accounts.length} 个账号`, 'success');
     }
     renderAccounts();
+    // 解析后要立刻重算验证码：renderAccounts 会把验证码重置为 '------' 占位符，
+    // 而 tick 只在 epoch 变化时才重算，不重置的话要等到下一个 30 秒周期才显示
+    startTick();
   });
 
   clearBtn.addEventListener('click', clearAll);

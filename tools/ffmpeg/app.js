@@ -177,9 +177,31 @@ async function fetchCoreFile(file) {
   throw new Error(`加载 ${file.name} 失败: ${lastErr?.message || '所有 CDN 源均不可用'}`);
 }
 
+/**
+ * 加载 FFmpeg 内核。
+ *
+ * 用 in-flight promise 去重：原来这里在 await 之前就把 ffmpeg 赋好，
+ * 于是并发的第二个调用会看到 ffmpeg 非空、直接返回一个**还没加载完**的实例，
+ * 后续 exec 必然失败（且首个调用失败时会把 ffmpeg 置 null，第二个调用已持有坏引用）。
+ */
 async function loadFFmpeg() {
   if (ffmpeg) return ffmpeg;
+  // 已有加载在进行中：复用同一个 promise，别再拉一遍 31MB 内核
+  if (ffmpegLoadPromise) return ffmpegLoadPromise;
 
+  ffmpegLoadPromise = doLoadFFmpeg();
+  try {
+    return await ffmpegLoadPromise;
+  } finally {
+    // 无论成败都清掉，下一次调用可以重试
+    ffmpegLoadPromise = null;
+  }
+}
+
+/** 进行中的内核加载（用于并发去重） */
+let ffmpegLoadPromise = null;
+
+async function doLoadFFmpeg() {
   // @ffmpeg/core 0.12.x 为单线程构建，不使用 SharedArrayBuffer，因此无需跨源隔离（COOP/COEP）。
   // 依赖 GitHub Pages 等静态托管本就不配置 COOP/COEP 响应头，单线程内核在普通页面即可运行。
 
