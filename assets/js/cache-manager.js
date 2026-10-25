@@ -39,37 +39,6 @@ let armedRestore = null; // 确认态恢复函数（关面板时调用，防残�
 
 /* ========== 入口与面板骨架 ========== */
 
-function injectButtonStyles() {
-  // 入口按钮样式放全局会污染首页/工具页头部，这里按需注入一次
-  if (document.getElementById('cache-manage-style')) return;
-  const style = document.createElement('style');
-  style.id = 'cache-manage-style';
-  style.textContent = `
-    .cache-manage-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      min-height: 36px;
-      padding: var(--space-xs) var(--space-sm);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      background: var(--bg-secondary);
-      color: var(--text-secondary);
-      font-size: var(--text-sm);
-      font-weight: 500;
-      cursor: pointer;
-      transition: color var(--transition-fast), background var(--transition-fast);
-    }
-    .cache-manage-btn:hover { color: var(--accent); background: var(--card); }
-    .cache-manage-btn svg { flex: none; }
-    @media (max-width: 640px) {
-      .cache-manage-btn { min-height: 40px; }
-      .cache-manage-btn__text { display: none; }
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 function buildPanel() {
   if (panelEl) return panelEl;
   const wrap = document.createElement('div');
@@ -618,7 +587,6 @@ function escapeHtml(s) {
 
 /* ========== 启动 ========== */
 
-injectButtonStyles();
 buildPanel();
 
 // 事件委托：入口按钮可能在面板构建前注入（工具页头部是 JS 动态加的）

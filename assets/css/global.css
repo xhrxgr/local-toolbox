@@ -348,8 +348,44 @@ button {
 }
 
 /* ========== 本地缓存管理面板 ==========
-   入口按钮 .cache-manage-btn 的样式由 assets/js/cache-manager.js 按需注入，
-   这里只放面板骨架样式（站点级功能，毛玻璃风格与全局一致） */
+   入口按钮 .cache-manage-btn 的样式放这里（而不是由 cache-manager.js 注入）：
+   按钮在首页与工具页头部是静态存在的，样式若随模块延迟注入，
+   首屏会出现「先是无样式的文字『缓存』、模块到位后才变成图标」的闪烁。
+   样式随首屏 CSS 一次到位，就不会闪。
+   窄屏也不隐藏文字：只留图标用户认不出是什么按钮。
+   面板骨架样式在本节下方（站点级功能，与全局风格一致） */
+.cache-manage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.cache-manage-btn:hover {
+  color: var(--accent);
+  background: var(--card);
+}
+
+.cache-manage-btn svg {
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .cache-manage-btn {
+    min-height: 40px;
+  }
+}
+
 /* 缓存管理面板打开时锁住背景滚动：面板是模态，背景不该跟着滚。
    锁定用 JS 给 body 加 position:fixed（不能用 html{overflow:hidden}，
    那会让根元素失去滚动容器、滚动位置归零，背景反而跳回顶部）。
