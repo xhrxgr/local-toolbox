@@ -335,4 +335,15 @@ export const TOOLS = [
     path: '/tools/ocr/',
     available: true,
   },
+  {
+    id: 'scripts',
+    name: '实用脚本',
+    icon: 'download',
+    desc: 'Windows 本地小工具，下载后本机运行：移动热点连接数上限、任务栏时钟秒数',
+    category: 'dev',
+    tags: ['Windows', '本地运行', '可下载'],
+    aliases: ['脚本', '下载', 'bat', '批处理', '实用工具', '热点', '移动热点', '连接数', '任务栏', '秒数', '时钟', 'script', 'download', 'windows脚本'],
+    path: '/tools/scripts/',
+    available: true,
+  },
 ];

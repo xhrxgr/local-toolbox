@@ -34,6 +34,7 @@
 | 开发 | SQL / CRON | SQL 格式化，CRON 表达式解析与下次执行时间 |
 | 开发 | Unicode 查看器 | 字符码点 / 编码 / 名称查询，字符可视化 |
 | 开发 | 加解密 | AES / DES / RC4 / Rabbit，哈希，编码转换 |
+| 开发 | 实用脚本 | Windows 本地小工具下载：移动热点连接数上限、任务栏时钟秒数一键切换 |
 | 文档 | 文档转换 | PDF/Word/Excel/CSV/Markdown/HTML/TXT/RTF/EPUB 本地互转，6 Tab |
 | 文档 | 扫描文档 | 图片转文档：批量导入、黑白/增强滤镜、曲面矫正、四角裁剪、去手写（红蓝笔擦除）、按序合并 PDF |
 | 安全 | 密码生成 | 随机密码 / 密码短语，强度评估 |
@@ -46,6 +47,7 @@
 - **无框架**：原生 JavaScript + CSS Variables，仅 Vite 作为构建工具
 - **高精度计时**：`performance.now()` + `requestAnimationFrame`，后台不丢时
 - **响应式**：移动端友好，关键页面跨视口自适应
+- **离线可用**：Service Worker 缓存静态资源与 CDN 内核，二次访问零流量；页面内可查看与清理缓存
 
 ## 技术栈
 
@@ -126,7 +128,10 @@ location / {
 │   ├── color/              # 颜色转换
 │   ├── password/           # 密码生成
 │   ├── unit/               # 单位换算
+│   ├── scripts/            # 实用脚本下载页
 │   └── otp-migration/      # OTP 迁移
+├── scripts/                # 可下载的 Windows 批处理脚本
+├── public/                 # sw.js（Service Worker，原样拷贝到站点根）
 ├── vite.config.js          # 多入口 + conditional COEP 插件
 └── package.json
 ```

@@ -22,6 +22,9 @@ syncOrtRuntime();
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/local-toolbox/' : '/',
   build: {
+    // 实用脚本以独立文件输出：小于内联阈值的脚本默认会被转成 data URL，
+    // 下载行为与文件下载不一致（个别浏览器对 data URL 下载处理不同）
+    assetsInlineLimit: (filePath) => (filePath.endsWith('.bat') ? false : undefined),
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
@@ -55,6 +58,7 @@ export default defineConfig(({ mode }) => ({
         crypto: resolve(__dirname, 'tools/crypto/index.html'),
         svg: resolve(__dirname, 'tools/svg/index.html'),
         ocr: resolve(__dirname, 'tools/ocr/index.html'),
+        scripts: resolve(__dirname, 'tools/scripts/index.html'),
       },
     },
   },
