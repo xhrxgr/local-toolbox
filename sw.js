@@ -86,6 +86,10 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.origin) {
+    // SW 脚本自身不缓存：浏览器对 SW 脚本有独立更新机制，
+    // 混进业务缓存只会在管理列表里造成困惑
+    if (url.pathname.endsWith('/sw.js')) return;
+
     // 2/3. 同源静态资源：hash 文件缓存优先，其余 SWR
     if (HASHED_ASSET_RE.test(url.pathname)) {
       event.respondWith(cacheFirst(req));

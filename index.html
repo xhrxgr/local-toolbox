@@ -31,6 +31,14 @@
       color: var(--accent);
     }
 
+    /* 头部右侧按钮组（缓存管理 + 主题切换） */
+    .home-header__actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex: none;
+    }
+
     /* 分类筛选 */
     .filter {
       display: flex;
@@ -506,9 +514,9 @@
       }
     }
   </style>
-  <script type="module" crossorigin src="/local-toolbox/assets/main-CQiF01hZ.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-DvIcmWY_.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CoXp42VO.css">
+  <script type="module" crossorigin src="/local-toolbox/assets/main-Vdqiymye.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-BTJKKIME.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BXAUtV0U.css">
 </head>
 <body>
   <div class="bg-decoration"></div>
@@ -520,7 +528,13 @@
       </svg>
       网页工具箱
     </div>
-    <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()">🌙</button>
+    <div class="home-header__actions">
+      <button class="cache-manage-btn" type="button" aria-label="缓存管理" title="缓存管理">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg>
+        <span class="cache-manage-btn__text">缓存</span>
+      </button>
+      <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></button>
+    </div>
   </header>
 
   <section class="search-section">
