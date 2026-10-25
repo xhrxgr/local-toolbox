@@ -367,9 +367,8 @@ button {
 .cache-panel__mask {
   position: absolute;
   inset: 0;
-  background: rgba(2, 6, 23, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* 实色遮罩，不用毛玻璃模糊：面板本身已是实底，背景再透出来只会显脏 */
+  background: rgba(15, 23, 42, 0.55);
 }
 
 .cache-panel__box {
@@ -379,14 +378,22 @@ button {
   width: 100%;
   max-width: 560px;
   max-height: min(85vh, 720px);
-  background: var(--card);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 8px 24px rgba(15, 23, 42, 0.12),
+    0 24px 60px rgba(15, 23, 42, 0.18);
   overflow: hidden;
   outline: none;
+}
+
+[data-theme="dark"] .cache-panel__box {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 24px 60px rgba(0, 0, 0, 0.6);
 }
 
 .cache-panel__head {
@@ -401,6 +408,14 @@ button {
 .cache-panel__head h2 {
   font-size: var(--text-base);
   font-weight: 600;
+  margin: 0;
+}
+
+.cache-panel__title p {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .cache-panel__close {
@@ -419,14 +434,82 @@ button {
   background: var(--bg-secondary);
 }
 
+/* 摘要卡：主信息（可清理体积）用大字，其余降级为辅助信息 */
 .cache-panel__summary {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-md) var(--space-lg) var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.cache-summary__main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs) var(--space-md);
-  padding: var(--space-sm) var(--space-lg);
+}
+
+.cache-summary__value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.cache-summary__label {
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+.cache-summary__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* 列表工具条：条目数 + 排序切换 */
+.cache-list__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg) var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.cache-sort {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.cache-sort__btn {
+  padding: 4px 10px;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.cache-sort__btn:hover {
+  color: var(--text);
+}
+
+.cache-sort__btn--active {
+  background: var(--card);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .cache-panel__actions {
@@ -477,7 +560,6 @@ button {
 
 .cache-group__name {
   font-weight: 600;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .cache-group__meta {
@@ -485,10 +567,25 @@ button {
   min-width: 0;
   font-size: var(--text-xs);
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .cache-group__list {
   margin-top: var(--space-xs);
+}
+
+/* 组头的「清空此缓存」降级为低调样式，hover 才变红：
+   与顶部「清除全部缓存」都用实心红会让人分不清哪个作用更大 */
+.cache-group__clear {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.cache-group__clear:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: var(--bg-secondary);
 }
 
 .cache-group__more {
@@ -505,32 +602,107 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  margin: 0 calc(-1 * var(--space-sm));
   border-bottom: 1px dashed var(--border);
+  border-radius: var(--radius-sm, 6px);
   font-size: var(--text-xs);
+  transition: background var(--transition-fast);
+}
+
+.cache-item:hover {
+  background: var(--bg-secondary);
 }
 
 .cache-item:last-child {
   border-bottom: none;
 }
 
-.cache-item__url {
+/* 条目主体：可读名称 + 类型标签 + 原始路径（淡显） */
+.cache-item__main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.cache-item__name {
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cache-item__kind {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cache-item__path {
+  flex-basis: 100%;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* 占比条：相对本组最大条目，一眼看出谁最占空间 */
+.cache-item__bar {
+  flex: none;
+  width: 64px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.cache-item:hover .cache-item__bar {
+  background: var(--border-hover);
+}
+
+.cache-item__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.55;
+  transition: opacity var(--transition-fast);
+}
+
+.cache-item:hover .cache-item__bar-fill {
+  opacity: 0.9;
 }
 
 .cache-item__size {
   white-space: nowrap;
   color: var(--text-secondary);
+  min-width: 56px;
+  text-align: right;
 }
 
+/* 删除按钮默认低调，悬停才变红：满屏红色按钮太吵 */
 .cache-item__del {
   flex: none;
+  min-height: 30px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.cache-item__del:hover {
+  color: #ef4444;
+  border-color: var(--border);
+  background: var(--bg-secondary);
 }
 
 @media (max-width: 640px) {
@@ -539,15 +711,31 @@ button {
   }
 
   .cache-panel__head,
-  .cache-panel__summary,
   .cache-panel__actions,
+  .cache-list__bar,
   .cache-panel__list,
   .cache-panel__note {
     padding-left: var(--space-md);
     padding-right: var(--space-md);
   }
 
+  /* 摘要卡是带 margin 的独立卡片，移动端只调 margin 不动内边距 */
+  .cache-panel__summary {
+    margin-left: var(--space-md);
+    margin-right: var(--space-md);
+  }
+
   .cache-panel__actions .btn {
     flex: 1 1 auto;
+  }
+
+  /* 触屏没有 hover，删除按钮保持可辨识的颜色 */
+  .cache-item__del {
+    color: var(--text-secondary);
+    border-color: var(--border);
+  }
+
+  .cache-item__path {
+    display: none;
   }
 }

@@ -5,9 +5,14 @@
  * 的 injectToolHeader 注入）。点击弹出毛玻璃管理面板：
  * 查看存储占用与缓存条目、按条目/按缓存删除、全部清除、申请持久化存储。
  *
+ * 显示取向：用户不关心 hash 文件名与长路径，所以条目一律翻译成可读名称
+ * （「多媒体转换 · 页面」「OCR 语言包」），并用占比条直观看出谁最占空间。
+ *
  * 由 common.js 仅在 production 动态加载（dev 模式不注册 SW，无缓存可管）。
  * 缓存策略本身见 public/sw.js。
  */
+
+import { TOOLS } from '/assets/js/tool-registry.js';
 
 const ICON_DB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg>';
 const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
@@ -15,22 +20,22 @@ const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" 
 /* 单个缓存默认最多渲染多少条，超出折叠，避免一次渲染上百条卡面板 */
 const RENDER_LIMIT = 60;
 
+/* 条目排序模式：size-desc（默认，最大占比优先）/ size-asc / name。
+   无大小信息的条目（跨域 opaque 响应等）任何模式下一律排尾部 */
+let sortMode = 'size-desc';
+
+const SORT_OPTIONS = [
+  { mode: 'size-desc', label: '大小↓' },
+  { mode: 'size-asc', label: '大小↑' },
+  { mode: 'name', label: '名称' },
+];
+
 let panelEl = null;
 let listEl = null;
 let summaryEl = null;
 let expanded = new Set(); // 已展开的缓存名
 let lastFocus = null;
 let armedRestore = null; // 确认态恢复函数（关面板时调用，防残留）
-/* 条目排序模式：url（默认，按缓存写入序）/ size-desc / size-asc。
-   无大小信息的条目（跨域 opaque 响应等）任何模式下一律排尾部 */
-let sortMode = 'url';
-
-const SORT_LABELS = {
-  url: '排序：默认',
-  'size-desc': '排序：大小降序',
-  'size-asc': '排序：大小升序',
-};
-const SORT_CYCLE = ['url', 'size-desc', 'size-asc'];
 
 /* ========== 入口与面板骨架 ========== */
 
@@ -75,22 +80,28 @@ function buildPanel() {
     <div class="cache-panel__mask" data-cache-close></div>
     <div class="cache-panel__box" role="dialog" aria-modal="true" aria-label="本地缓存管理" tabindex="-1">
       <div class="cache-panel__head">
-        <h2>本地缓存管理</h2>
+        <div class="cache-panel__title">
+          <h2>本地缓存管理</h2>
+          <p>本站离线资源与页面缓存</p>
+        </div>
         <button class="cache-panel__close" type="button" data-cache-close aria-label="关闭">${ICON_CLOSE}</button>
       </div>
       <div class="cache-panel__summary" id="cache-summary">读取中…</div>
       <div class="cache-panel__actions">
         <button class="btn btn-sm btn-secondary" type="button" id="cache-refresh">刷新</button>
-        <button class="btn btn-sm btn-secondary" type="button" id="cache-sort" title="切换条目排序方式">排序：默认</button>
         <button class="btn btn-sm btn-secondary" type="button" id="cache-persist">保持持久化</button>
         <button class="btn btn-sm btn--danger" type="button" id="cache-clear-all">清除全部缓存</button>
       </div>
+      <div class="cache-list__bar">
+        <span class="cache-list__count" id="cache-count">读取中…</span>
+        <div class="cache-sort" id="cache-sort" role="group" aria-label="条目排序">
+          ${SORT_OPTIONS.map((o) => `<button class="cache-sort__btn${o.mode === sortMode ? ' cache-sort__btn--active' : ''}" type="button" data-sort="${o.mode}">${o.label}</button>`).join('')}
+        </div>
+      </div>
       <div class="cache-panel__list" id="cache-list"></div>
       <div class="cache-panel__note">
-        缓存用于加速二次访问：页面文件走网络优先（保证内容最新），静态资源与 CDN
-        内核命中缓存后不再联网。删除后下次访问相应内容会自动重新下载；
-        「清除全部缓存」不会删除任何个人数据。存储占用为本站整体用量
-        （含缓存与其他站点数据）。
+        缓存用于加速二次访问：页面走网络优先（内容永远最新），静态资源命中缓存后不再联网。
+        删除后下次访问相应内容会自动重新下载，不会丢失任何个人数据。
       </div>
     </div>
   `;
@@ -103,9 +114,13 @@ function buildPanel() {
     if (e.target.closest('[data-cache-close]')) closePanel();
   });
   wrap.querySelector('#cache-refresh').addEventListener('click', () => loadData());
-  wrap.querySelector('#cache-sort').addEventListener('click', () => {
-    sortMode = SORT_CYCLE[(SORT_CYCLE.indexOf(sortMode) + 1) % SORT_CYCLE.length];
-    wrap.querySelector('#cache-sort').textContent = SORT_LABELS[sortMode];
+  wrap.querySelector('#cache-sort').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-sort]');
+    if (!btn) return;
+    sortMode = btn.dataset.sort;
+    wrap.querySelectorAll('#cache-sort .cache-sort__btn').forEach((b) => {
+      b.classList.toggle('cache-sort__btn--active', b.dataset.sort === sortMode);
+    });
     loadData();
   });
   wrap.querySelector('#cache-persist').addEventListener('click', requestPersistence);
@@ -171,11 +186,13 @@ async function loadData() {
   }
 
   // 存储概览（usage 为整个 origin 占用，含缓存之外的数据）
-  let estimateText = '存储用量不可用';
+  let usage = null;
+  let quota = null;
   try {
     if (navigator.storage && navigator.storage.estimate) {
       const est = await navigator.storage.estimate();
-      estimateText = `已用 ${formatSize(est.usage)} / 配额 ${formatSize(est.quota)}`;
+      usage = est.usage;
+      quota = est.quota;
     }
   } catch { /* 保持兜底文案 */ }
 
@@ -208,7 +225,12 @@ async function loadData() {
     groups.push({ name, cache, items, bytes: groupBytes });
   }
 
-  renderSummary({ estimateText, persisted, totalEntries, cacheCount: groups.length, totalBytes });
+  renderSummary({ usage, quota, persisted, totalEntries, cacheCount: groups.length, totalBytes });
+  // 列表工具条上的条目数（与摘要里的数字一致，方便滚动时对照）
+  const countEl = panelEl && panelEl.querySelector('#cache-count');
+  if (countEl) {
+    countEl.textContent = totalEntries > 0 ? `${totalEntries} 个条目` : '暂无缓存';
+  }
   try {
     renderList(groups);
   } catch (err) {
@@ -221,14 +243,19 @@ async function loadData() {
   }
 }
 
-function renderSummary({ estimateText, persisted, totalEntries, cacheCount, totalBytes }) {
+function renderSummary({ usage, quota, persisted, totalEntries, cacheCount, totalBytes }) {
   const persistBtn = summaryEl.parentElement.querySelector('#cache-persist');
   // 持久化状态常驻显示在摘要区，不用点开按钮才知道开没开
   const persistText = persisted === true ? '已开启' : persisted === false ? '未开启' : '不可用';
   summaryEl.innerHTML = `
-    <span>${escapeHtml(estimateText)}</span>
-    <span>存储持久化：${persistText}</span>
-    <span>缓存 ${cacheCount} 个 · 条目 ${totalEntries} 条 · 合计 ${formatSize(totalBytes)}</span>
+    <div class="cache-summary__main">
+      <span class="cache-summary__value">${formatSize(totalBytes)}</span>
+      <span class="cache-summary__label">可清理缓存 · ${totalEntries} 条 · ${cacheCount} 组</span>
+    </div>
+    <div class="cache-summary__meta">
+      <span>${usage !== null && usage !== undefined ? `站点已用 ${formatSize(usage)} / 配额 ${formatSize(quota)}` : '存储用量不可用'}</span>
+      <span>存储持久化：${persistText}</span>
+    </div>
   `;
   // 按钮永不禁用：已授权时重复调用 persist() 会直接 resolve，无害；
   // 禁用反而让用户点了没反应（.btn 没有 disabled 视觉样式，看不出已禁用）
@@ -259,9 +286,9 @@ function renderGroup(group) {
   const head = document.createElement('div');
   head.className = 'cache-group__head';
   head.innerHTML = `
-    <span class="cache-group__name">${escapeHtml(group.name)}</span>
+    <span class="cache-group__name">${escapeHtml(describeGroup(group.name))}</span>
     <span class="cache-group__meta">${group.items.length} 条 · ${formatSize(group.bytes)}</span>
-    <button class="btn btn-sm btn--danger cache-group__clear" type="button">清空此缓存</button>
+    <button class="btn btn-sm cache-group__clear" type="button">清空此缓存</button>
   `;
   head.querySelector('.cache-group__clear').addEventListener('click', (e) => {
     const btn = e.currentTarget;
@@ -280,11 +307,14 @@ function renderGroup(group) {
   box.appendChild(head);
 
   const limit = expanded.has(group.name) ? group.items.length : RENDER_LIMIT;
-  const shown = sortItems(group.items).slice(0, limit);
+  const sorted = sortItems(group.items);
+  const shown = sorted.slice(0, limit);
+  // 占比条以本组最大条目为 100%，一眼看出谁最占空间
+  const maxSize = sorted.reduce((max, it) => (it.size !== null && it.size > max ? it.size : max), 0);
   const list = document.createElement('div');
   list.className = 'cache-group__list';
   for (const item of shown) {
-    list.appendChild(renderItem(group, item));
+    list.appendChild(renderItem(group, item, maxSize));
   }
   box.appendChild(list);
 
@@ -302,45 +332,128 @@ function renderGroup(group) {
   return box;
 }
 
-/* 按当前排序模式重排条目：默认保持缓存写入序（即 URL 模式原序），
-   大小模式把无大小信息的条目固定在尾部 */
+/* 按当前排序模式重排条目：大小模式把无大小信息的条目固定在尾部，
+   名称模式按可读名称排序 */
 function sortItems(items) {
-  if (sortMode === 'url') return items;
+  if (sortMode === 'name') {
+    return [...items].sort((a, b) => {
+      const an = describeEntry(a.req.url).name;
+      const bn = describeEntry(b.req.url).name;
+      return an.localeCompare(bn, 'zh-Hans-CN');
+    });
+  }
   const sorted = [...items].sort((a, b) => {
     if (a.size === null && b.size === null) return 0;
     if (a.size === null) return 1;
     if (b.size === null) return -1;
-    return sortMode === 'size-desc' ? b.size - a.size : a.size - b.size;
+    return sortMode === 'size-asc' ? a.size - b.size : b.size - a.size;
   });
   return sorted;
 }
 
-function renderItem(group, item) {
+/* 常见第三方库文件（构建产物里不带 hash 的那批），标成「库文件」更贴切 */
+const LIBRARY_FILES = new Set([
+  'es.js', 'jsQR.js', 'purify.es.js', 'marked.esm.js', 'jspdf.es.min.js',
+  'html2canvas.js', 'jszip.min.js', 'qrcode.js', 'ort-wasm-simd-threaded.mjs',
+  'pdf.worker.min.mjs', 'pdf.min.js', 'word.js', 'epub.js', 'rtf.js',
+  'xlsx.js', 'ort-wasm-simd-threaded.wasm',
+]);
+
+/* 缓存组名 → 可读名称（toolbox-v1 是站点自身缓存，其余是工具专用缓存） */
+function describeGroup(name) {
+  if (name.startsWith('toolbox')) return '站点页面与静态资源';
+  if (name.startsWith('ffmpeg-core')) return 'FFmpeg 转换内核';
+  if (name.startsWith('inkerase-models')) return '扫描文档去手写模型';
+  return name;
+}
+
+/**
+ * 缓存条目 URL → 可读名称与类型标签。
+ * 用户不关心 hash 文件名和长路径，「多媒体转换 · 页面」远比
+ * 「/local-toolbox/assets/ffmpeg-CEFw3M00.js」直观。
+ */
+function describeEntry(rawUrl) {
+  let u;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return { name: rawUrl, kind: '' };
+  }
+  const file = u.pathname.split('/').filter(Boolean).pop() || u.pathname;
+
+  // 同源：工具页面
+  if (u.origin === location.origin) {
+    const tool = TOOLS.find((t) => u.pathname.endsWith(t.path));
+    if (tool) return { name: tool.name, kind: '页面' };
+
+    // 同源资源：去掉构建 hash
+    const clean = file.replace(/-[A-Za-z0-9_-]{8,}(\.[^.]+)$/, '$1');
+    if (clean === 'main.js') return { name: '主程序', kind: '脚本' };
+    if (clean === 'common.js') return { name: '公共脚本', kind: '脚本' };
+    if (clean === 'common.css') return { name: '公共样式', kind: '样式' };
+    const chunk = clean.match(/^([a-z0-9-]+)\.js$/i);
+    if (chunk) {
+      const t = TOOLS.find((x) => x.id === chunk[1]);
+      if (t) return { name: t.name, kind: '脚本' };
+    }
+    if (clean.endsWith('.wasm')) return { name: clean, kind: '运行时' };
+    if (clean.endsWith('.onnx')) return { name: '去手写模型', kind: '模型' };
+    if (LIBRARY_FILES.has(clean)) return { name: clean, kind: '库文件' };
+    return { name: clean, kind: '文件' };
+  }
+
+  // 跨域
+  if (file.endsWith('.traineddata.gz')) {
+    return { name: file.replace('.traineddata.gz', ''), kind: '语言包' };
+  }
+  if (file.startsWith('ffmpeg-core')) return { name: 'FFmpeg 内核', kind: file.endsWith('.wasm') ? '运行时' : '脚本' };
+  if (file.endsWith('.wasm')) return { name: file, kind: '运行时' };
+  return { name: file, kind: u.host };
+}
+
+function renderItem(group, item, maxSize) {
   const row = document.createElement('div');
   row.className = 'cache-item';
 
-  // 同源条目只显示路径（完整 URL 放 title）；跨域条目带主机名区分来源
-  let url;
-  try {
-    const u = new URL(item.req.url);
-    url = u.origin === location.origin ? u.pathname + u.search : u.host + u.pathname;
-  } catch {
-    url = item.req.url;
-  }
+  const desc = describeEntry(item.req.url);
 
-  const urlEl = document.createElement('span');
-  urlEl.className = 'cache-item__url';
-  urlEl.textContent = url;
-  urlEl.title = item.req.url;
+  const main = document.createElement('div');
+  main.className = 'cache-item__main';
+  const nameEl = document.createElement('span');
+  nameEl.className = 'cache-item__name';
+  nameEl.textContent = desc.name;
+  main.appendChild(nameEl);
+  if (desc.kind) {
+    const kindEl = document.createElement('span');
+    kindEl.className = 'cache-item__kind';
+    kindEl.textContent = desc.kind;
+    main.appendChild(kindEl);
+  }
+  const pathEl = document.createElement('span');
+  pathEl.className = 'cache-item__path';
+  pathEl.textContent = item.req.url;
+  pathEl.title = item.req.url;
+  main.appendChild(pathEl);
+
+  // 占比条：相对本组最大条目
+  const bar = document.createElement('span');
+  bar.className = 'cache-item__bar';
+  const pct = maxSize > 0 && item.size ? Math.max(4, Math.round((item.size / maxSize) * 100)) : 0;
+  const fill = document.createElement('span');
+  fill.className = 'cache-item__bar-fill';
+  fill.style.width = pct + '%';
+  bar.appendChild(fill);
+  bar.title = pct > 0 ? `占本组最大条目的 ${pct}%` : '';
 
   const size = document.createElement('span');
   size.className = 'cache-item__size';
   size.textContent = formatSize(item.size);
 
   const del = document.createElement('button');
-  del.className = 'btn btn-sm btn--danger cache-item__del';
+  del.className = 'btn btn-sm cache-item__del';
   del.type = 'button';
   del.textContent = '删除';
+  del.title = '删除这个缓存条目';
   del.addEventListener('click', async () => {
     del.disabled = true;
     del.textContent = '删除中…';
@@ -353,7 +466,8 @@ function renderItem(group, item) {
     loadData();
   });
 
-  row.appendChild(urlEl);
+  row.appendChild(main);
+  row.appendChild(bar);
   row.appendChild(size);
   row.appendChild(del);
   return row;
