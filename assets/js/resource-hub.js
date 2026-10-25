@@ -55,6 +55,14 @@ function injectStyles() {
       color: var(--text-secondary);
       line-height: 1.5;
     }
+    .resource-panel__link {
+      color: var(--accent);
+      text-decoration: none;
+      margin: 0 2px;
+    }
+    .resource-panel__link:hover {
+      text-decoration: underline;
+    }
     .resource-item {
       display: flex;
       flex-wrap: wrap;
@@ -97,6 +105,8 @@ export function mountResourcePanel(container, toolId, options = {}) {
   const resources = resourcesOfTool(toolId);
   if (resources.length === 0) return;
 
+  const base = (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/') || '/';
+
   // 用原生 details/summary 折叠：默认收起不占空间，展开才看到条目
   const details = document.createElement('details');
   details.className = PANEL_CLASS;
@@ -106,7 +116,7 @@ export function mountResourcePanel(container, toolId, options = {}) {
       <span>离线资源</span>
       <span class="resource-panel__badge" data-role="badge">检查中…</span>
     </summary>
-    <div class="resource-panel__hint">大文件提前下载到本地，用的时候就不用等；删掉可释放空间。全部资源也可在「资源中心」一次性下载。</div>
+    <div class="resource-panel__hint">大文件提前下载到本地，用的时候就不用等；删掉可释放空间。全部资源可在<a class="resource-panel__link" href="${base}tools/resources/">资源中心</a>一次性下载。</div>
   `;
   el.innerHTML = '';
   el.appendChild(details);

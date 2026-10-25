@@ -51,13 +51,17 @@ function getBasePath() {
 
 /**
  * 渲染工具卡片
+ *
+ * 只渲染业务工具：siteFeature 标记的站点级入口（资源中心、实用脚本）
+ * 不属于业务功能，单独放在网格上方的站点功能区。
  */
 function renderTools(filter = 'all') {
   const grid = document.getElementById('tools-grid');
   if (!grid) return;
 
   const base = getBasePath();
-  const filtered = filter === 'all' ? TOOLS : TOOLS.filter((t) => t.category === filter);
+  const business = TOOLS.filter((t) => !t.siteFeature);
+  const filtered = filter === 'all' ? business : business.filter((t) => t.category === filter);
 
   grid.innerHTML = filtered
     .map(
@@ -73,6 +77,41 @@ function renderTools(filter = 'all') {
           ${tool.tags.map((tag) => `<span class="tag">${tag}</span>`).join('')}
         </div>
       </div>
+    </a>
+  `
+    )
+    .join('');
+}
+
+/**
+ * 渲染站点功能入口
+ *
+ * 资源中心、实用脚本这类入口不是业务工具，放在工具网格上方独立一行，
+ * 视觉上与业务工具卡片区分（横排小卡 vs 竖排大卡）。
+ * 仍可被搜索命中，注册表里保留即可。
+ */
+function renderSiteFeatures() {
+  const section = document.getElementById('site-features');
+  const list = document.getElementById('site-features-list');
+  if (!section || !list) return;
+
+  const features = TOOLS.filter((t) => t.siteFeature && t.available);
+  if (features.length === 0) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  const base = getBasePath();
+  list.innerHTML = features
+    .map(
+      (f) => `
+    <a href="${base}${f.path.replace(/^\//, '')}" class="site-feature">
+      <span class="site-feature__icon">${ICONS[f.icon] || ''}</span>
+      <span class="site-feature__text">
+        <span class="site-feature__name">${f.name}</span>
+        <span class="site-feature__desc">${f.shortDesc || f.desc}</span>
+      </span>
     </a>
   `
     )
@@ -578,6 +617,7 @@ function restoreHomeState() {
 // 页面加载完成后渲染
 document.addEventListener('DOMContentLoaded', () => {
   renderTools();
+  renderSiteFeatures();
   initFilter();
   initSearch();
   initStateSave();
