@@ -63,7 +63,7 @@ function buildPanel() {
   wrap.hidden = true;
   wrap.innerHTML = `
     <div class="cache-panel__mask" data-cache-close></div>
-    <div class="cache-panel__box" role="dialog" aria-modal="true" aria-label="本地缓存管理">
+    <div class="cache-panel__box" role="dialog" aria-modal="true" aria-label="本地缓存管理" tabindex="-1">
       <div class="cache-panel__head">
         <h2>本地缓存管理</h2>
         <button class="cache-panel__close" type="button" data-cache-close aria-label="关闭">${ICON_CLOSE}</button>
@@ -341,6 +341,9 @@ function renderItem(group, item) {
  */
 function armConfirm(btn, confirmText, onConfirm) {
   if (btn.dataset.armed) return;
+  // 先恢复上一个确认态：否则 armedRestore 被覆盖，关面板时只恢复最后一个，
+  // 前面那个按钮的红色文字和取消按钮会残留在界面上
+  if (armedRestore) armedRestore();
   btn.dataset.armed = '1';
   const original = btn.textContent;
   btn.textContent = confirmText;

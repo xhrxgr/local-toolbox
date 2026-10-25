@@ -95,4 +95,9 @@ if (import.meta.env && import.meta.env.PROD && 'serviceWorker' in navigator) {
       // 加载失败不影响主功能
     });
   });
+} else {
+  // dev 模式不注册 SW、不加载缓存管理模块，入口按钮点了也没反应——直接隐藏
+  const hideStyle = document.createElement('style');
+  hideStyle.textContent = '.cache-manage-btn { display: none !important; }';
+  document.head.appendChild(hideStyle);
 }
