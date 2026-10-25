@@ -11,6 +11,7 @@
  */
 
 import { TOOLS } from '/assets/js/tool-registry.js';
+import { armConfirm } from '/assets/js/confirm.js';
 
 const ICON_DB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg>';
 
@@ -386,15 +387,18 @@ function renderItem(group, item, maxSize) {
   del.textContent = '删除';
   del.title = '删除这个缓存条目';
   del.addEventListener('click', async () => {
-    del.disabled = true;
-    del.textContent = '删除中…';
-    try {
-      await group.cache.delete(item.req);
-      flashBtn(del, '已删除', 'btn--success');
-    } catch {
-      flashBtn(del, '失败', 'btn--danger');
-    }
-    loadData();
+    // 二次确认：缓存条目删除不可撤销（下次访问要重新下载）
+    armConfirm(del, '确认删除？', async () => {
+      del.disabled = true;
+      del.textContent = '删除中…';
+      try {
+        await group.cache.delete(item.req);
+        flashBtn(del, '已删除', 'btn--success');
+      } catch {
+        flashBtn(del, '失败', 'btn--danger');
+      }
+      loadData();
+    });
   });
 
   row.appendChild(main);
@@ -413,48 +417,6 @@ function renderItem(group, item, maxSize) {
  * 但用原生 confirm 会割裂毛玻璃 UI，所以在按钮内做轻量二次确认。
  * 删除单条代价小（重新访问即回），保持直接删不加确认。
  */
-function armConfirm(btn, confirmText, onConfirm) {
-  if (btn.dataset.armed) return;
-  // 先恢复上一个确认态：否则 armedRestore 被覆盖，关面板时只恢复最后一个，
-  // 前面那个按钮的红色文字和取消按钮会残留在界面上
-  if (armedRestore) armedRestore();
-  btn.dataset.armed = '1';
-  const original = btn.textContent;
-  btn.textContent = confirmText;
-  btn.classList.add('btn--danger');
-  btn.title = '再次点击确认执行';
-
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'btn btn-sm btn-secondary';
-  cancel.textContent = '取消';
-  btn.parentElement.insertBefore(cancel, btn.nextSibling);
-
-  const timer = setTimeout(restore, 5000);
-
-  function restore() {
-    clearTimeout(timer);
-    delete btn.dataset.armed;
-    btn.textContent = original;
-    btn.classList.remove('btn--danger');
-    btn.title = '';
-    cancel.remove();
-    btn.removeEventListener('click', onConfirmClick, true);
-    if (armedRestore === restore) armedRestore = null;
-  }
-
-  function onConfirmClick(e) {
-    // capture 阶段拦截，抢在原 click handler 之前
-    e.stopImmediatePropagation();
-    restore();
-    onConfirm();
-  }
-
-  cancel.addEventListener('click', restore);
-  btn.addEventListener('click', onConfirmClick, true);
-  armedRestore = restore;
-}
-
 function doClearAllCaches() {
   const btn = summaryEl.parentElement.querySelector('#cache-clear-all');
   btn.disabled = true;

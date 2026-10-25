@@ -7,6 +7,7 @@
  */
 import { RESOURCE_GROUPS, allResources, totalSize } from '/assets/js/resource-registry.js';
 import { showToast } from '/assets/js/toast.js';
+import { armConfirm } from '/assets/js/confirm.js';
 
 const state = {
   selected: new Set(), // 已勾选的资源 id
@@ -115,7 +116,10 @@ function renderRow(res) {
   delBtn.type = 'button';
   delBtn.className = 'btn btn-sm btn--danger';
   delBtn.textContent = '删除';
-  delBtn.addEventListener('click', () => removeOne(res));
+  delBtn.addEventListener('click', () => {
+    // 二次确认：资源删除后要用时得重新下载（最大的有几十 MB）
+    armConfirm(delBtn, '确认删除？', () => removeOne(res));
+  });
   actions.appendChild(dlBtn);
   actions.appendChild(delBtn);
   row.appendChild(actions);

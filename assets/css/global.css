@@ -685,6 +685,14 @@ button {
   background: var(--bg-secondary);
 }
 
+/* 二次确认态：按钮文案变了，颜色也要跟着变红（.cache-item__del 的
+   低调色声明在后面会盖掉 .btn--danger，这里显式提权） */
+.cache-item__del.btn--danger {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: var(--bg-secondary);
+}
+
 @media (max-width: 640px) {
   .缓存管理 {
     padding: var(--space-sm);
