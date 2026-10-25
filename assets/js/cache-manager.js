@@ -20,6 +20,7 @@ let listEl = null;
 let summaryEl = null;
 let expanded = new Set(); // 已展开的缓存名
 let lastFocus = null;
+let armedRestore = null; // 确认态恢复函数（关面板时调用，防残留）
 
 /* ========== 入口与面板骨架 ========== */
 
@@ -111,6 +112,8 @@ function openPanel() {
 
 function closePanel() {
   if (!panelEl) return;
+  // 关面板时恢复残留的确认态，避免重开看到变红的「确认清除全部？」
+  if (armedRestore) armedRestore();
   panelEl.hidden = true;
   if (lastFocus && lastFocus.isConnected) lastFocus.focus();
 }
@@ -244,17 +247,19 @@ function renderGroup(group) {
     <span class="cache-group__meta">${group.items.length} 条 · ${formatSize(group.bytes)}</span>
     <button class="btn btn-sm btn--danger cache-group__clear" type="button">清空此缓存</button>
   `;
-  head.querySelector('.cache-group__clear').addEventListener('click', async (e) => {
+  head.querySelector('.cache-group__clear').addEventListener('click', (e) => {
     const btn = e.currentTarget;
-    btn.disabled = true;
-    btn.textContent = '清理中…';
-    try {
-      await caches.delete(group.name);
-      flashBtn(btn, '已清空', 'btn--success');
-    } catch {
-      flashBtn(btn, '清空失败', 'btn--danger');
-    }
-    loadData();
+    armConfirm(btn, '确认清空？', async () => {
+      btn.disabled = true;
+      btn.textContent = '清理中…';
+      try {
+        await caches.delete(group.name);
+        flashBtn(btn, '已清空', 'btn--success');
+      } catch {
+        flashBtn(btn, '清空失败', 'btn--danger');
+      }
+      loadData();
+    });
   });
   box.appendChild(head);
 
@@ -327,19 +332,73 @@ function renderItem(group, item) {
 
 /* ========== 操作 ========== */
 
-async function clearAllCaches() {
+/**
+ * 破坏性操作的二次确认：点击后按钮进入确认态（文字变红 + 出现「取消」），
+ * 需再次点击才执行，5 秒无操作自动恢复。
+ * 清除缓存的误触代价大（去手写模型 28MB、ffmpeg 内核都靠重新下载），
+ * 但用原生 confirm 会割裂毛玻璃 UI，所以在按钮内做轻量二次确认。
+ * 删除单条代价小（重新访问即回），保持直接删不加确认。
+ */
+function armConfirm(btn, confirmText, onConfirm) {
+  if (btn.dataset.armed) return;
+  btn.dataset.armed = '1';
+  const original = btn.textContent;
+  btn.textContent = confirmText;
+  btn.classList.add('btn--danger');
+  btn.title = '再次点击确认执行';
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn-sm btn-secondary';
+  cancel.textContent = '取消';
+  btn.parentElement.insertBefore(cancel, btn.nextSibling);
+
+  const timer = setTimeout(restore, 5000);
+
+  function restore() {
+    clearTimeout(timer);
+    delete btn.dataset.armed;
+    btn.textContent = original;
+    btn.classList.remove('btn--danger');
+    btn.title = '';
+    cancel.remove();
+    btn.removeEventListener('click', onConfirmClick, true);
+    if (armedRestore === restore) armedRestore = null;
+  }
+
+  function onConfirmClick(e) {
+    // capture 阶段拦截，抢在原 click handler 之前
+    e.stopImmediatePropagation();
+    restore();
+    onConfirm();
+  }
+
+  cancel.addEventListener('click', restore);
+  btn.addEventListener('click', onConfirmClick, true);
+  armedRestore = restore;
+}
+
+function doClearAllCaches() {
   const btn = summaryEl.parentElement.querySelector('#cache-clear-all');
   btn.disabled = true;
   btn.textContent = '清理中…';
-  try {
-    const names = await caches.keys();
-    await Promise.all(names.map((n) => caches.delete(n)));
-    expanded = new Set();
-    flashBtn(btn, '已清除全部', 'btn--success');
-  } catch {
-    flashBtn(btn, '清除失败', 'btn--danger');
-  }
-  loadData();
+  caches.keys()
+    .then((names) => Promise.all(names.map((n) => caches.delete(n))))
+    .then(() => {
+      expanded = new Set();
+      // 删除完成后再刷新列表：大缓存（28MB 模型）删除耗时可达数百毫秒，
+      // 提前 loadData 会读到还没删掉的条目
+      loadData();
+      flashBtn(btn, '已清除全部', 'btn--success');
+    })
+    .catch(() => {
+      flashBtn(btn, '清除失败', 'btn--danger');
+    });
+}
+
+function clearAllCaches() {
+  const btn = summaryEl.parentElement.querySelector('#cache-clear-all');
+  armConfirm(btn, '确认清除全部？', doClearAllCaches);
 }
 
 async function requestPersistence() {
