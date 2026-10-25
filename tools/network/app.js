@@ -262,7 +262,7 @@ function appendPingLog(seq, result) {
 async function startPing() {
   const url = normalizeUrl(document.getElementById('ping-url').value);
   if (!url) {
-    alert('请输入目标地址');
+    document.getElementById('ping-log').innerHTML = '<div class="empty-state">请输入目标地址</div>';
     return;
   }
   const count = parseInt(document.getElementById('ping-count').value) || 10;
@@ -312,7 +312,7 @@ async function runDiag() {
   const resultEl = document.getElementById('diag-result');
   const noteEl = document.getElementById('diag-note');
   if (!url) {
-    alert('请输入目标地址');
+    resultEl.innerHTML = '<div class="empty-state">请输入目标地址</div>';
     return;
   }
 
@@ -371,9 +371,9 @@ async function runDiag() {
   // 判断是否被 Timing-Allow-Origin 限制
   const restricted = (entry.domainLookupStart === 0 && entry.requestStart === 0);
   if (restricted) {
-    noteEl.textContent = '⚠ 目标未发送 Timing-Allow-Origin 头，DNS/TCP/TLS/TTFB 细节被限制为 0，仅总耗时可用。';
+    noteEl.textContent = '注意：目标未发送 Timing-Allow-Origin 头，DNS/TCP/TLS/TTFB 细节被限制为 0，仅总耗时可用。';
   } else if (corsError) {
-    noteEl.textContent = '⚠ CORS 预检失败（已回退 no-cors），但 Timing-Allow-Origin 头存在，各阶段耗时可用。';
+    noteEl.textContent = '注意：CORS 预检失败（已回退 no-cors），但 Timing-Allow-Origin 头存在，各阶段耗时可用。';
   }
 
   const phases = [
@@ -546,7 +546,7 @@ async function queryDNS() {
   const provider = document.getElementById('dns-provider').value;
   const resultEl = document.getElementById('dns-result');
   if (!domain) {
-    alert('请输入域名');
+    resultEl.innerHTML = '<div class="empty-state">请输入域名</div>';
     return;
   }
 
@@ -778,13 +778,13 @@ async function loadExitCompare() {
     }
 
     if (splitDetails.length > 0) {
-      html += `<div class="exit-compare__conclusion exit-compare__conclusion--warn">⚠ 同一协议栈内存在多个出口 IP，疑似 VPN 分流（不同检测源经不同代理节点出口）：<br>${splitDetails.join('<br>')}</div>`;
+      html += `<div class="exit-compare__conclusion exit-compare__conclusion--warn">同一协议栈内存在多个出口 IP，疑似 VPN 分流（不同检测源经不同代理节点出口）：<br>${splitDetails.join('<br>')}</div>`;
     } else {
       const stacks = [];
       if (v4Ips.size === 1) stacks.push(`IPv4 <code>${[...v4Ips][0]}</code>`);
       if (v6Ips.size === 1) stacks.push(`IPv6 <code>${[...v6Ips][0]}</code>`);
       const dualNote = (v4Ips.size === 1 && v6Ips.size === 1) ? '（双栈环境，v4 与 v6 地址不同属正常）' : '';
-      html += `<div class="exit-compare__conclusion exit-compare__conclusion--ok">✓ 各协议栈出口 IP 一致${dualNote}：${stacks.join('，')}。未检测到 VPN 分流。</div>`;
+      html += `<div class="exit-compare__conclusion exit-compare__conclusion--ok">各协议栈出口 IP 一致${dualNote}：${stacks.join('，')}。未检测到 VPN 分流。</div>`;
     }
   }
 

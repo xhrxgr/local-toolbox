@@ -1,7 +1,7 @@
 /**
  * 文件下载：单文件下载 + 多文件 ZIP 打包
  */
-import { showToast } from './toast.js';
+import { showToast } from '/assets/js/toast.js';
 import { downloadBlob as sharedDownloadBlob } from '/assets/js/download.js';
 
 // 下载实现统一走共享模块（assets/js/download.js），撤销时机与全站一致

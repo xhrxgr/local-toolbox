@@ -10,7 +10,7 @@ import { renderPage, defaultCorners } from './render.js';
 import { detectCorners, validateQuad, snapToBorder, checkEdgeStrength } from './detect.js';
 import { CornerOverlay } from './corners-ui.js';
 import { exportPageImage, exportMergedPdf } from './exporter.js';
-import { showToast } from './lib/toast.js';
+import { showToast } from '/assets/js/toast.js';
 
 const THUMB_SIZE = 120;
 const EDITOR_MAX_SIZE = 1400;

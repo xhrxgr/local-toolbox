@@ -82,6 +82,16 @@
   min-width: 0;
 }
 
+/* 非法输入提示（红色文字走全局 .field-error） */
+.unit-hint {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.unit-hint[hidden] {
+  display: none;
+}
+
 .unit-input {
   width: 100%;
   padding: var(--space-md);

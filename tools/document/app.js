@@ -17,7 +17,7 @@
 import { escapeHtml, getFileKind, formatFileSize } from './handlers/utils.js';
 import { OPERATIONS, TEXT_LABELS, TEXT_HINTS } from './operations.js';
 import { TAB_MODULE_LOADERS } from './tab-loaders.js';
-import { showToast } from './ui/toast.js';
+import { showToast } from '/assets/js/toast.js';
 import { downloadBlob, downloadAllAsZip } from './ui/download.js';
 import { copyText } from './ui/clipboard.js';
 import { getFiles, addFiles, removeFileAt, clearFiles, renderFileList, setFilesChangedHandler } from './ui/file-list.js';

@@ -7,6 +7,8 @@
  * - localStorage 持久化（刷新恢复）
  */
 
+import { showToast } from '/assets/js/toast.js';
+
 const STORAGE_KEY = 'countdown-state-v1';
 const MS_TOGGLE_KEY = 'countdown-show-ms-v1';
 const DEFAULT_MS = 25 * 60 * 1000; // 默认 25 分钟番茄钟
@@ -431,7 +433,7 @@ function initCountdown() {
   document.getElementById('btn-apply').addEventListener('click', () => {
     const ms = readInputsToMs();
     if (ms <= 0) {
-      alert('请设置大于 0 的时长');
+      showToast('请设置大于 0 的时长', 'warning');
       return;
     }
     setDuration(ms);

@@ -5,6 +5,8 @@
  * 双向实时转换 + 交换单位
  */
 
+import { initTabScrollHint } from '/assets/js/tab-hint.js';
+
 /* ========== 单位定义表（factor = 到基准单位的倍数） ========== */
 const UNITS = {
   length: {
@@ -170,10 +172,29 @@ function recompute(category, sourceDirection) {
   const value = parseValue(sourceInput.value);
   if (value === null) {
     targetInput.value = '';
+    // 空输入不是错误（清空另一侧即可）；有内容但解析不了要给可见提示，
+    // 否则用户只看到另一侧变空白，分不清是没算出来还是输入不合法
+    showInvalidHint(sourceInput, sourceInput.value.trim() !== '');
     return;
   }
+  showInvalidHint(sourceInput, false);
   const result = convert(value, category, sourceSelect.value, targetSelect.value);
   targetInput.value = formatResult(result);
+}
+
+/* 在输入框下方显示/隐藏「无法识别为数值」提示（每个 .unit-side 一个） */
+function showInvalidHint(inputEl, show) {
+  const side = inputEl.closest('.unit-side');
+  if (!side) return;
+  let hint = side.querySelector('.unit-hint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.className = 'unit-hint field-error';
+    hint.hidden = true;
+    side.appendChild(hint);
+  }
+  hint.textContent = show ? '无法识别为数值' : '';
+  hint.hidden = !show;
 }
 
 /* ========== 交换两侧单位 + 数值 ========== */
@@ -226,6 +247,9 @@ function initUnit() {
     // 交换按钮
     els.swapBtn.addEventListener('click', () => swap(category));
   });
+
+  // tab 行窄屏可滑动，加边缘渐变提示
+  initTabScrollHint();
 }
 
 export { initUnit };

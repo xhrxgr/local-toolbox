@@ -6,6 +6,7 @@
  * 特殊位：setuid(4000) / setgid(2000) / sticky(1000)
  */
 import { copyText } from '/assets/js/clipboard.js';
+import { showToast } from '/assets/js/toast.js';
 
 function initChmod() {
   const $ = (id) => document.getElementById(id);
@@ -149,7 +150,7 @@ function initChmod() {
     try {
       applyFromNumeric($('chmod-num-input').value);
     } catch (e) {
-      alert(e.message);
+      showToast(e.message, 'error');
     }
   });
 

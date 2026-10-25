@@ -4,7 +4,7 @@
  */
 import { escapeHtml, getFileKind, formatFileSize } from '../handlers/utils.js';
 import { BIG_FILE_BYTES } from '../operations.js';
-import { showToast } from './toast.js';
+import { showToast } from '/assets/js/toast.js';
 
 let files = [];
 let lastOp = null;              // 最近一次渲染时使用的操作配置

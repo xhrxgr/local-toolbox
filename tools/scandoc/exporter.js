@@ -5,7 +5,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { renderPage } from './render.js';
 import { downloadBlob, canvasToBlob } from './lib/download.js';
-import { showToast } from './lib/toast.js';
+import { showToast } from '/assets/js/toast.js';
 
 const EXPORT_MAX_SIZE = 2200; // 导出最长边限制，控制 PDF 体积
 

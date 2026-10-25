@@ -119,9 +119,12 @@
 
 .file-item__icon {
   flex-shrink: 0;
-  font-size: 16px;
-  width: 24px;
+  /* 扩展名文字标签（如 MP4/JPG），替代原 emoji 图标 */
+  font-size: 11px;
+  font-weight: 500;
+  width: 44px;
   text-align: center;
+  color: var(--text-secondary);
 }
 
 .file-item__name {
@@ -1065,40 +1068,4 @@
 
 .btn-clear-result:hover {
   color: var(--text);
-}
-
-/* ========== 警告提示 ========== */
-.warning-toast {
-  position: fixed;
-  bottom: var(--space-lg);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: var(--space-md) var(--space-lg);
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fcd34d;
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  max-width: 480px;
-  text-align: center;
-  box-shadow: var(--shadow-lg);
-  z-index: 200;
-  animation: slideUp 0.3s ease;
-}
-
-[data-theme="dark"] .warning-toast {
-  background: #422006;
-  color: #fde68a;
-  border-color: #78350f;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
 }

@@ -5,6 +5,7 @@
  */
 
 import { downloadBlob } from '/assets/js/download.js';
+import { showToast } from '/assets/js/toast.js';
 
 /* ========== 全局状态 ========== */
 const state = {
@@ -91,7 +92,7 @@ function revoke(obj) {
 async function handleFile(file) {
   if (!file) return;
   if (!ACCEPT_TYPES.includes(file.type)) {
-    alert('不支持的图片格式，请选择 JPEG / PNG / WebP / GIF / BMP');
+    showToast('不支持的图片格式，请选择 JPEG / PNG / WebP / GIF / BMP', 'error');
     return;
   }
 
@@ -106,7 +107,7 @@ async function handleFile(file) {
   try {
     state.img = await loadImage(file);
   } catch (e) {
-    alert('图片加载失败：' + e.message);
+    showToast('图片加载失败：' + e.message, 'error');
     return;
   }
   state.originalURL = URL.createObjectURL(file);
@@ -118,8 +119,8 @@ async function handleFile(file) {
   const CANVAS_MAX_PIXELS = 100000000;
   const iw = state.img.naturalWidth, ih = state.img.naturalHeight;
   if (iw > CANVAS_MAX_EDGE || ih > CANVAS_MAX_EDGE || iw * ih > CANVAS_MAX_PIXELS) {
-    alert('图片尺寸过大（' + iw + '×' + ih + '），超出浏览器处理上限。' +
-      '请先缩小到 ' + CANVAS_MAX_EDGE + 'px 以内再试。');
+    showToast('图片尺寸过大（' + iw + '×' + ih + '），超出浏览器处理上限。' +
+      '请先缩小到 ' + CANVAS_MAX_EDGE + 'px 以内再试。', 'error');
     clearFile();
     return;
   }
@@ -181,7 +182,7 @@ function updateQualityVisibility() {
 
 async function compress() {
   if (!state.img) {
-    alert('请先选择图片');
+    showToast('请先选择图片', 'warning');
     return;
   }
   const btn = document.getElementById('btn-compress');
@@ -242,7 +243,7 @@ async function compress() {
 
     document.getElementById('compress-result').hidden = false;
   } catch (e) {
-    alert('压缩失败：' + e.message);
+    showToast('压缩失败：' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = '开始压缩';
@@ -474,7 +475,7 @@ function cropSelection() {
 
   cropCanvas.toBlob((blob) => {
     if (!blob) {
-      alert('裁剪失败：编码错误');
+      showToast('裁剪失败：编码错误', 'error');
       return;
     }
     state.cropURL = revoke(state.cropURL);

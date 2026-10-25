@@ -6,6 +6,8 @@
  * - localStorage 持久化：时区列表 + 毫秒偏好 + 浏览器时区
  */
 
+import { showToast } from '/assets/js/toast.js';
+
 const STORAGE_KEY = 'worldclock-state-v1';
 const MS_KEY = 'worldclock-show-ms-v1';
 
@@ -283,7 +285,7 @@ function closeFullscreen() {
 function addZone(tzId) {
   if (!tzId) return;
   if (state.zones.includes(tzId)) {
-    alert('该时区已添加');
+    showToast('该时区已添加', 'info');
     return;
   }
   state.zones.push(tzId);
@@ -379,7 +381,7 @@ function initWorldclock() {
   btnAddTz.addEventListener('click', () => {
     const tzId = tzSelect.value;
     if (!tzId) {
-      alert('请先选择一个时区');
+      showToast('请先选择一个时区', 'warning');
       return;
     }
     addZone(tzId);

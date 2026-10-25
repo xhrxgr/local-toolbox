@@ -53,10 +53,10 @@ function initSqlCron() {
       $('sql-meta').textContent = `格式化完成（${result.length} 字符）`;
     } catch (e) {
       $('sql-meta').textContent = '错误：' + e.message;
-      $('sql-meta').style.color = '#ef4444';
+      $('sql-meta').classList.add('field-error');
       return;
     }
-    $('sql-meta').style.color = '';
+    $('sql-meta').classList.remove('field-error');
   }
 
   $('btn-sql-format').addEventListener('click', formatSql);
@@ -101,12 +101,12 @@ function initSqlCron() {
     const parts = input.split(/\s+/);
     if (parts.length < 5 || parts.length > 6) {
       $('cron-meta').textContent = '错误：CRON 应为 5 段（分 时 日 月 周）或 6 段（含秒）';
-      $('cron-meta').style.color = '#ef4444';
+      $('cron-meta').classList.add('field-error');
       return;
     }
 
     $('cron-meta').textContent = '加载 cronstrue...';
-    $('cron-meta').style.color = '';
+    $('cron-meta').classList.remove('field-error');
     try {
       const cronstrue = (await import('cronstrue')).default;
       // cronstrue 默认 5 段（分时日月周），如果 6 段则把第一段（秒）传给 options
@@ -151,7 +151,7 @@ function initSqlCron() {
       $('cron-next').hidden = false;
       $('cron-meta').textContent = '解释完成';
     } catch (e) {
-      $('cron-next-list').innerHTML = `<li style="color: #ef4444;">无法计算下次运行时间：${e.message}</li>`;
+      $('cron-next-list').innerHTML = `<li class="field-error">无法计算下次运行时间：${e.message}</li>`;
       $('cron-next').hidden = false;
       $('cron-meta').textContent = '警告：' + e.message;
     }

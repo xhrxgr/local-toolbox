@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import { copyText } from '/assets/js/clipboard.js';
 import { downloadBlob } from '/assets/js/download.js';
+import { showToast } from '/assets/js/toast.js';
 
 let accounts = [];
 let rafId = null;
@@ -212,7 +213,7 @@ function parseInput(text) {
     }
   }
   if (errors.length) {
-    flashToast(`${errors.length} 条链接解析失败：${errors[0].msg}`, 'error');
+    showToast(`${errors.length} 条链接解析失败：${errors[0].msg}`, 'error');
   }
   return allOtps;
 }
@@ -261,7 +262,7 @@ function renderAccounts() {
       <div class="acct-card__body">
         <div class="acct-card__code" id="code-${i}">${hasError ? '不支持' : '------'}</div>
         <div class="acct-card__countdown">
-          ${hasError ? '<span class="acct-card__warn">⚠</span>' : `
+          ${hasError ? '' : `
           <svg viewBox="0 0 40 40" class="acct-card__ring">
             <circle cx="20" cy="20" r="17" fill="none" stroke="var(--border)" stroke-width="2.5" />
             <circle cx="20" cy="20" r="17" fill="none" stroke="var(--accent)" stroke-width="2.5"
@@ -294,7 +295,7 @@ function renderAccounts() {
         btn.textContent = '已复制';
         setTimeout(() => { btn.textContent = orig; }, 1200);
       } else {
-        flashToast('复制失败', 'error');
+        showToast('复制失败', 'error');
       }
     });
   });
@@ -397,7 +398,7 @@ async function showQrModal(index) {
     canvas.style.height = size + 'px';
   } catch (e) {
     console.error('QR 生成失败:', e);
-    flashToast('二维码生成失败: ' + e.message, 'error');
+    showToast('二维码生成失败: ' + e.message, 'error');
   }
 
   overlay.hidden = false;
@@ -456,41 +457,22 @@ async function handleImageFiles(files) {
     const msg = texts.length
       ? `识别成功 ${texts.length} 个二维码${failed ? `（${failed} 个失败）` : ''}，请点击"解析"`
       : `${totalImages} 张图片均未识别出二维码`;
-    flashToast(msg, texts.length ? 'success' : 'error');
+    showToast(msg, texts.length ? 'success' : 'error');
   }
-}
-
-/* ========== 轻量 toast ========== */
-let toastTimer = null;
-function flashToast(msg, type = 'info') {
-  let el = document.getElementById('totp-toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'totp-toast';
-    el.className = 'totp-toast';
-    document.body.appendChild(el);
-  }
-  el.textContent = msg;
-  el.className = 'totp-toast totp-toast--' + type;
-  el.classList.add('totp-toast--show');
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    el.classList.remove('totp-toast--show');
-  }, 2800);
 }
 
 /* ========== 下载 txt ========== */
 function downloadTxt() {
   const valid = accounts.filter((a) => a._url);
   if (!valid.length) {
-    flashToast('没有可导出的有效账号', 'error');
+    showToast('没有可导出的有效账号', 'error');
     return;
   }
   const content = valid.map((a) => a._url).join('\n');
   const blob = new Blob(['\uFEFF' + content], { type: 'text/plain' });
   downloadBlob(blob, 'totp-accounts.txt');
   const skipped = accounts.length - valid.length;  if (skipped > 0) {
-    flashToast(`已导出 ${valid.length} 个账号（跳过 ${skipped} 个无效）`, 'info');
+    showToast(`已导出 ${valid.length} 个账号（跳过 ${skipped} 个无效）`, 'info');
   }
 }
 
@@ -525,21 +507,21 @@ function initTotpMigration() {
   parseBtn.addEventListener('click', async () => {
     const text = input.value.trim();
     if (!text) {
-      flashToast('请先粘贴迁移链接或拖入二维码截图', 'info');
+      showToast('请先粘贴迁移链接或拖入二维码截图', 'info');
       return;
     }
     accounts = parseInput(text);
     if (!accounts.length) {
       input.style.borderColor = '#ef4444';
       setTimeout(() => { input.style.borderColor = ''; }, 2000);
-      flashToast('未解析出任何账号，请检查链接格式', 'error');
+      showToast('未解析出任何账号，请检查链接格式', 'error');
       return;
     }
     const errCount = accounts.filter(a => !a._url).length;
     if (errCount > 0) {
-      flashToast(`解析出 ${accounts.length} 个账号（${errCount} 个算法不支持）`, 'info');
+      showToast(`解析出 ${accounts.length} 个账号（${errCount} 个算法不支持）`, 'info');
     } else {
-      flashToast(`解析出 ${accounts.length} 个账号`, 'success');
+      showToast(`解析出 ${accounts.length} 个账号`, 'success');
     }
     renderAccounts();
     // 解析后要立刻重算验证码：renderAccounts 会把验证码重置为 '------' 占位符，

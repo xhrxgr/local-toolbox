@@ -410,7 +410,7 @@ function compare() {
 
   const maxLines = Math.max(aLines.length, bLines.length);
   if (maxLines > 5000) {
-    showWarning('⚠ 文本较大（' + maxLines + ' 行），对比可能稍慢');
+    showWarning('文本较大（' + maxLines + ' 行），对比可能稍慢');
   } else {
     hideWarning();
   }
@@ -420,7 +420,7 @@ function compare() {
     lineDiff = diffLcs(aLines, bLines, (l) => normalizeLine(l, options));
   } catch (err) {
     // 超过安全规模时给出明确原因，而不是硬算到标签页崩溃
-    showWarning('⚠ ' + err.message);
+    showWarning(err.message);
     statsEl.hidden = true;
     showEmpty();
     return;

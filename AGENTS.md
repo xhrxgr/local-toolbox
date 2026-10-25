@@ -146,16 +146,15 @@
 
 **2026-10-25 真机审查结论（agent-browser 截图 + 脚本测量，60 张全页截图）**：
 - 页面级横向溢出 0、字号 <12px 0、内容裁切 0（`overflow-x: clip` 生效）
-- **触控目标是最大盲区**：global.css 的 40px 规则只覆盖 `.btn`/`.btn-sm` 与头部外壳，
-  工具自己的控件类完全没抬升——390px 实测 mode-tab 25~36px（unicode 最矮，
-  其 640px 查询还把 padding 改小了）、codec-select/scan-select/tz-select 28~36px、
-  field-input/json-path-input 35px、preset-btn 38px、view-btn 28px、flag-chip 29px、
-  qr-ecl__item 29px、segmented__btn 32px、btn-copy 32px、form-input--sm 27px；
-  复选框外层 label 22~29px（.chk / .diff-checkbox / .ms-toggle / .checkbox /
-  .hmac-toggle / .qr-ecl__item / .flag-chip），违反上面「label 必须 36px」的规矩；
-  slider 轨道 6px。**新增控件类时必须在 640px 查询里同步抬升**
-- color（6 tab）与 unit（7 tab）的 tab 行是 `overflow-x:auto` 可滑动的，
-  可达但无渐变遮罩/箭头提示，用户不易发现还有隐藏 tab
+- **触控目标曾是最大盲区，当日已补齐**：global.css 640px 查询现覆盖
+  mode-tab / codec-select / scan-select / tz-select / field-input /
+  json-path-input / preset-btn / view-btn / segmented__btn / form-input(-sm) /
+  diff-select / convert-select / convert-input / btn-copy → 40px；
+  复选框 label 用 `label:has(> input[type=checkbox|radio])` 统一 36px（免枚举类名）；
+  `input[type=range]` 命中区 40px（视觉轨道仍 6px）。复测全部达标
+- color（6 tab）与 unit（7 tab）的 tab 行 `overflow-x:auto` 可滑动，
+  已加边缘渐变提示（`assets/js/tab-hint.js` 维护 --scrollable/--at-start/--at-end
+  三个状态类，global.css 的 `.mode-tabs::before/::after` 消费）
 - 测量脚本与截图在 `.workbuddy/audit-2026-10-25/`（audit.js + m390/m768 目录）
 
 ## 界面符号规范
@@ -172,11 +171,13 @@
 ffmpeg 的队列状态（✓⊘✗●○ → 5 个内联 SVG，按状态着色）、
 timestamp 的复制失败（✗ → 叉号 SVG + `btn-copy--fail` 样式）。
 
-**2026-10-25 审查新发现的存量违规（待修，清单见「输入校验一致性」节）**：
+**2026-10-25 审查新发现的存量违规：当日已全部清理**——
 json 的 `✓ JSON 有效` / `✗ ` 前缀、diff 与 network 与 otp-migration 的 `⚠` 前缀、
-ffmpeg 文件列表的 27 个 emoji 图标（🎬📹🎵🖼📄，`getFileIcon`）——
-document 工具早已改用文字标签（PDF/DOC/XLS），ffmpeg 是漏网。
+ffmpeg 文件列表的 27 个 emoji 图标（`getFileIcon` → 扩展名文字标签）、
+markdown 内置示例文档的 `✓`、network 出口对比结论的 `✓`。
 同日已修：common.js 主题切换按钮的 ☀️/🌙 → 内联 SVG（太阳/月亮，lucide 风格）。
+**符号类审查必须用 Python Unicode 正则**：bash 里 grep emoji 会因编码丢失静默漏报
+（2026-10-25 曾因此差点误判 ffmpeg「已修」）。
 颜色徽章改用文字后，原先靠字符形状区分状态的地方要补颜色区分（ffmpeg 的 `.task-item__icon` 各状态配色）。
 
 **状态色的兜底样式放在 `assets/css/global.css`**（`.meta-btn--success` / `.meta-btn--danger`）——
@@ -240,16 +241,24 @@ document 工具早已改用文字标签（PDF/DOC/XLS），ffmpeg 是漏网。
   otp-migration `flashToast(msg,type)`（无 warning 级）、ffmpeg `showWarn(msg,ms)`
   （无类型分级）。**下一工具做 toast 时把这四套收敛成共享模块**
 
-### 存量差异清单（2026-10-25 快照，随工具维护时收敛）
-- alert：network / image / chmod / countdown / worldclock / stopwatch
-- 空输入说法不统一：「请输入目标地址」「请先选择图片」「输入为空」
-  「请先粘贴迁移链接或拖入二维码截图」等七种
-- 英文透传：json（V8 JSON 错误）、radix（中英混排）
-- 硬编码错误色：radix、sqlcron
-- 无错误样式：text 的 meta、diff 的 warning 文字
-- 静默无反馈：unit（非法输入）、text/radix（空输入）、hash（count 非法钳位）、
-  markdown（导出空文档）
-- 符号违规（同时违反界面符号规范）：json ✓/✗、diff/network/otp-migration ⚠
+### 存量差异清单（2026-10-25 当日全部处理完毕）
+- alert：**已清零**（原 14 处：network 3 / image 6 / chmod / countdown /
+  worldclock 2 / stopwatch）。network 三处改行内空状态（贴近输入区），
+  其余改 toast
+- toast 实现：**已收敛为共享模块** `assets/js/toast.js`（原 4 套：
+  document/ui/toast.js、scandoc/lib/toast.js、otp-migration 的 flashToast、
+  ffmpeg 的 showWarn —— 后两个本地模块已删除）
+- 空输入说法不统一：措辞仍各工具自定义，但**机制**已统一（行内 / toast），
+  「空输入」与「失败」已分开措辞
+- 硬编码错误色：**已清零**，统一走 global.css 的 `.field-error`
+  （radix / sqlcron 已改 class）
+- unit 非法输入静默：**已修**，输入框下方显示「无法识别为数值」
+  （空输入不算错误，只在有内容但解析不了时提示）
+- 英文透传（json 的 V8 错误、radix 中英混排）：仍在，
+  待做中英映射（document 的 friendlyError 是样板）
+- 无错误样式（text 的 meta、diff 的 warning 文字）：仍在
+- 静默无反馈：text/radix 空输入、hash count 钳位、markdown 导出空文档 —— 仍在
+- 符号违规：**已清零**（json ✓/✗、diff/network/otp ⚠、ffmpeg emoji 等）
 
 ## 首页搜索栏（核心功能）
 **位置**：标题下方，分类筛选上方，最大宽度 720px 居中。

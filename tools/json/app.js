@@ -134,7 +134,7 @@ function validateJSON() {
   }
   try {
     JSON.parse(input);
-    showStatus('✓ JSON 有效', 'ok');
+    showStatus('JSON 有效', 'ok');
   } catch (e) {
     handleParseError(input, e, false);
   }
@@ -166,7 +166,7 @@ function handleParseError(input, e, clearOutput = true) {
   }
   if (clearOutput) setResult('', null);
   updateMeta(input);
-  showStatus('✗ ' + detail, 'err');
+  showStatus(detail, 'err');
 }
 
 /* ========== 转义 / 反转义 ========== */

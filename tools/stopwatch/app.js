@@ -7,6 +7,7 @@
  * - localStorage 持久化（刷新恢复）
  */
 import { downloadBlob } from '/assets/js/download.js';
+import { showToast } from '/assets/js/toast.js';
 
 const STORAGE_KEY = 'stopwatch-state-v1';
 const MAX_LAPS = 999;
@@ -125,7 +126,7 @@ function toggleStartPause() {
 function lap() {
   if (!state.running) return;
   if (state.laps.length >= MAX_LAPS) {
-    alert('已达计次上限（' + MAX_LAPS + ' 次）');
+    showToast('已达计次上限（' + MAX_LAPS + ' 次）', 'warning');
     return;
   }
   const totalMs = getCurrentElapsed();

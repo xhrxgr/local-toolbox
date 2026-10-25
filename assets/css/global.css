@@ -252,6 +252,46 @@ button {
     min-height: 40px;
     min-width: 40px;
   }
+
+  /* 触控目标补齐（2026-10-25 真机审查结论）：40px 规则此前只覆盖 .btn 外壳，
+     工具自有控件类实测 25~38px 全面偏低。这些类名跨 20+ 工具复用，
+     集中在此一处覆盖，新增工具使用同类名即自动获得适配 */
+  .mode-tab,
+  .codec-select,
+  .scan-select,
+  .tz-select,
+  .field-input,
+  .json-path-input,
+  .preset-btn,
+  .view-btn,
+  .segmented__btn,
+  .form-input,
+  .form-input--sm,
+  .diff-select,
+  .convert-select,
+  .convert-input {
+    min-height: 40px;
+  }
+
+  /* 纯图标按钮：timestamp 的 .btn-copy 实测 32×32，宽度也要撑起来 */
+  .btn-copy {
+    min-height: 40px;
+    min-width: 40px;
+  }
+
+  /* 包裹复选框/单选框的 label：点击区撑到 36px。
+     :has 覆盖各工具的 .chk/.diff-checkbox/.ms-toggle/.checkbox/.hmac-toggle/
+     .qr-ecl__item/.flag-chip/.seg 而不必枚举类名；复选框本身保持 16px 视觉尺寸 */
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    min-height: 36px;
+  }
+
+  /* 滑块命中区加高：视觉轨道由各工具的 ::-webkit-slider-runnable-track
+     独立控制（仍为 6px 细轨），不受 input 高度影响 */
+  input[type="range"] {
+    min-height: 40px;
+  }
 }
 
 /* ========== 平板 ========== */
@@ -259,6 +299,52 @@ button {
   .container {
     padding: 0 var(--space-lg);
   }
+}
+
+/* 通用行内错误文字：替代各工具里硬编码的 style.color = '#ef4444'
+   （radix / sqlcron / unit 等），错误色全站统一走 class */
+.field-error {
+  color: #ef4444;
+}
+
+/* ========== 可横向滚动的 Tab 行（滑动提示）==========
+   color / unit 的 tab 较多，窄屏下 tab 行 overflow-x:auto 可滑动，
+   但无任何提示时用户不知道还有隐藏的 tab。滚动到边缘时显示对应侧渐变遮罩：
+   JS 只需在滚动容器上维护 --scrollable / --at-start / --at-end 三个状态类
+   （见 tools/color/app.js 与 tools/unit/app.js 的 initTabScrollHint）。 */
+.mode-tabs {
+  position: relative;
+}
+
+.mode-tabs::before,
+.mode-tabs::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 1;
+}
+
+.mode-tabs::before {
+  left: 0;
+  background: linear-gradient(to right, var(--card), transparent);
+}
+
+.mode-tabs::after {
+  right: 0;
+  background: linear-gradient(to left, var(--card), transparent);
+}
+
+.mode-tabs--scrollable:not(.mode-tabs--at-start)::before {
+  opacity: 1;
+}
+
+.mode-tabs--scrollable:not(.mode-tabs--at-end)::after {
+  opacity: 1;
 }
 
 /* ========== 本地缓存管理面板 ==========

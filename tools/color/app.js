@@ -5,6 +5,7 @@
  */
 
 import { copyText } from '/assets/js/clipboard.js';
+import { initTabScrollHint } from '/assets/js/tab-hint.js';
 
 /* ========== Tab 切换 ========== */
 function switchTab(mode) {
@@ -617,6 +618,9 @@ function initColor() {
   // 调色板
   setupPaletteDrop();
   document.getElementById('palette-count').addEventListener('change', processPalette);
+
+  // tab 行窄屏可滑动，加边缘渐变提示
+  initTabScrollHint();
 }
 
 export { initColor };

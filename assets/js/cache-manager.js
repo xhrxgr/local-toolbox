@@ -21,6 +21,16 @@ let summaryEl = null;
 let expanded = new Set(); // 已展开的缓存名
 let lastFocus = null;
 let armedRestore = null; // 确认态恢复函数（关面板时调用，防残留）
+/* 条目排序模式：url（默认，按缓存写入序）/ size-desc / size-asc。
+   无大小信息的条目（跨域 opaque 响应等）任何模式下一律排尾部 */
+let sortMode = 'url';
+
+const SORT_LABELS = {
+  url: '排序：默认',
+  'size-desc': '排序：大小降序',
+  'size-asc': '排序：大小升序',
+};
+const SORT_CYCLE = ['url', 'size-desc', 'size-asc'];
 
 /* ========== 入口与面板骨架 ========== */
 
@@ -71,6 +81,7 @@ function buildPanel() {
       <div class="cache-panel__summary" id="cache-summary">读取中…</div>
       <div class="cache-panel__actions">
         <button class="btn btn-sm btn-secondary" type="button" id="cache-refresh">刷新</button>
+        <button class="btn btn-sm btn-secondary" type="button" id="cache-sort" title="切换条目排序方式">排序：默认</button>
         <button class="btn btn-sm btn-secondary" type="button" id="cache-persist">保持持久化</button>
         <button class="btn btn-sm btn--danger" type="button" id="cache-clear-all">清除全部缓存</button>
       </div>
@@ -92,6 +103,11 @@ function buildPanel() {
     if (e.target.closest('[data-cache-close]')) closePanel();
   });
   wrap.querySelector('#cache-refresh').addEventListener('click', () => loadData());
+  wrap.querySelector('#cache-sort').addEventListener('click', () => {
+    sortMode = SORT_CYCLE[(SORT_CYCLE.indexOf(sortMode) + 1) % SORT_CYCLE.length];
+    wrap.querySelector('#cache-sort').textContent = SORT_LABELS[sortMode];
+    loadData();
+  });
   wrap.querySelector('#cache-persist').addEventListener('click', requestPersistence);
   wrap.querySelector('#cache-clear-all').addEventListener('click', clearAllCaches);
   document.addEventListener('keydown', (e) => {
@@ -264,7 +280,7 @@ function renderGroup(group) {
   box.appendChild(head);
 
   const limit = expanded.has(group.name) ? group.items.length : RENDER_LIMIT;
-  const shown = group.items.slice(0, limit);
+  const shown = sortItems(group.items).slice(0, limit);
   const list = document.createElement('div');
   list.className = 'cache-group__list';
   for (const item of shown) {
@@ -284,6 +300,19 @@ function renderGroup(group) {
     box.appendChild(more);
   }
   return box;
+}
+
+/* 按当前排序模式重排条目：默认保持缓存写入序（即 URL 模式原序），
+   大小模式把无大小信息的条目固定在尾部 */
+function sortItems(items) {
+  if (sortMode === 'url') return items;
+  const sorted = [...items].sort((a, b) => {
+    if (a.size === null && b.size === null) return 0;
+    if (a.size === null) return 1;
+    if (b.size === null) return -1;
+    return sortMode === 'size-desc' ? b.size - a.size : a.size - b.size;
+  });
+  return sorted;
 }
 
 function renderItem(group, item) {

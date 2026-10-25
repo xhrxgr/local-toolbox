@@ -5,6 +5,7 @@
  */
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { showToast } from '/assets/js/toast.js';
 
 /** HTML 转义：文件名、错误信息会进 innerHTML，必须转义 */
 function escapeHtml(s) {
@@ -274,17 +275,6 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-/** 轻量提示：复用页面的 warning-toast 元素 */
-let warnTimer = null;
-function showWarn(msg, ms = 5000) {
-  const el = document.getElementById('warning-toast');
-  if (!el) return;
-  el.textContent = msg;
-  el.hidden = false;
-  clearTimeout(warnTimer);
-  warnTimer = setTimeout(() => { el.hidden = true; }, ms);
-}
-
 /* ========== 多文件管理 ========== */
 
 function addFiles(newFiles) {
@@ -292,7 +282,7 @@ function addFiles(newFiles) {
     if (f.size > 200 * 1024 * 1024) {
       // 必须真正拦下：转码时整文件会进 JS 堆、再复制进 wasm 的 MEMFS、输出再一份，
       // 峰值约为文件体积的 3 倍，只提示不拦等于放任标签页崩溃
-      showWarn(`「${f.name}」${formatBytes(f.size)} 超过 200MB 上限，已跳过。浏览器内转码建议先裁剪或分段`, 6000);
+      showToast(`「${f.name}」${formatBytes(f.size)} 超过 200MB 上限，已跳过。浏览器内转码建议先裁剪或分段`, 'warning', 6000);
       continue;
     }
     const dup = files.find(e => e.name === f.name && e.size === f.size && e.lastModified === f.lastModified);
@@ -363,10 +353,13 @@ function renderFileList() {
 
   list.innerHTML = files.map((f, i) => {
     const sel = i === selectedIndex;
-    const ext = f.name.split('.').pop()?.toUpperCase() || '?';
+    // 扩展名作为文字标签（界面不用 emoji，见 AGENTS.md 界面符号规范）；
+    // 无扩展名的文件显示 FILE，避免把整个文件名当扩展名
+    const dot = f.name.lastIndexOf('.');
+    const ext = dot > 0 ? f.name.slice(dot + 1).toUpperCase() : 'FILE';
     return `
       <div class="file-item ${sel ? 'file-item--selected' : ''}" data-index="${i}">
-        <span class="file-item__icon">${getFileIcon(ext)}</span>
+        <span class="file-item__icon">${ext}</span>
         <span class="file-item__name" title="${f.name}">${f.name}</span>
         <span class="file-item__size">${formatFileSize(f.size)}</span>
         <button class="file-item__remove" data-action="remove" data-index="${i}" title="移除">
@@ -387,11 +380,6 @@ function renderFileList() {
       removeFile(parseInt(btn.dataset.index));
     });
   });
-}
-
-function getFileIcon(ext) {
-  const m = { MP4:'🎬',MOV:'🎬',MKV:'🎬',AVI:'🎬',WEBM:'🎬',FLV:'🎬',WMV:'🎬',MTS:'📹',M2TS:'📹',TS:'📹',AMV:'🎬','3GP':'🎬',OGV:'🎬',MP3:'🎵',AAC:'🎵',WAV:'🎵',FLAC:'🎵',OGG:'🎵',OPUS:'🎵',M4A:'🎵',WMA:'🎵',AIFF:'🎵',AC3:'🎵',JPG:'🖼',JPEG:'🖼',PNG:'🖼',WEBP:'🖼',GIF:'🖼',BMP:'🖼',AVIF:'🖼',TIFF:'🖼',SVG:'🖼' };
-  return m[ext] || '📄';
 }
 
 function updateUploadUI() {

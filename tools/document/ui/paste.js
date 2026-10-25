@@ -2,7 +2,7 @@
  * 粘贴支持：文件类操作粘贴图片/文件，文本类操作粘贴纯文本
  * deps: { getOp, addFiles } 由 app 注入，避免循环依赖
  */
-import { showToast } from './toast.js';
+import { showToast } from '/assets/js/toast.js';
 
 export function handlePaste(e, deps) {
   const { getOp, addFiles } = deps;

@@ -333,56 +333,10 @@
   font-size: 1.25rem;
 }
 
-.acct-card__warn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  font-size: 1.5rem;
-  color: #ef4444;
-}
-
 .acct-card__errmsg {
   margin: 0;
   font-size: var(--text-xs);
   color: #ef4444;
   line-height: 1.4;
   word-break: break-all;
-}
-
-/* Toast */
-.totp-toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  padding: var(--space-sm) var(--space-lg);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  color: var(--text);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
-  max-width: 90vw;
-  word-break: break-all;
-}
-
-.totp-toast--show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.totp-toast--success {
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #22c55e;
-}
-
-.totp-toast--error {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #ef4444;
 }

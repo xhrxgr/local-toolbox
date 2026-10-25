@@ -249,10 +249,10 @@ function initRadix() {
         fillByteOutputs(bytes);
       }
       metaEl.textContent = '转换成功';
-      metaEl.style.color = '';
+      metaEl.classList.remove('field-error');
     } catch (e) {
       metaEl.textContent = '错误：' + e.message;
-      metaEl.style.color = '#ef4444';
+      metaEl.classList.add('field-error');
     }
   }
 
@@ -311,7 +311,7 @@ function initRadix() {
           meta.textContent = '输入过长（' + inputEl.value.length.toLocaleString() +
             ' 字符），超出 ' + RADIX_MAX_INPUT.toLocaleString() +
             ' 上限。转换耗时随长度指数上升，请分段处理';
-          meta.style.color = '#ef4444';
+          meta.classList.add('field-error');
         }
         return;
       }
