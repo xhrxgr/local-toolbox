@@ -471,9 +471,115 @@ const CATEGORY_LABELS = {
   security: '安全',
 };
 
+/* ============================================================
+ * 返回首页时的状态衔接
+ *
+ * 工具页是整页跳转，而 Service Worker 会让 bfcache 失效，
+ * 浏览器不会自动记住首页停在哪个位置，返回时总是落在首屏。
+ * 这里自己在离开首页时记下滚动位置与分类筛选，返回时还原。
+ *
+ * 只在「确实是回到首页」时才还原：
+ *   - 点了工具页的返回链接（common.js 会打 toolbox-returning 标记）
+ *   - 用浏览器后退/前进回到首页（导航类型为 back_forward）
+ * 直接输入地址打开首页时不还原，避免被拉回上一次的位置。
+ * ============================================================ */
+const HOME_STATE_KEY = 'toolbox-home-state';
+const HOME_RETURN_FLAG = 'toolbox-returning';
+
+/**
+ * 保存首页状态
+ * @param {boolean} skipIfZero 为 true 时，滚动位置为 0 就不写
+ *   （导航/切后台时浏览器可能已把 scrollY 报成 0，别用它覆盖正确位置；
+ *   点击时位置是准确的，0 也是合法值，不能跳过）
+ */
+function saveHomeState(skipIfZero) {
+  const y = Math.round(window.scrollY);
+  if (skipIfZero && y === 0) return;
+  try {
+    const active = document.querySelector('.filter__item--active');
+    sessionStorage.setItem(
+      HOME_STATE_KEY,
+      JSON.stringify({
+        scrollY: y,
+        filter: active ? active.dataset.filter : 'all',
+      })
+    );
+  } catch {
+    // 隐私模式下 sessionStorage 不可用，忽略
+  }
+}
+
+/**
+ * 在点击工具卡片的瞬间保存状态。
+ * 不能只靠 pagehide：那时浏览器已进入卸载流程，scrollY 会被报成 0。
+ */
+function initStateSave() {
+  document.addEventListener(
+    'click',
+    (e) => {
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+      const href = link.getAttribute('href') || '';
+      if (!href.includes('/tools/')) return;
+      saveHomeState(false);
+    },
+    true
+  );
+  // 兜底：刷新、关闭标签页、浏览器后退等
+  window.addEventListener('pagehide', () => saveHomeState(true));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveHomeState(true);
+  });
+}
+
+function isReturningToHome() {
+  // 浏览器后退/前进
+  const nav = performance.getEntriesByType('navigation')[0];
+  if (nav && nav.type === 'back_forward') return true;
+  // 点工具页的返回链接
+  try {
+    return sessionStorage.getItem(HOME_RETURN_FLAG) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function restoreHomeState() {
+  let state = null;
+  try {
+    const raw = sessionStorage.getItem(HOME_STATE_KEY);
+    if (!raw) return;
+    state = JSON.parse(raw);
+    sessionStorage.removeItem(HOME_RETURN_FLAG);
+  } catch {
+    return;
+  }
+  if (!state) return;
+
+  // 还原分类筛选
+  if (state.filter && state.filter !== 'all') {
+    const btn = document.querySelector(`.filter__item[data-filter="${state.filter}"]`);
+    if (btn) {
+      document.querySelectorAll('.filter__item').forEach((f) => f.classList.remove('filter__item--active'));
+      btn.classList.add('filter__item--active');
+      renderTools(state.filter);
+    }
+  }
+
+  // 还原滚动位置：要等卡片渲染完，否则页面高度不够会滚不到位
+  if (state.scrollY > 0) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => window.scrollTo(0, state.scrollY));
+    });
+  }
+}
+
 // 页面加载完成后渲染
 document.addEventListener('DOMContentLoaded', () => {
   renderTools();
   initFilter();
   initSearch();
+  initStateSave();
+  // 只有从工具页返回（或浏览器后退）才还原，直接打开首页保持原样
+  if (isReturningToHome()) restoreHomeState();
 });

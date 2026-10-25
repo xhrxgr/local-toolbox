@@ -58,6 +58,17 @@ function injectToolHeader(toolName) {
     </div>
   `;
   document.body.prepend(header);
+
+  // 返回首页时打标记：首页据此还原滚动位置与分类筛选。
+  // 工具页是整页跳转，而 Service Worker 会让 bfcache 失效，
+  // 浏览器不会自动记住首页停在哪，返回总是落在首屏。
+  header.querySelector('.back').addEventListener('click', () => {
+    try {
+      sessionStorage.setItem('toolbox-returning', '1');
+    } catch {
+      // 隐私模式下不可用，忽略
+    }
+  });
 }
 
 // 导出给其他模块使用
