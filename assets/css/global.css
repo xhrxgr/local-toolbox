@@ -350,6 +350,10 @@ button {
 /* ========== 本地缓存管理面板 ==========
    入口按钮 .cache-manage-btn 的样式由 assets/js/cache-manager.js 按需注入，
    这里只放面板骨架样式（站点级功能，毛玻璃风格与全局一致） */
+/* 缓存管理面板打开时锁住背景滚动：面板是模态，背景不该跟着滚。
+   锁定用 JS 给 body 加 position:fixed（不能用 html{overflow:hidden}，
+   那会让根元素失去滚动容器、滚动位置归零，背景反而跳回顶部）。
+   面板自身与列表都设 overscroll-behavior:contain，阻断滚动链。 */
 .cache-panel {
   position: fixed;
   inset: 0;
@@ -358,6 +362,8 @@ button {
   align-items: center;
   justify-content: center;
   padding: var(--space-md);
+  /* 面板自身不参与滚动链：列表滚到底后继续滚不会传给背景 */
+  overscroll-behavior: contain;
 }
 
 .cache-panel[hidden] {
@@ -524,6 +530,8 @@ button {
   overflow-y: auto;
   padding: 0 var(--space-lg) var(--space-md);
   -webkit-overflow-scrolling: touch;
+  /* 关键：阻断滚动链。缺这一条，列表滚到底后继续滚动会穿透到背景页面 */
+  overscroll-behavior: contain;
 }
 
 .cache-panel__note {

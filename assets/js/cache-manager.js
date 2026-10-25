@@ -137,6 +137,7 @@ function openPanel() {
   buildPanel();
   lastFocus = document.activeElement;
   panelEl.hidden = false;
+  lockBackgroundScroll();
   loadData();
   panelEl.querySelector('.cache-panel__box').focus();
 }
@@ -146,7 +147,34 @@ function closePanel() {
   // 关面板时恢复残留的确认态，避免重开看到变红的「确认清除全部？」
   if (armedRestore) armedRestore();
   panelEl.hidden = true;
+  unlockBackgroundScroll();
   if (lastFocus && lastFocus.isConnected) lastFocus.focus();
+}
+
+/* 背景锁定：面板是模态，背景不该跟着滚。
+   用 position:fixed 锁 body 而不是 html{overflow:hidden}——
+   后者会让根元素失去滚动容器、滚动位置被重置为 0（背景突然跳回顶部，
+   比穿透本身更糟）。锁定后把滚动位置记下来，关闭时还原。 */
+let lockedScrollY = 0;
+
+function lockBackgroundScroll() {
+  lockedScrollY = window.scrollY;
+  const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${lockedScrollY}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  // 锁定后滚动条消失，body 会变宽，用 padding 补回这段宽度
+  if (scrollbar > 0) document.body.style.paddingRight = scrollbar + 'px';
+}
+
+function unlockBackgroundScroll() {
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.paddingRight = '';
+  window.scrollTo(0, lockedScrollY);
 }
 
 /* ========== 数据读取与渲染 ========== */
