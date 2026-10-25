@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Windows 本地实用脚本下载 —— 移动热点连接数上限、任务栏时钟秒数一键切换，下载后本机运行" />
+  <title>实用脚本 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/scripts-D2Rp7cxY.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-DFcjpWqt.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CtW-JZGz.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scripts-B-TIOPn4.css">
+</head>
+<body>
+  <main class="tool-container">
+    <section class="mode-panel glass mode-panel--active">
+      <div class="panel-desc">
+        Windows 本地小工具：下载后在本机运行，不联网、不上传任何数据。
+        每个脚本只改动对应的注册表项，并附带恢复方式。
+      </div>
+      <div class="script-list" id="script-list"></div>
+    </section>
+
+    <section class="mode-panel glass">
+      <div class="panel-title">使用说明</div>
+      <ul class="script-notes">
+        <li>下载后若双击没有反应或提示「已阻止无法运行此脚本」：右键文件 → 属性 → 常规 → 勾选「解除锁定」→ 确定，再重新运行。</li>
+        <li>需要管理员权限的脚本，右键 →「以管理员身份运行」；脚本开头也会检查权限并给出提示。</li>
+        <li>修改移动热点的连接数上限后，重开移动热点或重启电脑生效。</li>
+        <li>任务栏时钟脚本会自动重启资源管理器使设置生效，桌面图标会短暂消失属正常现象。</li>
+      </ul>
+    </section>
+  </main>
+
+</body>
+</html>
