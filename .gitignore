@@ -9,8 +9,9 @@ mse-test.png
 .DS_Store
 Thumbs.db
 
-# AI 助手内部文档（不公开）
-# AGENTS.md 已纳入 git 跟踪（用户 2026-07-21 起改为公开保留跨对话上下文）
+# 内部文档（不公开）
+# AGENTS.md 为本机内部约定，仅本地保留，不提交到公开仓库
+AGENTS.md
 .workbuddy/
 conversation_summary.md
 .screenshots/
