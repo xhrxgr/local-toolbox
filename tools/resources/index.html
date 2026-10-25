@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="离线资源中心 —— 一键预下载全部工具依赖的大文件，之后断网也能正常使用" />
-  <title>资源中心 - 网页工具箱</title>
+  <meta name="description" content="资源与缓存 —— 一键预下载全部工具依赖的大文件，查看与管理本站离线缓存" />
+  <title>资源与缓存 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/resources-CC7ZvSdv.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-DDAhigZ3.js">
+  <script type="module" crossorigin src="/local-toolbox/assets/resources-CUHqj8GI.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Bz2cUsnr.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/tool-registry-m27mxQwW.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/toast-C63kdhUO.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/resource-registry-DgwSUswY.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BmwxlG-D.css">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/resource-registry-MGQVM-gY.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CGMhxrUr.css">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/resources-BOahtgSB.css">
 </head>
 <body>
@@ -37,6 +39,15 @@
       </div>
 
       <div id="res-groups"></div>
+    </section>
+
+    <section class="mode-panel glass">
+      <div class="panel-title">缓存管理</div>
+      <div class="panel-desc">
+        下面列出已缓存在本机的页面与资源。缓存让二次访问不必重新下载，
+        也可以随时删除以释放空间。
+      </div>
+      <div id="cache-section"></div>
     </section>
 
     <section class="mode-panel glass">
