@@ -1,26 +1,12 @@
 /**
- * 大资源预下载管理
+ * 大资源面板（工具页用）
  *
- * ffmpeg 转换内核（~31MB）、OCR 语言包（~20MB）、扫描文档去手写模型（28MB）
- * 都是「用到才下载」的大文件，第一次用要干等很久，弱网下更是几分钟。
- * 本模块给这些资源提供统一的「提前下载 / 删除」入口：
- *   下载：把资源取回本地（写进 Cache Storage），之后使用同一 URL 直接命中
- *   删除：移除本地副本，释放空间
- *
- * 资源条目由各工具提供（URL 与缓存规则分散在各自代码里，
- * 这里只负责渲染状态、串联下载与删除）：
- *   {
- *     id: string,
- *     name: string,        // 展示名
- *     desc: string,        // 一句话说明
- *     sizeLabel: string,   // 体积标签，如 '~31 MB'
- *     isCached: async () => boolean,        // 是否已在本地
- *     download: async (onProgress) => void,  // 下载并落地到缓存
- *     remove: async () => void,              // 删除本地副本
- *   }
+ * 资源条目统一来自共享清单 assets/js/resource-registry.js，
+ * 与「资源中心」页面共用同一份定义，避免两处维护不一致。
+ * 本模块只负责渲染状态、串联下载与删除。
  */
-
 import { showToast } from './toast.js';
+import { resourcesOfTool } from './resource-registry.js';
 
 const PANEL_CLASS = 'resource-panel';
 let styleInjected = false;
@@ -98,15 +84,18 @@ function injectStyles() {
 }
 
 /**
- * 挂载资源面板
+ * 挂载资源面板（工具页用）
  * @param {HTMLElement|string} container 容器元素或选择器
- * @param {Array} resources 资源条目数组
+ * @param {string} toolId 工具 id（ffmpeg / ocr / scandoc），资源取自共享清单
  * @param {{collapsed?: boolean}} options collapsed=true 时默认折叠
  */
-export function mountResourcePanel(container, resources, options = {}) {
+export function mountResourcePanel(container, toolId, options = {}) {
   const el = typeof container === 'string' ? document.querySelector(container) : container;
   if (!el) return;
   injectStyles();
+
+  const resources = resourcesOfTool(toolId);
+  if (resources.length === 0) return;
 
   // 用原生 details/summary 折叠：默认收起不占空间，展开才看到条目
   const details = document.createElement('details');
@@ -117,7 +106,7 @@ export function mountResourcePanel(container, resources, options = {}) {
       <span>离线资源</span>
       <span class="resource-panel__badge" data-role="badge">检查中…</span>
     </summary>
-    <div class="resource-panel__hint">大文件提前下载到本地，用的时候就不用等；删掉可释放空间。</div>
+    <div class="resource-panel__hint">大文件提前下载到本地，用的时候就不用等；删掉可释放空间。全部资源也可在「资源中心」一次性下载。</div>
   `;
   el.innerHTML = '';
   el.appendChild(details);
@@ -139,7 +128,7 @@ function renderItem(res, onChanged) {
   const main = document.createElement('div');
   main.className = 'resource-item__main';
   main.innerHTML = `
-    <div class="resource-item__name">${res.name}${res.sizeLabel ? ' · ' + res.sizeLabel : ''}</div>
+    <div class="resource-item__name">${res.name} · ${formatBytes(res.size)}</div>
     <div class="resource-item__desc">${res.desc}</div>
   `;
 
@@ -254,29 +243,6 @@ async function refreshAll(details, resources) {
         ? `${ready}/${resources.length} 已就绪`
         : '未下载';
     badge.classList.toggle('resource-panel__badge--ready', ready === resources.length && resources.length > 0);
-  }
-}
-
-/** 某个 URL 是否已缓存在任意缓存里（不依赖具体缓存名） */
-export async function urlCachedAnywhere(url) {
-  if (!('caches' in window)) return false;
-  for (const name of await caches.keys()) {
-    const cache = await caches.open(name);
-    try {
-      if (await cache.match(url)) return true;
-    } catch { /* 忽略单个缓存的错误 */ }
-  }
-  return false;
-}
-
-/** 从所有缓存里移除某个 URL */
-export async function removeUrlEverywhere(url) {
-  if (!('caches' in window)) return;
-  for (const name of await caches.keys()) {
-    const cache = await caches.open(name);
-    try {
-      await cache.delete(url);
-    } catch { /* 忽略 */ }
   }
 }
 

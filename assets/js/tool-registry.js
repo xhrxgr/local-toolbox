@@ -346,4 +346,15 @@ export const TOOLS = [
     path: '/tools/scripts/',
     available: true,
   },
+  {
+    id: 'resources',
+    name: '资源中心',
+    icon: 'download',
+    desc: '一键预下载全部工具依赖的大文件，之后断网也能正常使用',
+    category: 'dev',
+    tags: ['离线可用', '预下载'],
+    aliases: ['资源', '资源中心', '离线', '预下载', '下载资源', '缓存下载', '大文件', '内核', '模型', 'offline', 'resources'],
+    path: '/tools/resources/',
+    available: true,
+  },
 ];

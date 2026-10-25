@@ -59,6 +59,7 @@ export default defineConfig(({ mode }) => ({
         svg: resolve(__dirname, 'tools/svg/index.html'),
         ocr: resolve(__dirname, 'tools/ocr/index.html'),
         scripts: resolve(__dirname, 'tools/scripts/index.html'),
+        resources: resolve(__dirname, 'tools/resources/index.html'),
       },
     },
   },

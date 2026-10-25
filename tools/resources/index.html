@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="离线资源中心 —— 一键预下载全部工具依赖的大文件，之后断网也能正常使用" />
+  <title>资源中心 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/resources/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <section class="mode-panel glass mode-panel--active">
+      <div class="panel-desc">
+        音频转码、OCR 识别、擦除手写这几项功能依赖几十 MB 的内核与模型文件，
+        默认是「用到才下载」。这里可以一次性把它们全部预取到本地，
+        之后即使断网也能正常用。
+      </div>
+
+      <div class="res-bar">
+        <label class="res-bar__check">
+          <input type="checkbox" id="res-select-all" />
+          <span>全选</span>
+        </label>
+        <span class="res-bar__info" id="res-selection">未选择</span>
+        <button class="btn btn-primary" id="res-download-all" type="button" disabled>下载所选</button>
+      </div>
+
+      <div class="res-progress" id="res-progress" hidden>
+        <div class="res-progress__track"><div class="res-progress__fill" id="res-progress-fill"></div></div>
+        <div class="res-progress__text" id="res-progress-text">准备中…</div>
+      </div>
+
+      <div id="res-groups"></div>
+    </section>
+
+    <section class="mode-panel glass">
+      <div class="panel-title">说明</div>
+      <ul class="res-notes">
+        <li>下载的内容存在浏览器本地（Cache Storage），不会上传任何数据，也不占用服务器空间。</li>
+        <li>资源来自公共 CDN（jsDelivr / unpkg），首次下载需要联网；之后离线可用。</li>
+        <li>「删除」会移除本地副本以释放空间，下次用到时会重新下载。</li>
+        <li id="res-usage">正在读取本地占用…</li>
+      </ul>
+    </section>
+  </main>
+
+  <script type="module" src="/tools/resources/main.js"></script>
+</body>
+</html>

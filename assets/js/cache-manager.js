@@ -71,6 +71,9 @@ function buildPanel() {
       <div class="cache-panel__note">
         缓存用于加速二次访问：页面走网络优先（内容永远最新），静态资源命中缓存后不再联网。
         删除后下次访问相应内容会自动重新下载，不会丢失任何个人数据。
+        <div class="cache-panel__link-row">
+          <a class="cache-panel__link" id="cache-panel-resources-link" href="#">需要提前下载大文件？去资源中心 →</a>
+        </div>
       </div>
     </div>
   `;
@@ -83,6 +86,10 @@ function buildPanel() {
     if (e.target.closest('[data-cache-close]')) closePanel();
   });
   wrap.querySelector('#cache-refresh').addEventListener('click', () => loadData());
+  // 资源中心互链：缓存面板管「已缓存内容」，资源中心管「主动预下载」
+  const base = (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/') || '/';
+  const resLink = wrap.querySelector('#cache-panel-resources-link');
+  if (resLink) resLink.setAttribute('href', `${base}tools/resources/`);
   wrap.querySelector('#cache-sort').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sort]');
     if (!btn) return;
