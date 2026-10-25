@@ -1,7 +1,7 @@
 /**
  * 工具注册表（纯数据，无副作用）
  *
- * 首页渲染（assets/js/tools.js）与缓存管理面板（assets/js/cache-manager.js）
+ * 首页渲染（assets/js/tools.js）与缓存管理区块（assets/js/cache-manager.js）
  * 共用同一份工具清单，避免两处各维护一份工具名导致显示对不上。
  */
 export const TOOLS = [
@@ -340,9 +340,7 @@ export const TOOLS = [
     name: '实用脚本',
     icon: 'download',
     desc: 'Windows 本地小工具，下载后本机运行：移动热点连接数上限、任务栏时钟秒数',
-    shortDesc: 'Windows 小工具，一键下载到本机',
     category: 'dev',
-    siteFeature: true,
     tags: ['Windows', '本地运行', '可下载'],
     aliases: ['脚本', '下载', 'bat', '批处理', '实用工具', '热点', '移动热点', '连接数', '任务栏', '秒数', '时钟', 'script', 'download', 'windows脚本'],
     path: '/tools/scripts/',
@@ -350,14 +348,13 @@ export const TOOLS = [
   },
   {
     id: 'resources',
-    name: '资源中心',
+    name: '资源与缓存',
     icon: 'download',
-    desc: '一键预下载全部工具依赖的大文件，之后断网也能正常使用',
-    shortDesc: '预下载全部大文件，断网也能用',
+    desc: '预下载全部工具依赖的大文件，并查看与清理本站缓存',
     category: 'dev',
-    siteFeature: true,
+    hidden: true,
     tags: ['离线可用', '预下载'],
-    aliases: ['资源', '资源中心', '离线', '预下载', '下载资源', '缓存下载', '大文件', '内核', '模型', 'offline', 'resources'],
+    aliases: ['资源', '资源中心', '资源与缓存', '离线', '预下载', '下载资源', '缓存', '缓存管理', '清理缓存', '大文件', '内核', '模型', 'offline', 'resources'],
     path: '/tools/resources/',
     available: true,
   },

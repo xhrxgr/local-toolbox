@@ -1,21 +1,18 @@
 /**
  * 本地缓存管理（Service Worker 缓存的可视化与手动清理）
  *
- * 入口：页面上的 .cache-manage-btn 按钮（首页静态写入，工具页由 common.js
- * 的 injectToolHeader 注入）。点击弹出毛玻璃管理面板：
- * 查看存储占用与缓存条目、按条目/按缓存删除、全部清除、申请持久化存储。
+ * 入口：资源与缓存页面（/tools/resources/）里的「缓存管理」区块，
+ * 由 mountCacheSection(container) 挂载。
  *
  * 显示取向：用户不关心 hash 文件名与长路径，所以条目一律翻译成可读名称
  * （「多媒体转换 · 页面」「OCR 语言包」），并用占比条直观看出谁最占空间。
  *
- * 由 common.js 仅在 production 动态加载（dev 模式不注册 SW，无缓存可管）。
  * 缓存策略本身见 public/sw.js。
  */
 
 import { TOOLS } from '/assets/js/tool-registry.js';
 
 const ICON_DB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg>';
-const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
 
 /* 单个缓存默认最多渲染多少条，超出折叠，避免一次渲染上百条卡面板 */
 const RENDER_LIMIT = 60;
@@ -30,33 +27,24 @@ const SORT_OPTIONS = [
   { mode: 'name', label: '名称' },
 ];
 
-let panelEl = null;
 let listEl = null;
 let summaryEl = null;
 let expanded = new Set(); // 已展开的缓存名
-let lastFocus = null;
-let armedRestore = null; // 确认态恢复函数（关面板时调用，防残留）
 
 /* ========== 入口与面板骨架 ========== */
 
-function buildPanel() {
-  if (panelEl) return panelEl;
-  const wrap = document.createElement('div');
-  wrap.className = 'cache-panel';
-  wrap.id = 'cache-panel';
-  wrap.hidden = true;
-  wrap.innerHTML = `
-    <div class="cache-panel__mask" data-cache-close></div>
-    <div class="cache-panel__box" role="dialog" aria-modal="true" aria-label="本地缓存管理" tabindex="-1">
-      <div class="cache-panel__head">
-        <div class="cache-panel__title">
-          <h2>本地缓存管理</h2>
-          <p>本站离线资源与页面缓存</p>
-        </div>
-        <button class="cache-panel__close" type="button" data-cache-close aria-label="关闭">${ICON_CLOSE}</button>
-      </div>
-      <div class="cache-panel__summary" id="cache-summary">读取中…</div>
-      <div class="cache-panel__actions">
+/**
+ * 挂载缓存管理区块（嵌入页面，不弹窗）
+ * @param {HTMLElement|string} container 容器元素或选择器
+ */
+export function mountCacheSection(container) {
+  const el = typeof container === 'string' ? document.querySelector(container) : container;
+  if (!el) return;
+
+  el.innerHTML = `
+    <div class="cache-section">
+      <div class="cache-section__summary" id="cache-summary">读取中…</div>
+      <div class="cache-section__actions">
         <button class="btn btn-sm btn-secondary" type="button" id="cache-refresh">刷新</button>
         <button class="btn btn-sm btn-secondary" type="button" id="cache-persist">保持持久化</button>
         <button class="btn btn-sm btn--danger" type="button" id="cache-clear-all">清除全部缓存</button>
@@ -67,93 +55,32 @@ function buildPanel() {
           ${SORT_OPTIONS.map((o) => `<button class="cache-sort__btn${o.mode === sortMode ? ' cache-sort__btn--active' : ''}" type="button" data-sort="${o.mode}">${o.label}</button>`).join('')}
         </div>
       </div>
-      <div class="cache-panel__list" id="cache-list"></div>
-      <div class="cache-panel__note">
+      <div class="cache-section__list" id="cache-list"></div>
+      <div class="cache-section__note">
         缓存用于加速二次访问：页面走网络优先（内容永远最新），静态资源命中缓存后不再联网。
         删除后下次访问相应内容会自动重新下载，不会丢失任何个人数据。
-        <div class="cache-panel__link-row">
-          <a class="cache-panel__link" id="cache-panel-resources-link" href="#">需要提前下载大文件？去资源中心 →</a>
-        </div>
       </div>
     </div>
   `;
-  document.body.appendChild(wrap);
-  panelEl = wrap;
-  listEl = wrap.querySelector('#cache-list');
-  summaryEl = wrap.querySelector('#cache-summary');
 
-  wrap.addEventListener('click', (e) => {
-    if (e.target.closest('[data-cache-close]')) closePanel();
-  });
-  wrap.querySelector('#cache-refresh').addEventListener('click', () => loadData());
-  // 资源中心互链：缓存面板管「已缓存内容」，资源中心管「主动预下载」
-  const base = (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/') || '/';
-  const resLink = wrap.querySelector('#cache-panel-resources-link');
-  if (resLink) resLink.setAttribute('href', `${base}tools/resources/`);
-  wrap.querySelector('#cache-sort').addEventListener('click', (e) => {
+  listEl = el.querySelector('#cache-list');
+  summaryEl = el.querySelector('#cache-summary');
+
+  el.querySelector('#cache-refresh').addEventListener('click', () => loadData());
+  el.querySelector('#cache-sort').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sort]');
     if (!btn) return;
     sortMode = btn.dataset.sort;
-    wrap.querySelectorAll('#cache-sort .cache-sort__btn').forEach((b) => {
+    el.querySelectorAll('#cache-sort .cache-sort__btn').forEach((b) => {
       b.classList.toggle('cache-sort__btn--active', b.dataset.sort === sortMode);
     });
     loadData();
   });
-  wrap.querySelector('#cache-persist').addEventListener('click', requestPersistence);
-  wrap.querySelector('#cache-clear-all').addEventListener('click', clearAllCaches);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !panelEl.hidden) closePanel();
-  });
-  return panelEl;
-}
+  el.querySelector('#cache-persist').addEventListener('click', requestPersistence);
+  el.querySelector('#cache-clear-all').addEventListener('click', clearAllCaches);
 
-/* ========== 打开 / 关闭 ========== */
-
-function openPanel() {
-  buildPanel();
-  lastFocus = document.activeElement;
-  panelEl.hidden = false;
-  lockBackgroundScroll();
   loadData();
-  panelEl.querySelector('.cache-panel__box').focus();
 }
-
-function closePanel() {
-  if (!panelEl) return;
-  // 关面板时恢复残留的确认态，避免重开看到变红的「确认清除全部？」
-  if (armedRestore) armedRestore();
-  panelEl.hidden = true;
-  unlockBackgroundScroll();
-  if (lastFocus && lastFocus.isConnected) lastFocus.focus();
-}
-
-/* 背景锁定：面板是模态，背景不该跟着滚。
-   用 position:fixed 锁 body 而不是 html{overflow:hidden}——
-   后者会让根元素失去滚动容器、滚动位置被重置为 0（背景突然跳回顶部，
-   比穿透本身更糟）。锁定后把滚动位置记下来，关闭时还原。 */
-let lockedScrollY = 0;
-
-function lockBackgroundScroll() {
-  lockedScrollY = window.scrollY;
-  const scrollbar = window.innerWidth - document.documentElement.clientWidth;
-  document.body.style.position = 'fixed';
-  document.body.style.top = `-${lockedScrollY}px`;
-  document.body.style.left = '0';
-  document.body.style.right = '0';
-  // 锁定后滚动条消失，body 会变宽，用 padding 补回这段宽度
-  if (scrollbar > 0) document.body.style.paddingRight = scrollbar + 'px';
-}
-
-function unlockBackgroundScroll() {
-  document.body.style.position = '';
-  document.body.style.top = '';
-  document.body.style.left = '';
-  document.body.style.right = '';
-  document.body.style.paddingRight = '';
-  window.scrollTo(0, lockedScrollY);
-}
-
-/* ========== 数据读取与渲染 ========== */
 
 function formatSize(bytes) {
   if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return '—';
@@ -231,7 +158,7 @@ async function loadData() {
 
   renderSummary({ usage, quota, persisted, totalEntries, cacheCount: groups.length, totalBytes });
   // 列表工具条上的条目数（与摘要里的数字一致，方便滚动时对照）
-  const countEl = panelEl && panelEl.querySelector('#cache-count');
+  const countEl = summaryEl && summaryEl.closest('.cache-section')?.querySelector('#cache-count');
   if (countEl) {
     countEl.textContent = totalEntries > 0 ? `${totalEntries} 个条目` : '暂无缓存';
   }
@@ -591,15 +518,5 @@ function escapeHtml(s) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }
-
-/* ========== 启动 ========== */
-
-buildPanel();
-
-// 事件委托：入口按钮可能在面板构建前注入（工具页头部是 JS 动态加的）
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.cache-manage-btn');
-  if (btn) openPanel();
-});
 
 export { ICON_DB };
