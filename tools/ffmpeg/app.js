@@ -6,6 +6,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { showToast } from '/assets/js/toast.js';
+import { mountResourcePanel } from '/assets/js/resource-hub.js';
 
 /** HTML 转义：文件名、错误信息会进 innerHTML，必须转义 */
 function escapeHtml(s) {
@@ -95,6 +96,83 @@ const FFMPEG_CORE_FILES = [
   { name: 'ffmpeg-core.js', mime: 'text/javascript' },
   { name: 'ffmpeg-core.wasm', mime: 'application/wasm' },
 ];
+
+/* ========== 内核资源预下载（离线准备） ========== */
+
+/** 内核文件是否已在本地缓存（任一源命中即可，与运行时判定一致） */
+async function coreFileCached(file) {
+  const cache = ('caches' in window) ? await caches.open(FFMPEG_CACHE_NAME).catch(() => null) : null;
+  if (!cache) return false;
+  for (const base of FFMPEG_CORE_SOURCES) {
+    try {
+      if (await cache.match(`${base}/${file.name}`)) return true;
+    } catch { /* 忽略单个源的错误 */ }
+  }
+  return false;
+}
+
+/** 内核是否已完整就绪（两个文件都在） */
+async function coreCached() {
+  for (const file of FFMPEG_CORE_FILES) {
+    if (!(await coreFileCached(file))) return false;
+  }
+  return true;
+}
+
+/**
+ * 预下载内核文件到本地缓存（多源回退，与运行时同一套源顺序）
+ * 运行时 fetchCoreFile 会先查自己的缓存，所以这里写进同一处即可命中。
+ */
+async function downloadCoreFile(file, onProgress) {
+  const cache = ('caches' in window) ? await caches.open(FFMPEG_CACHE_NAME).catch(() => null) : null;
+  let lastErr = null;
+  for (const base of FFMPEG_CORE_SOURCES) {
+    const fullUrl = `${base}/${file.name}`;
+    try {
+      const resp = await fetch(fullUrl);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const total = Number(resp.headers.get('content-length')) || 0;
+      if (resp.body && onProgress) {
+        const reader = resp.body.getReader();
+        const chunks = [];
+        let loaded = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          loaded += value.byteLength;
+          onProgress(loaded, total);
+        }
+        const buf = new Uint8Array(loaded);
+        let off = 0;
+        for (const c of chunks) { buf.set(c, off); off += c.byteLength; }
+        if (cache) await cache.put(fullUrl, new Response(buf));
+        return loaded;
+      }
+      const buf = await resp.arrayBuffer();
+      if (cache) { try { await cache.put(fullUrl, new Response(buf)); } catch { /* 配额不足则本次仍可用 */ } }
+      onProgress?.(buf.byteLength, total);
+      return buf.byteLength;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw new Error(`下载 ${file.name} 失败：${lastErr?.message || '所有 CDN 源均不可用'}`);
+}
+
+/** 删除内核缓存（工具自有缓存 + 浏览器缓存里可能留的副本） */
+async function removeCoreCache() {
+  if ('caches' in window) {
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      for (const base of FFMPEG_CORE_SOURCES) {
+        for (const file of FFMPEG_CORE_FILES) {
+          try { await cache.delete(`${base}/${file.name}`); } catch { /* 忽略 */ }
+        }
+      }
+    }
+  }
+}
 
 /* ========== 任务队列状态图标（内联 SVG，不用装饰符号） ========== */
 const ICON_SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"';
@@ -1967,6 +2045,21 @@ function updateFormatHint() {
 
 /* ========== 事件绑定 ========== */
 export function initFFmpeg() {
+  // === 离线资源（内核预下载）===
+  mountResourcePanel('#resource-panel', [{
+    id: 'ffmpeg-core',
+    name: 'FFmpeg 转换内核',
+    desc: '转码所需的 wasm 内核，约 31 MB。提前下载后转码无需等待联网。',
+    sizeLabel: '~31 MB',
+    isCached: coreCached,
+    download: async (onProgress) => {
+      for (const file of FFMPEG_CORE_FILES) {
+        await downloadCoreFile(file, onProgress);
+      }
+    },
+    remove: removeCoreCache,
+  }]);
+
   // === 上传区 ===
   const uploadArea = document.getElementById('upload-area');
   const fileInput = document.getElementById('file-input');

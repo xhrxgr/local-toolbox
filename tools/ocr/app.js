@@ -6,6 +6,7 @@
 
 import { copyText } from '/assets/js/clipboard.js';
 import { downloadBlob } from '/assets/js/download.js';
+import { mountResourcePanel, urlCachedAnywhere, removeUrlEverywhere } from '/assets/js/resource-hub.js';
 
 // tesseract 运行时与 core 的外部来源：版本锁定，避免库升级后默认值漂移。
 // 语言包也走 CDN（按语言分别下载，自托管会让仓库体积不可接受）；
@@ -272,6 +273,53 @@ function clearResult() {
   hideProgress();
 }
 
+/* ========== 离线资源：语言包预下载 ========== */const TESSDATA_BASE = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data';
+
+/**
+ * 语言包 URL 列表。
+ * 规则与 tesseract.js 内部默认完全一致（worker-script/index.js 里
+ * `langPath || https://cdn.jsdelivr.net/npm/@tesseract.js-data/${lang}/4.0.0_best_int`，
+ * 文件名 `${lang}.traineddata.gz`），所以预下载的副本能被识别时直接命中。
+ */
+function langDataUrls() {
+  const langs = document.getElementById('ocr-lang').value.split('+').filter(Boolean);
+  const oem = parseInt(document.getElementById('ocr-oem').value, 10);
+  const dir = oem === 1 ? '4.0.0_best_int' : '4.0.0';
+  return langs.map((lang) => `${TESSDATA_BASE}/${lang}/${dir}/${lang}.traineddata.gz`);
+}
+
+function mountOcrResourcePanel() {
+  mountResourcePanel('#resource-panel', [{
+    id: 'ocr-lang',
+    name: 'OCR 语言包',
+    desc: '识别用的语言数据（中文约 10 MB、英文约 4 MB）。提前下载后识别不用等联网；识别引擎本身体积小，识别时自动获取。',
+    sizeLabel: '约 10-15 MB',
+    isCached: async () => {
+      const urls = langDataUrls();
+      if (urls.length === 0) return false;
+      for (const url of urls) {
+        if (!(await urlCachedAnywhere(url))) return false;
+      }
+      return true;
+    },
+    download: async (onProgress) => {
+      const urls = langDataUrls();
+      let loaded = 0;
+      for (const url of urls) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const total = Number(resp.headers.get('content-length')) || 0;
+        const buf = await resp.arrayBuffer();
+        loaded += buf.byteLength;
+        onProgress?.(loaded, total);
+      }
+    },
+    remove: async () => {
+      for (const url of langDataUrls()) await removeUrlEverywhere(url);
+    },
+  }]);
+}
+
 /* ========== 初始化 ========== */
 function initOcr() {
   setupDropzone();
@@ -281,6 +329,12 @@ function initOcr() {
   document.getElementById('btn-ocr-copy').addEventListener('click', copyResult);
   document.getElementById('btn-ocr-download').addEventListener('click', downloadTxt);
   document.getElementById('btn-ocr-clear').addEventListener('click', clearResult);
+
+  // 离线资源：语言/引擎模式变了要重建面板（语言包 URL 随之变化）
+  mountOcrResourcePanel();
+  for (const id of ['ocr-lang', 'ocr-oem']) {
+    document.getElementById(id).addEventListener('change', mountOcrResourcePanel);
+  }
 }
 
 export { initOcr };

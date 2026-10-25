@@ -97,7 +97,8 @@
   缓存条目列表（URL + 大小）、按条目删除 / 清空单缓存 / 清除全部、
   申请持久化存储。条目大小优先读 `content-length`，没有则读缓存 body
   （本地读取不走网络；跨域 opaque 响应读不了 body，显示「—」）。
-  单缓存超 60 条折叠展开。删除后下次访问自动重新缓存
+  单缓存超 60 条折叠展开。删除后下次访问自动重新缓存；
+  条目支持按大小排序（默认 / 降序 / 升序循环切换，无大小信息的条目固定排尾部）
 - **实测结论**（preview + agent-browser）：二次访问 3 个资源 0 流量全走缓存；
   断网后工具页完整可用；改 HTML 后刷新立刻拿到新版本（网络优先验证）；
   面板删单条/清空/全删均生效且刷新后自动重缓存
@@ -259,6 +260,30 @@ markdown 内置示例文档的 `✓`、network 出口对比结论的 `✓`。
 - 无错误样式（text 的 meta、diff 的 warning 文字）：仍在
 - 静默无反馈：text/radix 空输入、hash count 钳位、markdown 导出空文档 —— 仍在
 - 符号违规：**已清零**（json ✓/✗、diff/network/otp ⚠、ffmpeg emoji 等）
+
+## 离线资源预下载（2026-10-25 上线）
+
+ffmpeg 转换内核（~31MB）、OCR 语言包（~10-15MB）、扫描文档去手写模型（28MB）
++ 推理运行时（14MB）都是「用到才下载」的大文件，第一次用要干等很久。
+
+- **共享模块** `assets/js/resource-hub.js`：面板渲染 + 下载/删除串联 +
+  `urlCachedAnywhere()` / `removeUrlEverywhere()`（不依赖具体缓存名）
+- **面板形态**：原生 `<details>` 折叠（ffmpeg/ocr 默认展开，scandoc 默认折叠），
+  摘要行显示总状态徽标（未下载 / N/M 已就绪 / 全部已就绪）
+- **接入位置**：ffmpeg 与 ocr 在 `<main>` 顶部，scandoc 在 `<main>` 末尾
+- **下载原理**：预下载后资源落在 Cache Storage，运行时同 URL 直接命中（秒开）；
+  删除 = 从所有缓存移除该 URL，释放空间
+- **各资源的落点与一致性**：
+  | 资源 | 缓存位置 | 一致性要点 |
+  |---|---|---|
+  | ffmpeg 内核 | 工具自有 `ffmpeg-core-v0.12.6` | 与运行时 `fetchCoreFile` 同一套多源回退顺序 |
+  | OCR 语言包 | SW 跨域缓存 | URL 必须与 tesseract.js 内部默认规则一致（`@tesseract.js-data/{lang}/4.0.0_best_int/{lang}.traineddata.gz`），改 tesseract 版本时要同步 |
+  | 去手写模型 | `inkerase-models-v1` | 复用 model-manager 的 `ensureModel`（含 SHA-256 校验）/ `clearModelCache` |
+  | ONNX 运行时 | SW 同源缓存 | 与站点同源，不经第三方 |
+- **注意**：ffmpeg 内核会被存两份（工具自有缓存 + SW 跨域缓存），
+  删除时两处都要清（`removeCoreCache()` 已遍历所有缓存）
+- **SW 跨域缓存正则**要带 `.gz`（语言包是 `.traineddata.gz`），
+  否则预下载不落缓存、等于白下
 
 ## 首页搜索栏（核心功能）
 **位置**：标题下方，分类筛选上方，最大宽度 720px 居中。

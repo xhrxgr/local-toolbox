@@ -11,6 +11,15 @@ import { detectCorners, validateQuad, snapToBorder, checkEdgeStrength } from './
 import { CornerOverlay } from './corners-ui.js';
 import { exportPageImage, exportMergedPdf } from './exporter.js';
 import { showToast } from '/assets/js/toast.js';
+import { mountResourcePanel, urlCachedAnywhere, removeUrlEverywhere } from '/assets/js/resource-hub.js';
+import {
+  MODEL_INFO,
+  RUNTIME_SIZE,
+  ensureModel,
+  isModelCached,
+  clearModelCache,
+  runtimeWasmPaths,
+} from './handwriting/model-manager.js';
 
 const THUMB_SIZE = 120;
 const EDITOR_MAX_SIZE = 1400;
@@ -493,6 +502,47 @@ function escapeAttr(s) {
 
 /* ========== 初始化 ========== */
 export function initScanDoc() {
+  // 离线资源：去手写模型与推理运行时（28MB + 14MB），可提前下载
+  mountResourcePanel('#resource-panel', [
+    {
+      id: 'scandoc-model',
+      name: '去手写模型',
+      desc: `本地 AI 修复笔迹背景（${MODEL_INFO.name}），约 28 MB。提前下载后擦除笔迹无需等待。`,
+      sizeLabel: '约 28 MB',
+      isCached: isModelCached,
+      download: async (onProgress) => {
+        await ensureModel(onProgress);
+      },
+      remove: clearModelCache,
+    },
+    {
+      id: 'scandoc-runtime',
+      name: '推理运行时',
+      desc: 'ONNX 推理引擎（wasm），约 14 MB。与站点同源，不经过任何第三方。',
+      sizeLabel: '约 14 MB',
+      isCached: async () => {
+        const { wasm, mjs } = runtimeWasmPaths();
+        return (await urlCachedAnywhere(wasm)) && (await urlCachedAnywhere(mjs));
+      },
+      download: async (onProgress) => {
+        const { wasm, mjs } = runtimeWasmPaths();
+        let loaded = 0;
+        for (const url of [wasm, mjs]) {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const buf = await resp.arrayBuffer();
+          loaded += buf.byteLength;
+          onProgress?.(loaded, RUNTIME_SIZE);
+        }
+      },
+      remove: async () => {
+        const { wasm, mjs } = runtimeWasmPaths();
+        await removeUrlEverywhere(wasm);
+        await removeUrlEverywhere(mjs);
+      },
+    },
+  ], { collapsed: true });
+
   canvas = document.getElementById('scan-canvas');
   overlay = new CornerOverlay(document.getElementById('corner-layer'), canvas, () => {
     // 拖拽结束：更新角点并重渲染（矫正结果随之变化）
