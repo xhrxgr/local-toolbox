@@ -120,8 +120,17 @@ button {
 
 .btn-primary:hover {
   background: var(--accent-hover);
+  /* 必须显式给回白色文字：以 <a class="btn btn-primary"> 形式使用时，
+     全局 a:hover（特异性 0,1,1）会压过 .btn-primary（0,1,0），
+     把白字改成紫色——紫底紫字，按钮看起来凭空消失 */
+  color: #fff;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+.btn-primary:focus-visible {
+  background: var(--accent-hover);
+  color: #fff;
 }
 
 .btn-primary:disabled {
@@ -576,6 +585,19 @@ button {
   line-height: 1.7;
   color: var(--text-secondary);
   border-top: 1px solid var(--border);
+}
+
+.cache-panel__link-row {
+  margin-top: var(--space-xs);
+}
+
+.cache-panel__link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.cache-panel__link:hover {
+  text-decoration: underline;
 }
 
 .cache-empty {
