@@ -5,6 +5,8 @@
 /* 主题图标：内联 SVG，随主题切换（界面不用 emoji，见 AGENTS.md 界面符号规范） */
 const ICON_SUN = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>';
 const ICON_MOON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>';
+/* 缓存管理入口图标（数据库造型，与 cache-manager.js 面板内的图标同款） */
+const ICON_CACHE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg>';
 
 function initTheme() {
   const stored = localStorage.getItem('theme');
@@ -50,7 +52,10 @@ function injectToolHeader(toolName) {
       工具箱
     </a>
     <h1>${toolName}</h1>
-    <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()">${ICON_MOON}</button>
+    <div class="tool-header__actions">
+      <button class="cache-manage-btn" type="button" aria-label="缓存管理" title="缓存管理">${ICON_CACHE}<span class="cache-manage-btn__text">缓存</span></button>
+      <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()">${ICON_MOON}</button>
+    </div>
   `;
   document.body.prepend(header);
 }
@@ -84,6 +89,10 @@ if (import.meta.env && import.meta.env.PROD && 'serviceWorker' in navigator) {
     const base = (typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL) || '/';
     navigator.serviceWorker.register(`${base}sw.js`, { scope: base }).catch(() => {
       // 注册失败（协议不支持等）时静默降级，不影响站点功能
+    });
+    // 缓存管理面板（查看/删除本地缓存），与 SW 同生命周期
+    import('./cache-manager.js').catch(() => {
+      // 加载失败不影响主功能
     });
   });
 }

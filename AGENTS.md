@@ -90,8 +90,17 @@
 - **与 `public/tools/ffmpeg/coi-serviceworker.js` 的关系**：后者是清理脚本，
   给装着旧版 coi SW 的历史浏览器用（自删缓存 + 自我注销），
   新访客不会安装它，与全局缓存 SW 不冲突
+- **缓存管理 UI**（2026-10-25 新增）：`assets/js/cache-manager.js` 共享模块，
+  由 common.js 仅生产环境动态加载。入口是 `.cache-manage-btn` 按钮
+  （首页静态写入、工具页由 `injectToolHeader` 注入，事件委托绑定不怕注入时序），
+  点击弹出毛玻璃面板：存储占用（`storage.estimate`，origin 级）、
+  缓存条目列表（URL + 大小）、按条目删除 / 清空单缓存 / 清除全部、
+  申请持久化存储。条目大小优先读 `content-length`，没有则读缓存 body
+  （本地读取不走网络；跨域 opaque 响应读不了 body，显示「—」）。
+  单缓存超 60 条折叠展开。删除后下次访问自动重新缓存
 - **实测结论**（preview + agent-browser）：二次访问 3 个资源 0 流量全走缓存；
-  断网后工具页完整可用；改 HTML 后刷新立刻拿到新版本（网络优先验证）
+  断网后工具页完整可用；改 HTML 后刷新立刻拿到新版本（网络优先验证）；
+  面板删单条/清空/全删均生效且刷新后自动重缓存
 - **部署**：`npm run build` 后 dist/ 根目录带 sw.js，
   随 gh-pages 分支发布即生效（无需额外配置）
 
