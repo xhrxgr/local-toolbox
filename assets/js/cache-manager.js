@@ -204,23 +204,22 @@ async function loadData() {
 
 function renderSummary({ estimateText, persisted, totalEntries, cacheCount, totalBytes }) {
   const persistBtn = summaryEl.parentElement.querySelector('#cache-persist');
-  if (persistBtn) {
-    if (persisted === true) {
-      persistBtn.textContent = '持久化已开启';
-      persistBtn.disabled = true;
-    } else if (persisted === false) {
-      persistBtn.textContent = '保持持久化';
-      persistBtn.disabled = false;
-      persistBtn.title = '防止浏览器在磁盘空间不足时自动清理本站缓存';
-    } else {
-      persistBtn.textContent = '保持持久化';
-      persistBtn.disabled = false;
-    }
-  }
+  // 持久化状态常驻显示在摘要区，不用点开按钮才知道开没开
+  const persistText = persisted === true ? '已开启' : persisted === false ? '未开启' : '不可用';
   summaryEl.innerHTML = `
     <span>${escapeHtml(estimateText)}</span>
+    <span>存储持久化：${persistText}</span>
     <span>缓存 ${cacheCount} 个 · 条目 ${totalEntries} 条 · 合计 ${formatSize(totalBytes)}</span>
   `;
+  // 按钮永不禁用：已授权时重复调用 persist() 会直接 resolve，无害；
+  // 禁用反而让用户点了没反应（.btn 没有 disabled 视觉样式，看不出已禁用）
+  if (persistBtn && !persistBtn.dataset.flashing) {
+    persistBtn.disabled = false;
+    persistBtn.textContent = persisted === true ? '持久化已开启' : '保持持久化';
+    persistBtn.title = persisted === true
+      ? '已开启：浏览器不会自动清理本站缓存，点击可查看状态'
+      : '防止浏览器在磁盘空间不足时自动清理本站缓存';
+  }
 }
 
 function renderList(groups) {
@@ -347,23 +346,34 @@ async function requestPersistence() {
   const btn = summaryEl.parentElement.querySelector('#cache-persist');
   try {
     const granted = await navigator.storage.persist();
-    flashBtn(btn, granted ? '已开启' : '未获授权', granted ? 'btn--success' : 'btn--danger');
+    // 已授权时重复调用直接 resolve true，明确告知无需重复申请；
+    // 闪烁结束再 loadData 同步按钮文字与摘要状态，避免中间态不一致
+    flashBtn(btn, granted ? '已开启，无需重复申请' : '未获授权', granted ? 'btn--success' : 'btn--danger', loadData);
   } catch {
-    flashBtn(btn, '不可用', 'btn--danger');
+    flashBtn(btn, '不可用', 'btn--danger', loadData);
   }
-  loadData();
 }
 
 /* ========== 工具函数 ========== */
 
-function flashBtn(btn, text, cls) {
+function flashBtn(btn, text, cls, onRestore) {
+  // 闪烁期间忽略重复触发：连点会让 original 捕获到闪烁中的文字，
+  // 恢复时留下错误状态（持久化按钮在 loadData 后仍存在于 DOM，会踩到）
+  if (btn.dataset.flashing) return;
   const original = btn.textContent;
   btn.textContent = text;
   btn.classList.add(cls);
+  // 闪烁锁：loadData() 的 renderSummary 不能在此期间重置按钮文字，
+  // 否则刚设置的「已开启/未获授权」会被立刻覆盖，用户看不到反馈
+  btn.dataset.flashing = '1';
   setTimeout(() => {
     btn.textContent = original;
     btn.classList.remove(cls);
+    delete btn.dataset.flashing;
     btn.disabled = false;
+    // 恢复后按最新状态重刷（持久化授权结果要等闪烁结束才同步，
+    // 避免「按钮说已开启、摘要说未开启」的中间态）
+    if (onRestore) onRestore();
   }, 1500);
 }
 

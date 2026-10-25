@@ -105,6 +105,14 @@ button {
   min-height: 34px;
 }
 
+/* 禁用态兜底：此前只有 .btn-primary:disabled 有样式，其他按钮禁用后
+   看起来与可用无异，用户点了没反应也不知道原因（缓存管理面板踩过） */
+.btn:disabled,
+.btn-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;
