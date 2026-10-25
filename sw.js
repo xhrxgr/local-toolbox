@@ -28,8 +28,8 @@ const MAX_ENTRIES = 250;
 /* 带内容 hash 的静态资源：路径中含 8 位以上 hash 串 + 已知静态扩展名 */
 const HASHED_ASSET_RE = /[.-][A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2?|png|jpe?g|gif|svg|webp|ico|wasm|data|onnx|txt)$/i;
 
-/* 跨域可缓存资源类型（ffmpeg core 的 .wasm/.js、tesseract 的 .traineddata 等） */
-const CROSS_ORIGIN_ASSET_RE = /\.(?:js|mjs|wasm|data|onnx|traineddata|json|zip)(?:[?#]|$)/i;
+/* 跨域可缓存资源类型（ffmpeg core 的 .wasm/.js、tesseract 的 .traineddata.gz 等） */
+const CROSS_ORIGIN_ASSET_RE = /\.(?:js|mjs|wasm|data|onnx|traineddata|traineddata\.gz|gz|json|zip)(?:[?#]|$)/i;
 
 /* 离线且无对应缓存时的兜底页 */
 const OFFLINE_HTML = `<!DOCTYPE html>
