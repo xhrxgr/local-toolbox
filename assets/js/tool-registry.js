@@ -237,6 +237,17 @@ export const TOOLS = [
     available: true,
   },
   {
+    id: 'dewatermark',
+    name: '去水印',
+    icon: 'watermark',
+    desc: 'PDF 像素级水印清除：自动识别固定位水印，框选追踪变位水印',
+    category: 'document',
+    tags: ['本地处理', 'PDF', '像素级修复'],
+    aliases: ['去水印', '水印', '去水印工具', 'pdf去水印', '去除水印', '清除水印', '水印去除', '图片水印', '页眉水印', 'watermark', 'remove watermark', 'dewatermark'],
+    path: '/tools/dewatermark/',
+    available: true,
+  },
+  {
     id: 'scandoc',
     name: '扫描文档',
     icon: 'scandoc',

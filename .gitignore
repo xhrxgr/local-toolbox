@@ -22,3 +22,6 @@ pages-deployed.png
 # ONNX Runtime Web 运行时（构建时从 node_modules 同步）
 tools/scandoc/handwriting/runtime/
 .tmp-*
+
+# 二维码识别回归基准页（开发期资产，不属于工具页面）
+tools/qrcode/bench.html

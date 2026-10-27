@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => ({
         markdown: resolve(__dirname, 'tools/markdown/index.html'),
         otpMigration: resolve(__dirname, 'tools/otp-migration/index.html'),
         document: resolve(__dirname, 'tools/document/index.html'),
+        dewatermark: resolve(__dirname, 'tools/dewatermark/index.html'),
         scandoc: resolve(__dirname, 'tools/scandoc/index.html'),
         text: resolve(__dirname, 'tools/text/index.html'),
         radix: resolve(__dirname, 'tools/radix/index.html'),
@@ -64,7 +65,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util', 'zxing-wasm'],
   },
   plugins: [
     {

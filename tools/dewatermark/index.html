@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PDF 水印去除 —— 自动识别固定位水印，框选追踪变位水印，本地像素级修复，文件不上传云端" />
+  <title>去水印 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/dewatermark/style.css" />
+</head>
+<body>
+  <main class="dw-app">
+    <header class="dw-header glass">
+      <div class="dw-header__title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+          <path d="M3 15s2-3 5-3 5 3 8 3 5-3 5-3"/>
+          <path d="M3 9s2-3 5-3 5 3 8 3 5-3 5-3"/>
+          <circle cx="12" cy="12" r="10"/>
+        </svg>
+        <h1>去水印</h1>
+        <span class="dw-header__sub">PDF 像素级水印清除 · 本地处理</span>
+      </div>
+      <div class="dw-header__actions">
+        <button class="btn btn-sm btn-secondary" id="btn-import" type="button">导入 PDF</button>
+        <button class="btn btn-sm btn-secondary" id="btn-export" type="button" disabled>导出 PDF</button>
+        <input type="file" id="file-input" accept="application/pdf,.pdf" hidden />
+      </div>
+    </header>
+
+    <div class="dw-body">
+      <!-- 左侧：操作面板 -->
+      <aside class="dw-panel glass">
+        <section class="dw-section">
+          <h2 class="dw-section__title">第一步 · 载入</h2>
+          <div class="dw-drop" id="dw-drop" role="button" tabindex="0" aria-label="选择 PDF 文件">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="26" height="26">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <p id="dw-drop-text">点击选择 PDF</p>
+            <p class="dw-drop__hint" id="dw-drop-hint">也可拖拽文件到此处</p>
+          </div>
+          <p class="dw-file-info" id="dw-file-info" hidden></p>
+        </section>
+
+        <section class="dw-section">
+          <h2 class="dw-section__title">第二步 · 找水印</h2>
+          <div class="dw-field">
+            <button class="btn btn-secondary dw-btn-block" id="btn-auto" type="button" disabled>
+              自动识别固定位水印
+            </button>
+            <p class="dw-hint">
+              逐页比对同一坐标的墨迹。页眉、页脚、边栏这类每页位置相同的水印会被自动找出。
+            </p>
+          </div>
+          <div class="dw-field">
+            <button class="btn btn-secondary dw-btn-block" id="btn-pick" type="button" disabled>
+              框选水印并追踪到其他页
+            </button>
+            <p class="dw-hint">
+              用于插在正文行里、位置逐页不同的水印。在预览图上拖动框选一处水印，
+              工具会按字形在全部页面寻找同类实例。
+            </p>
+            <p class="dw-hint">
+              框选时尽量只圈住水印文字本身，别把两端的正文一起圈进去 ——
+              混进正文的模板更容易匹到普通正文。
+            </p>
+          </div>
+          <div class="dw-field dw-field--inline">
+            <label class="dw-check">
+              <input type="checkbox" id="chk-show-all" />
+              <span>显示全部候选</span>
+            </label>
+          </div>
+          <div class="dw-field">
+            <details class="dw-notes">
+              <summary class="dw-notes__title">这类水印能清到什么程度</summary>
+              <ul class="dw-notes__list">
+                <li>
+                  行内水印是把正文「顶掉」之后写上去的，水印下面的原文已经不存在了。
+                  擦掉水印后该处只会留白，无法还原原文。
+                </li>
+                <li>
+                  变位水印每页位置都不同，无法自动识别，必须先框选一处再由工具追踪。
+                  追踪结果里置信度偏低的会归入「待确认」，默认不擦，
+                  需要勾选「显示全部候选」才会一并清除。
+                </li>
+                <li>
+                  擦除只涂掉水印笔画像素，不动旁边的正文；
+                  但若水印与正文重叠，判定为重叠的那部分像素会被一起涂掉。
+                </li>
+                <li>
+                  输出为图片页，PDF 的文字层不保留，也无法再选中复制文字。
+                </li>
+              </ul>
+              <p class="dw-notes__related">
+                需要的是格式转换（PDF 转 Word / 图片、合并、拆分等）而不是去水印，请用
+                <a href="#" id="link-document">文档转换工具</a>。
+              </p>
+            </details>
+          </div>
+        </section>
+
+        <section class="dw-section">
+          <h2 class="dw-section__title">第三步 · 清除并导出</h2>
+          <div class="dw-field">
+            <button class="btn btn-primary dw-btn-block" id="btn-remove" type="button" disabled>
+              清除标记的水印
+            </button>
+            <p class="dw-hint" id="dw-remove-hint">尚未标记任何水印区域。</p>
+          </div>
+          <div class="dw-field">
+            <label class="dw-label" for="sel-quality">输出画质</label>
+            <select class="dw-select" id="sel-quality">
+              <option value="high" data-dpi="150">高（原始分辨率，PNG 无损）</option>
+              <option value="medium" data-dpi="150" selected>中（150 DPI，体积较小）</option>
+              <option value="low" data-dpi="96">低（96 DPI）</option>
+            </select>
+            <p class="dw-hint">
+              原 PDF 若每页是整张位图，清除后需重新编码为图片页，文字层不会保留。
+            </p>
+          </div>
+        </section>
+      </aside>
+
+      <!-- 右侧：预览区 -->
+      <section class="dw-viewer">
+        <div class="dw-toolbar glass">
+          <span class="dw-toolbar__info" id="dw-page-info">未载入文件</span>
+          <div class="dw-toolbar__actions">
+            <button class="btn btn-sm btn-secondary" id="btn-prev" type="button" disabled>上一页</button>
+            <button class="btn btn-sm btn-secondary" id="btn-next" type="button" disabled>下一页</button>
+            <button class="btn btn-sm btn-secondary" id="btn-toggle" type="button" disabled>显示标记</button>
+          </div>
+        </div>
+
+        <div class="dw-canvas-wrap glass" id="canvas-wrap">
+          <div class="dw-stage" id="dw-stage" hidden>
+            <canvas id="dw-canvas"></canvas>
+            <svg class="dw-marks" id="dw-marks" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="dw-empty" id="dw-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="44" height="44">
+              <path d="M3 15s2-3 5-3 5 3 8 3 5-3 5-3"/>
+              <path d="M3 9s2-3 5-3 5 3 8 3 5-3 5-3"/>
+              <circle cx="12" cy="12" r="10"/>
+            </svg>
+            <p>导入 PDF 后在此预览</p>
+            <p class="dw-empty__hint">自动识别固定位水印 · 框选追踪变位水印</p>
+          </div>
+          <div class="dw-busy" id="dw-busy" hidden>
+            <div class="dw-busy__box">
+              <div class="dw-busy__head">
+                <span class="dw-busy__spinner"></span>
+                <span id="dw-busy-text">处理中</span>
+              </div>
+              <div class="dw-busy__bar"><div class="dw-busy__fill" id="dw-busy-fill"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dw-marks-panel glass" id="marks-panel" hidden>
+          <div class="dw-marks-panel__head">
+            <span id="marks-count">0 处标记</span>
+            <button class="btn btn-sm btn-secondary" id="btn-clear-marks" type="button">清空标记</button>
+          </div>
+          <div class="dw-marks-panel__list" id="marks-list"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="/assets/js/common.js"></script>
+  <script type="module" src="/tools/dewatermark/main.js"></script>
+</body>
+</html>

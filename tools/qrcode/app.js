@@ -5,9 +5,15 @@
  */
 
 import QRCode from 'qrcode';
-import jsQR from 'jsqr';
 import { copyText } from '/assets/js/clipboard.js';
 import { downloadBlob, downloadDataUrl } from '/assets/js/download.js';
+import {
+  decodeCanvasAsync,
+  decodeFiles,
+  createVideoScanner,
+  STRATEGY_LABELS,
+} from '/assets/js/qr-decoder.js';
+import { prewarmZxing } from '/assets/js/qr-zxing.js';
 
 /* ========== 状态 ========== */
 // 最近一次生成的数据，供下载使用
@@ -20,6 +26,10 @@ let genTimer = null;
 let cameraStream = null;
 let cameraScanning = false;
 let cameraRafId = null;
+// 摄像头扫描器（多分辨率轮询 + 帧间投票 + 区域跟踪）
+let cameraScanner = null;
+// 扫描帧的串行链：扫描是异步的，用 promise 链保证同一时刻只有一帧在处理
+let cameraChain = Promise.resolve();
 
 /* ========== Tab 切换 ========== */
 function switchTab(mode) {
@@ -141,7 +151,8 @@ function isValidImageType(file) {
   return file.type.startsWith('image/');
 }
 
-// 解码单张图片，返回 { data, location } | null
+// 解码单张图片，返回 { data, location, strategy } | null
+// 走共享解码管线：多策略级联（光度、尺度、透视矫正、弯曲矫正、分块）
 async function decodeImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -153,9 +164,7 @@ async function decodeImage(file) {
     canvas.height = img.naturalHeight;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const result = jsQR(imageData.data, imageData.width, imageData.height);
-    return result ? { data: result.data, location: result.location } : null;
+    return decodeCanvasAsync(canvas);
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -170,7 +179,7 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-function renderResultItem(file, text) {
+function renderResultItem(file, text, strategy) {
   const list = document.getElementById('qr-result-list');
   const item = document.createElement('div');
   item.className = 'qr-result-item' + (text === null ? ' qr-result-item--fail' : ' qr-result-item--ok');
@@ -179,10 +188,23 @@ function renderResultItem(file, text) {
   const copyBtn = text === null
     ? ''
     : `<button class="qr-result__copy btn btn-secondary" data-text="${encodeURIComponent(text)}">复制</button>`;
+  // 识别策略标签：告诉用户是靠哪种处理才读出来的，便于判断成败原因
+  //
+  // 多帧融合的策略名带前缀（如 fuse-zxing-normalized），
+  // 表里没有对应项时退回前缀本身，仍然给用户一个可读的说明。
+  const strategyLabel = (() => {
+    if (!strategy) return '';
+    const text = STRATEGY_LABELS[strategy]
+      || (String(strategy).split('-')[0] === 'fuse' ? '多帧融合' : '');
+    return text ? `<span class="qr-result__strategy">${escapeHtml(text)}</span>` : '';
+  })();
   item.innerHTML = `
     <div class="qr-result__head">
       <span class="qr-result__name" title="${safeName}">${safeName}</span>
-      <span class="qr-result__size">${formatSize(file.size)}</span>
+      <span class="qr-result__meta">
+        ${strategyLabel}
+        <span class="qr-result__size">${formatSize(file.size)}</span>
+      </span>
     </div>
     <div class="qr-result__body">
       <code class="qr-result__text">${safeText}</code>
@@ -219,14 +241,31 @@ function formatSize(bytes) {
 async function handleFiles(files) {
   const imgs = Array.from(files).filter(isValidImageType);
   if (!imgs.length) return;
-  // 逐张识别（避免并发占用过多内存）
-  for (const file of imgs) {
-    try {
-      const result = await decodeImage(file);
-      renderResultItem(file, result ? result.data : null);
-    } catch {
-      renderResultItem(file, null);
-    }
+
+  const list = document.getElementById('qr-result-list');
+  const progressEl = document.getElementById('qr-progress');
+  list.innerHTML = '';
+  document.getElementById('qr-rec-actions').hidden = false;
+  if (progressEl) {
+    progressEl.hidden = false;
+    progressEl.textContent = `正在识别 0/${imgs.length}`;
+  }
+
+  // 受控并发解码：解码是 CPU 密集计算，并发太多反而变慢且吃内存
+  const items = await decodeFiles(imgs, {
+    concurrency: 3,
+    onProgress: (done, total) => {
+      if (progressEl) progressEl.textContent = `正在识别 ${done}/${total}`;
+    },
+  });
+
+  // 按原文件顺序展示
+  for (const it of items) {
+    const r = it.result;
+    renderResultItem(it.file, r ? r.data : null, r ? r.strategy : null);
+  }
+  if (progressEl) {
+    progressEl.hidden = true;
   }
 }
 
@@ -263,6 +302,7 @@ async function startCamera() {
     });
     video.srcObject = cameraStream;
     await video.play();
+    cameraScanner = createVideoScanner();
     cameraScanning = true;
     scanLoop();
   } catch (e) {
@@ -300,27 +340,31 @@ function scanLoop() {
   const video = document.getElementById('qr-camera-video');
 
   if (video.readyState >= 2 && video.videoWidth > 0) {
-    // 缩小到 640px 宽度提升性能
-    const scale = Math.min(1, 640 / video.videoWidth);
-    const w = Math.floor(video.videoWidth * scale);
-    const h = Math.floor(video.videoHeight * scale);
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(video, 0, 0, w, h);
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const result = jsQR(imageData.data, imageData.width, imageData.height);
+    // 扫描器封装了多分辨率轮询、帧间投票、区域跟踪与 zxing 兜底。
+    // 它是异步的（zxing 解码要 await），所以用串行链而非 rAF 回调，
+    // 避免上一帧还没结束就叠加下一帧。
+    cameraChain = cameraChain
+      .then(async () => {
+        if (!cameraScanning) return;
+        let hit = null;
+        try {
+          hit = await cameraScanner.scanFrame(video);
+        } catch {
+          hit = null;
+        }
 
-    if (result && result.data) {
-      // 识别成功
-      const text = result.data;
-      stopCamera();
-      // 模拟文件对象渲染结果
-      const fakeFile = { name: '摄像头扫描', size: 0 };
-      renderResultItem(fakeFile, text);
-      return;
-    }
+        if (hit && hit.data) {
+          const text = hit.data;
+          stopCamera();
+          // 模拟文件对象渲染结果
+          const fakeFile = { name: '摄像头扫描', size: 0 };
+          renderResultItem(fakeFile, text, hit.strategy);
+        }
+      })
+      .then(() => {
+        if (cameraScanning) cameraRafId = requestAnimationFrame(scanLoop);
+      });
+    return;
   }
 
   cameraRafId = requestAnimationFrame(scanLoop);
@@ -388,6 +432,10 @@ function setupDropzone() {
 
 /* ========== 初始化 ========== */
 function initQrcode() {
+  // 空闲时预热 zxing 后端：拉取并编译 wasm（约 400KB），
+  // 摊掉首次识别时的加载延迟。不阻塞首屏渲染。
+  prewarmZxing();
+
   // Tab 切换
   document.querySelectorAll('.mode-tab').forEach((tab) => {
     tab.addEventListener('click', () => switchTab(tab.dataset.mode));

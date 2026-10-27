@@ -92,6 +92,23 @@
   line-height: 1.5;
 }
 
+/* 相关工具引导（如去水印） */
+.setting__hint--related {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+.setting__hint--related a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.setting__hint--related a:hover {
+  border-bottom-color: currentColor;
+}
+
 .setting__select {
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);

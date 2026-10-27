@@ -4,10 +4,10 @@
  * 全部本地运行，零网络请求
  */
 import QRCode from 'qrcode';
-import jsQR from 'jsqr';
 import { copyText } from '/assets/js/clipboard.js';
 import { downloadBlob } from '/assets/js/download.js';
 import { showToast } from '/assets/js/toast.js';
+import { decodeCanvasAsync } from '/assets/js/qr-decoder.js';
 
 let accounts = [];
 let rafId = null;
@@ -412,7 +412,9 @@ function hideQrModal() {
 // 用共享实现：原先这里不检查 execCommand 的返回值，
 // 复制失败也会返回 true，用户看到"已复制"但剪贴板里还是旧内容。
 
-/* ========== 截图识别 (jsQR) ========== */
+/* ========== 截图识别 ========== */
+// 用共享解码管线：多策略级联（光度、尺度、透视矫正、弯曲矫正），
+// 变形与低对比的截图也能读出来。
 async function decodeImageFile(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -424,9 +426,8 @@ async function decodeImageFile(file) {
     canvas.height = img.naturalHeight;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const result = jsQR(imageData.data, imageData.width, imageData.height);
-    return result ? result.data : null;
+    const r = await decodeCanvasAsync(canvas);
+    return r ? r.data : null;
   } finally {
     URL.revokeObjectURL(url);
   }

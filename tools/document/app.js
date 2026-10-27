@@ -403,6 +403,16 @@ function initDocument() {
   // 粘贴（文件 / 文本）
   document.addEventListener('paste', (e) => handlePaste(e, { getOp: getCurrentOp, addFiles }));
 
+  // 跳转去水印工具（像素级修复，需要独立画布交互）
+  const linkDewatermark = document.getElementById('link-dewatermark');
+  if (linkDewatermark) {
+    linkDewatermark.addEventListener('click', (e) => {
+      e.preventDefault();
+      const base = (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/') || '/';
+      location.href = base.replace(/\/$/, '') + '/tools/dewatermark/';
+    });
+  }
+
   // 阻止页面默认拖放行为
   document.addEventListener('dragover', (e) => e.preventDefault());
   document.addEventListener('drop', (e) => e.preventDefault());

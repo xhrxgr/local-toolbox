@@ -1,0 +1,489 @@
+/* 去水印工具样式 */
+
+.dw-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  gap: var(--space-md);
+}
+
+/* ========== 头部 ========== */
+.dw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.dw-header__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text);
+}
+
+.dw-header__title h1 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin: 0;
+}
+
+.dw-header__sub {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.dw-header__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* ========== 主体布局 ========== */
+.dw-body {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ========== 左侧操作面板 ========== */
+.dw-panel {
+  width: 300px;
+  flex: 0 0 300px;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.dw-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.dw-section__title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.dw-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.dw-field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.dw-btn-block {
+  width: 100%;
+}
+
+.dw-hint {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.dw-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.dw-select {
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+}
+
+.dw-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.dw-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* 拖放区 */
+.dw-drop {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  text-align: center;
+}
+
+.dw-drop:hover,
+.dw-drop:focus-visible {
+  border-color: var(--accent);
+  background: var(--tag-bg);
+  outline: none;
+}
+
+.dw-drop p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.dw-drop__hint {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.dw-file-info {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin: 0;
+  word-break: break-all;
+}
+
+/* ========== 右侧预览区 ========== */
+.dw-viewer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.dw-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.dw-toolbar__info {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.dw-toolbar__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.dw-canvas-wrap {
+  position: relative;
+  padding: var(--space-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  overflow: auto;
+}
+
+/* 画布与标记层共用一个定位容器，保证覆盖层与画布像素对齐 */
+.dw-stage {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+#dw-canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  box-shadow: var(--shadow-md);
+  background: #fff;
+  cursor: crosshair;
+}
+
+#dw-canvas[data-picking="1"] {
+  cursor: cell;
+}
+
+/* 标记覆盖层：与画布同尺寸，absolute 贴合 */
+.dw-marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: visible;
+}
+
+/*
+ * SVG 的 rect 必须显式给 fill/stroke。
+ * CSS 的 border / background 对 SVG 元素不生效，
+ * 不写 fill="none" 的话 rect 会默认填成纯黑 —— 表现为一条黑杠盖住水印。
+ */
+.dw-marks__box {
+  fill: rgba(99, 102, 241, 0.12);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.dw-marks__box--auto {
+  fill: rgba(34, 197, 94, 0.12);
+  stroke: #22c55e;
+}
+
+/* 框选过程中的临时框 */
+.dw-marks__box--picking {
+  fill: rgba(99, 102, 241, 0.1);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.dw-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.dw-empty p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.dw-empty__hint {
+  font-size: var(--text-xs);
+}
+
+/* 忙碌遮罩 */
+.dw-busy {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  border-radius: var(--radius-lg);
+}
+
+.dw-busy__box {
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 240px;
+}
+
+.dw-busy__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.dw-busy__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: dw-spin 0.8s linear infinite;
+}
+
+@keyframes dw-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dw-busy__bar {
+  height: 4px;
+  background: var(--bg-secondary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.dw-busy__fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width var(--transition-fast);
+}
+
+/* ========== 标记列表 ========== */
+.dw-marks-panel {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.dw-marks-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.dw-marks-panel__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dw-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--text);
+  background: var(--bg-secondary);
+}
+
+.dw-mark__page {
+  color: var(--text-secondary);
+}
+
+.dw-mark__score {
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dw-mark__del {
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+.dw-mark__del:hover {
+  color: #ef4444;
+}
+
+/* 限制说明（折叠） */
+.dw-notes {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.dw-notes__title {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.dw-notes__title::-webkit-details-marker {
+  display: none;
+}
+
+.dw-notes__title::before {
+  content: "▸ ";
+  color: var(--text-tertiary);
+}
+
+.dw-notes[open] .dw-notes__title::before {
+  content: "▾ ";
+}
+
+.dw-notes__list {
+  margin: var(--space-sm) 0 0;
+  padding-left: 1.2em;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.dw-notes__list li {
+  margin-bottom: var(--space-xs);
+}
+
+.dw-notes__related {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dw-notes__related a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.dw-notes__related a:hover {
+  border-bottom-color: currentColor;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 1024px) {
+  .dw-body {
+    flex-direction: column;
+  }
+
+  .dw-panel {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .dw-app {
+    padding: var(--space-sm);
+  }
+
+  .dw-header {
+    padding: var(--space-md);
+  }
+
+  .dw-panel {
+    padding: var(--space-md);
+  }
+
+  .dw-canvas-wrap {
+    padding: var(--space-sm);
+    min-height: 300px;
+  }
+}

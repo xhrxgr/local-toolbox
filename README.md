@@ -20,7 +20,7 @@
 | 网络 | 证书解析 | 纯前端 ASN.1 DER 解析器，支持 PEM / Hex / Base64，Web Crypto 指纹 |
 | 编码 | 编码转换 | Base64 / URL / ASCII / Unicode，UTF-8 安全，全部本地运行 |
 | 编码 | 进制转换 | 2/8/10/16 进制及自定义进制互转，实时校验 |
-| 编码 | 二维码 | 生成 / 识别（jsqr），自定义颜色与容错级别 |
+| 编码 | 二维码 | 生成 / 识别，自定义颜色与容错级别；识别支持透视、弯曲、模糊、低对比等变形 |
 | 颜色 | 颜色转换 | HEX / RGB / HSL / HSV 互转，调色板，对比度检测 |
 | 换算 | 单位换算 | 长度 / 重量 / 温度 / 面积 / 体积 / 速度等 |
 | 开发 | JSON 工具 | 格式化 / 压缩 / 校验 / 转义 / 树形视图 |
@@ -37,6 +37,7 @@
 | 开发 | 实用脚本 | Windows 本地小工具下载：移动热点连接数上限、任务栏时钟秒数一键切换 |
 | 开发 | 资源与缓存 | 一键预下载全部工具依赖的大文件（转码内核 / OCR 语言包 / 去手写模型），并查看清理本站缓存 |
 | 文档 | 文档转换 | PDF/Word/Excel/CSV/Markdown/HTML/TXT/RTF/EPUB 本地互转，6 Tab |
+| 文档 | 去水印 | PDF 像素级水印清除：自动识别固定位水印，框选追踪变位水印 |
 | 文档 | 扫描文档 | 图片转文档：批量导入、黑白/增强滤镜、曲面矫正、四角裁剪、去手写（红蓝笔擦除）、按序合并 PDF |
 | 安全 | 密码生成 | 随机密码 / 密码短语，强度评估 |
 | 安全 | OTP 迁移 | Google Authenticator 二维码导出解析，生成 otpauth 链接 |
@@ -50,6 +51,9 @@
 - **响应式**：移动端友好，关键页面跨视口自适应
 - **离线可用**：Service Worker 缓存静态资源与 CDN 内核，二次访问零流量；右上角「下载」入口可预取资源并管理缓存
 - **资源预下载**：转码内核、OCR 语言包、去手写模型等大文件可在「资源与缓存」页一次预取（约 80 MB），之后断网也能正常使用相关功能
+- **二维码识别双引擎**：`jsQR` 负责常规码，`zxing-wasm` 兜底小尺寸、低对比与重度变形码；解码内核（wasm）本地托管，不依赖外网
+- **二维码几何矫正**：`透视矫正` 与 `弯曲矫正` 双向串联 —— 桶形畸变与相机姿态是两种独立形变，先做哪一个效果不同，两条顺序都试
+- **摄像头多帧融合**：实时扫描时把多帧平均，噪声按 1/√N 衰减而信号保留，等于在不损对比度的前提下提高信噪比；单帧读不出的场景靠它救回
 
 ## 技术栈
 
@@ -57,6 +61,7 @@
 - 样式：原生 CSS + CSS Variables（无 UI 框架）
 - 图标：内联 SVG
 - 音视频：`@ffmpeg/ffmpeg` + `@ffmpeg/util`（FFmpeg.wasm，浏览器端处理）
+- 二维码识别：`jsqr`（主引擎）+ `zxing-wasm`（兜底引擎，reader-only 子路径，wasm 本地托管）
 - 部署：Nginx 静态托管 `dist/`
 
 ## 本地开发
@@ -124,14 +129,17 @@ location / {
 │   ├── unicode/            # Unicode 查看器
 │   ├── crypto/             # 加解密
 │   ├── document/           # 文档转换（app.js + operations.js + tab-loaders.js + handlers/ + ui/）
+│   ├── dewatermark/        # 去水印（core.js 算法 + main.js 交互 + style.css）
 │   ├── scandoc/            # 扫描文档（app.js + state.js + render.js + filters.js + warp.js + detect.js + corners-ui.js + exporter.js + lib/）
 │   └── handwriting/      # 去手写处理步骤（app.js + model-manager.js + inpaint-worker.js + detect-ink.js + models/）
-│   ├── qrcode/             # 二维码
+│   ├── qrcode/             # 二维码（生成 + 识别）
 │   ├── color/              # 颜色转换
 │   ├── password/           # 密码生成
 │   ├── unit/               # 单位换算
 │   ├── scripts/            # 实用脚本下载页
 │   └── otp-migration/      # OTP 迁移
+├── assets/js/qr-decoder.js # 二维码识别共享模块（多策略级联解码管线）
+├── assets/js/qr-zxing.js   # zxing-wasm 惰性加载封装（wasm 本地资源定位）
 ├── scripts/                # 可下载的 Windows 批处理脚本
 ├── public/                 # sw.js（Service Worker，原样拷贝到站点根）
 ├── vite.config.js          # 多入口 + conditional COEP 插件

@@ -289,6 +289,8 @@ const LIBRARY_FILES = new Set([
   'html2canvas.js', 'jszip.min.js', 'qrcode.js', 'ort-wasm-simd-threaded.mjs',
   'pdf.worker.min.mjs', 'pdf.min.js', 'word.js', 'epub.js', 'rtf.js',
   'xlsx.js', 'ort-wasm-simd-threaded.wasm',
+  // 二维码识别的 zxing 解码内核（wasm）
+  'zxing_reader.wasm',
 ]);
 
 /* 缓存组名 → 可读名称（toolbox-v1 是站点自身缓存，其余是工具专用缓存） */
