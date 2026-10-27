@@ -441,7 +441,23 @@ export function barrelCandidateScore(gray, w, h, patterns, thr) {
   const b = (du[0] * dy[1] - du[1] * dy[0]) / det;
   const c = (dy[0] * dv[1] - dy[1] * dv[0]) / det;
   const d = (du[0] * dy[1] - du[1] * dy[0]) / det;
-  const f = (u, v) => [dst[0][0] + a * u + b * v, dst[0][1] + c * u + d * v];
+  // 仿射映射：模块坐标 → 图像坐标。
+  //
+  // 上面解出的是「差分关系」src[i] - src[0] = M·(dst[i] - dst[0])，
+  // 所以还原成坐标形式是 src[0] + M·(u - dst[0])。
+  //
+  // 这里曾经写成 dst[0] + M·u —— 少了一项平移，
+  // 误差 = dst[0] - src[0] + M·dst[0]。
+  // 码越大（M 大）误差被摊薄、影响越小；
+  // 模块越小时这个偏移占模块的比例越大，采样直接落到隔壁模块上，
+  // 交替率被彻底破坏 ——
+  // 实测修正前场景用例（640×480、码 140~200px、每模块 3~5 像素）
+  // 的 geo 全部是 0，修正后是 0.75~1.0；
+  // 主用例里 rotate-arbit 从 0 变 1、persp-45 从 0.75 变 1。
+  const f = (u, v) => [
+    src[0][0] + a * (u - dst[0][0]) + b * (v - dst[0][1]),
+    src[0][1] + c * (u - dst[0][0]) + d * (v - dst[0][1]),
+  ];
   const alt = (fixed, along) => {
     const bits = [];
     for (let i = 8; i <= dim - 9; i++) {
@@ -540,6 +556,178 @@ export function findFinderPatterns(bin, w, h) {
   }
 
   return dedupe(found);
+}
+
+/**
+ * 几何管线统一的定位图案检测入口。
+ *
+ * 为什么要有这一层：
+ *   几何策略都要先找到定位图案才能凑三元组，而图案的来源直接决定成败。
+ *   早期实现各处都用「全局 Otsu 阈值 + 找图案」，在重噪声 + 光照渐变下
+ *   全局阈值会把分割切坏 —— 实测同一张场景图（640×480，18% 噪声 + 渐变）：
+ *     全局 Otsu      检出 1069 个图案（几乎全是噪声碎块）
+ *     局部 Sauvola   检出  178 个图案（仍被噪声淹没）
+ *     中值 + Sauvola 检出   19 个图案（真图案排在最前，quality 完全保持）
+ *
+ *   图案池被噪声灌满的代价不只是「多」：
+ *     · 三元组枚举是 O(n³)，178 个图案时组合数上百万，是纯浪费
+ *     · 候选池按数量截断（取前 20/24 个）时真图案被整批切掉
+ *
+ * 所以判据不是「哪种方法更好」，而是「当前结果是否可信」：
+ *   正常图的图案数稳定在 8~36 个（29 个合成用例 + 12 个场景用例实测），
+ *   超过 60 个就说明分割已经坏了 —— 这时改用「中值滤波 + 局部阈值」。
+ *   中值滤波把碎块噪声压掉，局部阈值不受光照渐变影响，两者合起来才能
+ *   在噪声场景下保住真图案。
+ *
+ * 代价：中值滤波在 640×480 上约 55ms。只在「结果可疑」时才付。
+ *
+ * 第二个降级信号是模块尺寸：噪声碎块凑出的假阳性定位图案，
+ * 它的模块尺寸只有 1~2 像素（实测噪声图案的模块尺寸中位数为 1），
+ * 而真实码的定位图案在 200px 的画面上就有 4 像素左右。
+ * 所以「最好的三个图案的模块尺寸中位数 < 2.2」也判定结果不可信。
+ * 两个信号取或 —— 数量爆炸与尺寸过小都是噪声的特征。
+ *
+ * @param {Uint8ClampedArray} gray 源灰度
+ * @param {number} w 宽
+ * @param {number} h 高
+ * @param {number} noisyLimit 图案数超过此值判定分割已坏
+ * @returns {Array} 定位图案列表
+ */
+export function detectFinderPatterns(gray, w, h, opts = {}) {
+  const noisyLimit = opts.noisyLimit ?? 60;
+  const bin = binarize(gray, otsuThreshold(gray));
+  const pats = findFinderPatterns(bin, w, h);
+  if (!pats.length) return pats;
+
+  // 结果是否可信：图案太多，或最好的几个图案模块尺寸过小
+  let suspicious = pats.length > noisyLimit;
+  if (!suspicious) {
+    const top = pats.slice().sort((a, b) => a.quality - b.quality).slice(0, 3);
+    const ms = top.map((p) => p.moduleSize).sort((a, b) => a - b);
+    if (ms[Math.floor(ms.length / 2)] < 2.2) suspicious = true;
+  }
+  if (!suspicious) return pats;
+
+  // 结果可疑：改用中值 + 局部阈值重试
+  const med = medianFilter(gray, w, h);
+  const clean = findFinderPatterns(sauvolaBinarize(med, w, h), w, h);
+  // 局部阈值在极低对比图上会一个图案都检不出（实测 lowcontrast / faint），
+  // 此时宁可留着噪声图案，也不空手而归
+  return clean.length >= 3 ? clean : pats;
+}
+
+/**
+ * 图案检测的结果缓存。
+ *
+ * 同一次解码里，多个策略会对同一张灰度图各检一次图案
+ * （估模块尺寸、几何矫正、桶形扫描…）。
+ * 每次检测都是几十毫秒（噪声场景还要额外付中值滤波），
+ * 而同一张图的检测结果完全确定 —— 缓存后只算一次。
+ *
+ * 键是灰度数组本身（WeakMap 不阻止回收）。
+ */
+const patCache = new WeakMap();
+
+/**
+ * 带缓存的图案检测。同一张灰度图只检测一次。
+ *
+ * @param {Uint8ClampedArray} gray 源灰度
+ * @param {number} w 宽
+ * @param {number} h 高
+ * @returns {Array} 定位图案列表
+ */
+export function detectFinderPatternsCached(gray, w, h) {
+  let hit = patCache.get(gray);
+  if (!hit) {
+    hit = detectFinderPatterns(gray, w, h);
+    patCache.set(gray, hit);
+  }
+  return hit;
+}
+
+/**
+ * 由定位图案推出码所在的区域。
+ *
+ * 区域取「所有检出的图案」的包围盒，而不是单个三元组的 ——
+ * 后者不可靠：数据区偶然形成的假阳性图案同样能凑出自洽三元组，
+ * 实测一张真实照片上（强透视梯形码）三元组就选错了，
+ * 裁出来的区域只有整幅图的 27% 且完全裁歪。
+ *
+ * 用全部图案的包围盒，代价是区域可能偏大（数据区的假阳性也在里面），
+ * 但不会把真正的码裁掉 —— 而「裁掉真码」是不可接受的，
+ * 「区域偏大」只是少省一点时间。
+ *
+ * 外扩量按包围盒尺寸的比例给，固定比例比按模块尺寸推算更稳：
+ * 强透视下模块尺寸本身就被压扁了，推不准。
+ *
+ * @param {Array} patterns 检出的定位图案
+ * @param {number} w 图宽
+ * @param {number} h 图高
+ * @param {number} ext 外扩比例（包围盒尺寸的倍数）
+ * @returns {{x, y, w, h}|null}
+ */
+export function symbolRegion(patterns, w, h, ext = 0.3) {
+  if (!patterns || !patterns.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of patterns) {
+    if (p.x < x0) x0 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.x > x1) x1 = p.x;
+    if (p.y > y1) y1 = p.y;
+  }
+  const bw = x1 - x0, bh = y1 - y0;
+  const mx = Math.max(20, bw * ext), my = Math.max(20, bh * ext);
+  const x = Math.max(0, Math.floor(x0 - mx));
+  const y = Math.max(0, Math.floor(y0 - my));
+  const rw = Math.min(w - x, Math.ceil(bw + 2 * mx));
+  const rh = Math.min(h - y, Math.ceil(bh + 2 * my));
+  if (rw < 8 || rh < 8) return null;
+  return { x, y, w: rw, h: rh };
+}
+
+/**
+ * 码在画面里的位置 —— 用于把解码范围从整幅图缩到码附近。
+ *
+ * 动机：jsQR 自己要在整幅图上找定位图案。
+ * 在重噪声场景里（640×480、18% 噪声），一次 jsQR 要 200~960ms；
+ * 而码只占画面 10~30% 的面积，裁到码附近后只要 3~90ms。
+ * 光度组有 6 个变体，每个变体都要跑一次 jsQR ——
+ * 裁剪带来的收益是乘以变体数的。
+ *
+ * 三元组找不准时（反色码上图案检测不可靠）返回 null，
+ * 调用方应退回整幅图 —— 宁可慢，也不能丢命中。
+ *
+ * @returns {{x, y, w, h, pct}|null} pct 是面积占全图的比例
+ */
+export function locateSymbol(gray, w, h, opts = {}) {
+  const pats = detectFinderPatternsCached(gray, w, h);
+  if (pats.length < 3) return null;
+  const region = symbolRegion(pats, w, h, opts.ext ?? 0.3);
+  if (!region) return null;
+  const pct = (region.w * region.h) / (w * h);
+  // 裁不到 60% 以下就没有省的意义，只是白裁一次
+  if (pct > (opts.minGain ?? 0.6)) return null;
+  return { ...region, pct };
+}
+
+/**
+ * 估码的每模块像素数。
+ *
+ * 依据是定位图案的模块尺寸：定位图案是 7×7 的结构，
+ * 检测器给出的 moduleSize 就是「一个模块占多少像素」。
+ *
+ * 取 quality 最好的三个图案的模块尺寸中位数 ——
+ * 这三个最可能是真正的三个定位图案，它们的模块尺寸相互一致。
+ *
+ * @returns {number} 每模块像素数；检不出图案时返回 0（表示「未知」）
+ */
+export function estimateModuleSize(gray, w, h) {
+  if (!gray) return 0;
+  const pats = detectFinderPatternsCached(gray, w, h);
+  if (!pats.length) return 0;
+  const top = pats.slice().sort((a, b) => a.quality - b.quality).slice(0, 3);
+  const ms = top.map((p) => p.moduleSize).sort((a, b) => a - b);
+  return ms[Math.floor(ms.length / 2)];
 }
 
 /**
@@ -1482,6 +1670,12 @@ function buildAlphaLadder(from, to, ratio) {
 
 export const STRATEGY_LABELS = {
   direct: '直接识别',
+  'roi-direct': '区域识别',
+  'roi-normalize': '区域对比拉伸',
+  'roi-denoise': '区域去噪',
+  'roi-binarize': '区域全局二值化',
+  'roi-upscale': '区域放大',
+  'roi-adaptive-bin': '区域局部自适应二值化',
   normalize: '对比拉伸',
   denoise: '去噪',
   sharpen: '锐化',
@@ -1499,6 +1693,26 @@ export const STRATEGY_LABELS = {
   'zxing-geometry': 'zxing 解码（几何矫正）',
   'zxing-geometry-reverse': 'zxing 解码（透视矫正后消弯曲）',
 };
+
+/**
+ * 把裁剪区域里的定位点平移回整幅图的坐标。
+ *
+ * jsQR 返回的 location 是四个具名角点（topLeftCorner 等），
+ * 各自是 {x, y} 对象。
+ */
+function shiftLocation(location, shift) {
+  if (!location || !shift) return location;
+  const out = {};
+  for (const k of Object.keys(location)) {
+    const p = location[k];
+    if (p && typeof p.x === 'number' && typeof p.y === 'number') {
+      out[k] = { x: p.x + shift.x, y: p.y + shift.y };
+    } else {
+      out[k] = p;
+    }
+  }
+  return out;
+}
 
 /** 图像统计：判断哪些预处理值得做 */
 export function analyzeGray(gray, w, h) {
@@ -1768,7 +1982,6 @@ export function decodeCanvas(canvas, opts = {}) {
 
   // 准备基准画布（限制最长边）
   const base = limitSize(canvas, maxSide);
-  plan.push({ name: 'direct', group: 'fast', make: () => ({ cv: base }) });
 
   let ctxCache = null;
   // 灰度与统计量按需计算并缓存
@@ -1782,48 +1995,162 @@ export function decodeCanvas(canvas, opts = {}) {
     return ctxCache;
   };
 
-  // —— 光度策略 ——
-  plan.push({
-    name: 'normalize',
-    group: 'fast',
-    make: () => {
-      const { norm, w, h } = getCtx();
-      return norm.changed ? { cv: grayToCanvas(norm.gray, w, h) } : null;
-    },
+  // —— 码的定位区域 ——
+  //
+  // jsQR 自己要在整幅图上找定位图案，图越大越慢。
+  // 重噪声场景里（640×480、18% 噪声），一次 jsQR 要 200~960ms；
+  // 而码通常只占画面 10~30% 的面积，裁到码附近后只要 3~90ms。
+  //
+  // 所以光度组的每个变体都跑两遍：先在码附近跑，全都不行再在整幅图上跑。
+  // 收益是乘以变体数的（光度组有 6 个变体），
+  // 代价是最坏情况多付一遍 —— 但那一遍本来也要付。
+  //
+  // 定位本身有风险：三元组找错就会裁掉真正的码（实测反色码上会丢命中）。
+  // 所以整幅图那一遍必须留着 —— 命中不会丢。
+  //
+  // 实测收益（41 个用例）：
+  //   sc-grad-noise   裁剪 42ms  vs 整图 223ms
+  //   sc-hard-small   裁剪 33ms  vs 整图 442ms
+  //   sc-hard         裁剪 28ms  vs 整图 441ms
+  const regionCache = { value: undefined };
+  const getRegion = () => {
+    if (regionCache.value === undefined) {
+      const { gray, w, h } = getCtx();
+      regionCache.value = opts.roi === false ? null : locateSymbol(gray, w, h);
+    }
+    return regionCache.value;
+  };
+
+  // 变体画布的两种形态：码附近 / 整幅图
+  const variant = (name, build) => {
+    plan.push({
+      name,
+      group: 'fast',
+      make: () => {
+        const region = getRegion();
+        if (!region) return null;
+        const built = build(region);
+        if (!built) return null;
+        return { cv: built, shift: { x: region.x, y: region.y } };
+      },
+    });
+  };
+  // 整幅图形态（裁剪不可用或裁剪版失败后的兜底）
+  //
+  // 只在「定位不可用」或「定位可用但直查也失败」时才需要跑完整的整幅图组。
+  // 定位可用时，其余光度变体在区域里已经试过了 ——
+  // 再在整幅图上重跑一遍是纯浪费（实测 sc-hard 上要多付 1.4 秒）。
+  // 只有 direct 需要在整幅图上再试一次：
+  // 实测 12 个场景用例里，区域版与整幅图版的命中结果只有 sc-invert 不同
+  // （反色码上定位图案检测不可靠，区域版裁错了位置）。
+  const variantFull = (name, build, opts = {}) => {
+    plan.push({
+      name,
+      group: 'fast',
+      make: () => {
+        // 定位可用时，只保留 direct 的整幅图兜底
+        if (opts.directOnly && getRegion()) return null;
+        const built = build(null);
+        if (!built) return null;
+        return { cv: built };
+      },
+    });
+  };
+
+  // —— 区域版：各光度变体在码附近跑 ——
+  variant('roi-direct', (r) => cropCanvas(base, r.x, r.y, r.w, r.h));
+  variant('roi-normalize', (r) => {
+    const { norm, w, h } = getCtx();
+    if (!norm.changed) return null;
+    return cropCanvas(grayToCanvas(norm.gray, w, h), r.x, r.y, r.w, r.h);
   });
-  plan.push({
-    name: 'denoise',
-    group: 'fast',
-    make: () => {
-      const { norm, stats, w, h } = getCtx();
-      if (!norm.changed || stats.noise <= 12) return null;
-      return { cv: grayToCanvas(medianFilter(norm.gray, w, h), w, h) };
-    },
+  variant('roi-denoise', (r) => {
+    const { norm, stats, w, h } = getCtx();
+    if (!norm.changed || stats.noise <= 12) return null;
+    return cropCanvas(grayToCanvas(medianFilter(norm.gray, w, h), w, h), r.x, r.y, r.w, r.h);
   });
-  plan.push({
-    name: 'sharpen',
-    group: 'fast',
-    make: () => {
-      const { norm, stats, w, h } = getCtx();
-      if (!norm.changed || stats.noise > 12) return null;
-      return { cv: grayToCanvas(unsharpMask(norm.gray, w, h), w, h) };
-    },
+  variant('roi-binarize', (r) => {
+    const { gray, w, h } = getCtx();
+    if (getCtx().stats.noise < 10) return null;
+    const bin = binarize(gray, otsuThreshold(gray));
+    const out = new Uint8ClampedArray(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin[i] ? 0 : 255;
+    return cropCanvas(grayToCanvas(out, w, h), r.x, r.y, r.w, r.h);
   });
 
+  // —— 整幅图版：兜底，保证命中不会因为裁剪丢失 ——
+  variantFull('direct', () => base);
+  variantFull('normalize', () => {
+    const { norm, w, h } = getCtx();
+    return norm.changed ? grayToCanvas(norm.gray, w, h) : null;
+  }, { directOnly: true });
+  variantFull('denoise', () => {
+    const { norm, stats, w, h } = getCtx();
+    if (!norm.changed || stats.noise <= 12) return null;
+    return grayToCanvas(medianFilter(norm.gray, w, h), w, h);
+  }, { directOnly: true });
+  variantFull('sharpen', () => {
+    const { norm, stats, w, h } = getCtx();
+    if (!norm.changed || stats.noise > 12) return null;
+    return grayToCanvas(unsharpMask(norm.gray, w, h), w, h);
+  }, { directOnly: true });
+  variantFull('upscale', () => {
+    const b = buildUpscale(null);
+    return b ? b.cv : null;
+  }, { directOnly: true });
+  variantFull('binarize', () => {
+    const { gray, stats, w, h } = getCtx();
+    if (stats.noise < 10) return null;
+    const bin = binarize(gray, otsuThreshold(gray));
+    const out = new Uint8ClampedArray(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin[i] ? 0 : 255;
+    return grayToCanvas(out, w, h);
+  }, { directOnly: true });
+  variantFull('adaptive-bin', () => {
+    const b = buildAdaptiveBin(null);
+    return b;
+  }, { directOnly: true });
+
   // —— 尺度策略：每模块像素不足时放大 ——
-  plan.push({
-    name: 'upscale',
-    group: 'fast',
-    make: () => {
-      const { w, h } = getCtx();
-      const maxDim = Math.max(w, h);
-      if (maxDim >= 900) return null;
-      const scale = Math.min(4, Math.ceil(900 / maxDim));
-      const up = scaleCanvas(base, scale);
-      const upG = toGray(toImageData(up));
-      const upN = normalizeGray(upG.gray, upG.w, upG.h);
-      return { cv: upN.changed ? grayToCanvas(upG.changed ? upN.gray : upG.gray, upG.w, upG.h) : up };
-    },
+  //
+  // 门槛不是「整图边长」，而是「码的每模块有多少像素」。
+  //
+  // 原门槛是 maxDim < 900，这与「码有多小」无关 ——
+  // 640×480 的摄像头画面也会触发，而那种画面里的码往往有 200 像素宽，
+  // 每模块 3~5 像素，放大纯属浪费：实测 sc-hard 上放大后 jsQR 要 962ms，
+  // 而原图只要 610ms，且两者都读不出来（几何畸变不是放大能解决的）。
+  //
+  // 改用模块尺寸后判据才与问题对齐：
+  //   scale-64   每模块 1.86 像素 → 放大（命中）
+  //   scale-48   每模块 1.57 像素 → 放大（命中）
+  //   sc-hard    每模块 3.71 像素 → 不放大
+  //
+  // 门槛 2.6 像素：低于它每模块的信息量不足以稳定采样。
+  // 放大只在码小的时候有意义 —— 判据用「每模块多少像素」，
+  // 而不是整幅图的边长。区域版里按区域自身的尺寸判断更准。
+  const buildUpscale = (region) => {
+    const { gray, w, h } = getCtx();
+    const src = region ? cropCanvas(base, region.x, region.y, region.w, region.h) : base;
+    const sw = region ? region.w : w;
+    const sh = region ? region.h : h;
+    const maxDim = Math.max(sw, sh);
+    if (maxDim >= 900) return null;
+    // 估模块尺寸：靠定位图案的模块尺寸中位数。
+    // 检不出图案时退回按整图尺寸判断（保持原有行为）。
+    const ms = estimateModuleSize(gray, w, h);
+    if (ms > 0 && ms >= 2.6) return null;
+    const scale = Math.min(4, Math.ceil(900 / maxDim));
+    const up = scaleCanvas(src, scale);
+    const upG = toGray(toImageData(up));
+    const upN = normalizeGray(upG.gray, upG.w, upG.h);
+    return { cv: upN.changed ? grayToCanvas(upG.changed ? upN.gray : upG.gray, upG.w, upG.h) : up };
+  };
+  variant('roi-upscale', (r) => {
+    const b = buildUpscale(r);
+    if (!b) return null;
+    // 放大后坐标要按比例平移回原图
+    const scale = Math.max(b.cv.width / r.w, 1);
+    return { cv: b.cv, shift: { x: r.x * scale, y: r.y * scale } };
   });
 
   // —— 二值化策略：全局阈值 ——
@@ -1855,26 +2182,24 @@ export function decodeCanvas(canvas, opts = {}) {
   // 实测定位图案召回率：全局 Otsu 1/3（140px 码上 0/3），Sauvola 3/3。
   //
   // 放在 binarize 之后：全局阈值够用时不必付这个代价。
-  plan.push({
-    name: 'adaptive-bin',
-    group: 'fast',
-    make: () => {
-      const { gray, stats, w, h } = getCtx();
-      // 只有在全局分割确实可疑时才试：
-      // 判据是「暗像素占比偏离正常范围」——
-      // 正常码的暗像素占比约 4%（黑白相间），超过 20% 说明分割已经崩了。
-      const thr = otsuThreshold(gray);
-      const bin = binarize(gray, thr);
-      let dark = 0;
-      for (let i = 0; i < bin.length; i++) if (bin[i]) dark++;
-      const ratio = dark / bin.length;
-      if (ratio < 0.15) return null;
-      const sbin = sauvolaBinarize(gray, w, h);
-      const out = new Uint8ClampedArray(sbin.length);
-      for (let i = 0; i < sbin.length; i++) out[i] = sbin[i] ? 0 : 255;
-      return { cv: grayToCanvas(out, w, h) };
-    },
-  });
+  const buildAdaptiveBin = (region) => {
+    const { gray, stats, w, h } = getCtx();
+    // 只有在全局分割确实可疑时才试：
+    // 判据是「暗像素占比偏离正常范围」——
+    // 正常码的暗像素占比约 4%（黑白相间），超过 20% 说明分割已经崩了。
+    const thr = otsuThreshold(gray);
+    const bin = binarize(gray, thr);
+    let dark = 0;
+    for (let i = 0; i < bin.length; i++) if (bin[i]) dark++;
+    const ratio = dark / bin.length;
+    if (ratio < 0.15) return null;
+    const sbin = sauvolaBinarize(gray, w, h);
+    const out = new Uint8ClampedArray(sbin.length);
+    for (let i = 0; i < sbin.length; i++) out[i] = sbin[i] ? 0 : 255;
+    const cv = grayToCanvas(out, w, h);
+    return region ? cropCanvas(cv, region.x, region.y, region.w, region.h) : cv;
+  };
+  variant('roi-adaptive-bin', (r) => buildAdaptiveBin(r));
 
   // —— 几何策略：透视矫正 ——
   if (deep) {
@@ -1885,8 +2210,7 @@ export function decodeCanvas(canvas, opts = {}) {
         const { gray, norm, w, h } = getCtx();
         for (const g of [norm.changed ? norm.gray : null, gray]) {
           if (!g) continue;
-          const bin = binarize(g, otsuThreshold(g));
-          const patterns = findFinderPatterns(bin, w, h);
+          const patterns = detectFinderPatternsCached(g, w, h);
           if (patterns.length < 3) continue;
           // 惰性遍历候选：第一个能解码出来的即返回，避免全量重采样
           for (const rect of rectifyCandidates(g, w, h, patterns)) {
@@ -1931,8 +2255,7 @@ export function decodeCanvas(canvas, opts = {}) {
         //
         // 做法：先在源图上找定位图案，反推符号的中心与半对角线，
         // 用它当参考系。这样 k 的含义就与「码占画面多大」无关了。
-        const srcBin = binarize(src, otsuThreshold(src));
-        const srcPatterns = findFinderPatterns(srcBin, w, h);
+        const srcPatterns = detectFinderPatternsCached(src, w, h);
         const frame = srcPatterns.length >= 3 ? estimateSymbolFrame(srcPatterns) : null;
         const ref = frame ? { cx: frame.cx, cy: frame.cy, R: frame.R } : null;
 
@@ -2006,7 +2329,7 @@ export function decodeCanvas(canvas, opts = {}) {
         // 闸门放宽到 1 个角 —— 重度变形下正视图的角上定位图案
         // 往往已经被拉变形，严格闸门会把真候选全杀光。
         const bin = binarize(src, otsuThreshold(src));
-        const patterns = findFinderPatterns(bin, w, h);
+        const patterns = detectFinderPatternsCached(src, w, h);
         if (patterns.length < 3) return null;
 
         const rects = [];
@@ -2151,10 +2474,25 @@ export function decodeCanvas(canvas, opts = {}) {
 
           // 参考中心候选
           const centers = [{ cx: w / 2, cy: h / 2 }];
-          // 在原图上找定位图案，用来推「码自身中心」这个参考中心。
-          // 用局部阈值：重噪声 + 光照渐变下全局阈值常常连三个图案都检不出。
-          const sbin0 = sauvolaBinarize(gray, w, h);
-          const pats0 = findFinderPatterns(sbin0, w, h);
+
+          // 初始定位：与其它几何策略共用同一份图案检测结果。
+          //
+          // 关键在于「检测到的是不是真图案」：
+          // 重噪声场景里，直接在原图上做 Sauvola 会检出 170~180 个图案，
+          // 其中绝大多数是噪声碎块凑出的假阳性（实测 sc-hard 178 个、
+          // sc-hard-small 183 个）。后果是「图案包围盒」被噪声撑满 ——
+          // ROI 退化成整幅图，扫描阶段每个候选都要付全图像素的代价
+          // （单候选 8~12ms）。
+          //
+          // 统一检测入口 detectFinderPatternsCached 会在结果可疑时
+          // （图案数爆炸或模块尺寸过小）自动改用「3×3 中值滤波 + 局部阈值」：
+          // 图案数降到 14~20 个，而真图案的 moduleSize 与 quality 完全保持
+          // （真图案在结果里的索引从 92 降到 0~3）。
+          //
+          // 附带的好处：ROI 变小后噪声图案自然被裁掉，
+          // ROI 内检出的图案降到 17~23 个 —— 候选池的数量截断
+          // （取前 20/24 个）不再有切掉真图案的风险。
+          const pats0 = detectFinderPatternsCached(gray, w, h);
           if (pats0.length >= 3) {
             const frame = estimateSymbolFrame(pats0);
             if (frame) centers.push({ cx: frame.cx, cy: frame.cy });
@@ -2217,8 +2555,22 @@ export function decodeCanvas(canvas, opts = {}) {
             const union = [];
             for (const x of byGeo.slice(0, K_GEO)) union.push(x);
             for (const x of byPen.slice(0, K_PEN)) union.push(x);
-            // 组内再按 geo 排一遍，决定尝试顺序
-            union.sort((a, b) => b.geo - a.geo);
+            // 尝试顺序：先按 geo 分档，档内按 pen 排。
+            //
+            // 为什么不能只按 geo 排：geo 是离散的几档
+            // （采样 17 个模块算出的交替率，粒度 1/16），
+            // 同一档里的候选 geo 完全相同、无法区分。
+            // 实测 sc-hard-small 前 6 个候选的 geo 都是 0.917，
+            // 真解（alpha=-2e-5）geo 只有 0.875，被压到第 7 位；
+            // 而它在 pen 上排第 1（pen=0.05，其余是 0.07~0.58）。
+            //
+            // 为什么要分档而不是直接按 pen 排：
+            // geo 是「整条时序图案是否严格交替」，是网格规整度的直接度量；
+            // pen 是「两条直角边是否落在同一个 4v+10 上」，只看三点。
+            // 桶形残余破坏的是整片网格，pen 在原理上更弱。
+            // 所以 geo 定档（决定网格大致规整的那一档）、
+            // pen 定档内顺序（区分同一档里的候选），两者互补。
+            union.sort((a, b) => (b.geo - a.geo) || (a.pen - b.pen));
             for (const x of union) {
               const key = `${x.c.cx},${x.c.cy},${x.alpha}`;
               if (seen.has(key)) continue;
@@ -2248,6 +2600,12 @@ export function decodeCanvas(canvas, opts = {}) {
               // 区域原点（裁剪偏移）与畸变参数（反变换回原图）。
               rect.origin = { x: roi.x, y: roi.y };
               rect.warp = { alpha, cx: c.cx, cy: c.cy };
+              // 定位图案闸门：49 点采样，几乎免费，
+              // 而 jsQR 要 12ms。实测 19 个入选候选产出 98 个矫正图，
+              // 闸门能挡掉其中 56 个 —— 每次命中前的空跑大幅缩短。
+              // 闸门只认「角上是不是定位图案」，不认极性（反色码也合法），
+              // 实测首次命中的候选闸门一定通过，不会误杀正解。
+              if (!looksLikeFinderPattern(rect)) continue;
               const res = runJsQR(toImageData(rect.canvas));
               if (res) return { cv: rect.canvas, rect, hit: res };
             }
@@ -2302,6 +2660,8 @@ export function decodeCanvas(canvas, opts = {}) {
       let location = res.location || null;
       // 矫正图的定位点需要映射回原图
       if (built.rect) location = mapLocation(res.location, built.rect);
+      // 区域裁剪的定位点要平移回整幅图的坐标
+      else if (built.shift && location) location = shiftLocation(location, built.shift);
       return { data: res.data, location, strategy: at.name };
     }
   }
@@ -2411,8 +2771,7 @@ async function decodeGeoWithZxing(canvas, opts) {
   const ks = opts.unbarrelKs ?? [-0.45, -0.3, -0.2, -0.1, 0.1, 0.2, 0.3, 0.45];
   // 参考系与主管线保持一致：畸变相对码自身施加，用码的范围归一化，
   // 否则码在画面里偏小时矫正强度会差好几倍。
-  const srcBin = binarize(gray, otsuThreshold(gray));
-  const srcPatterns = findFinderPatterns(srcBin, w, h);
+  const srcPatterns = detectFinderPatternsCached(gray, w, h);
   const frame = srcPatterns.length >= 3 ? estimateSymbolFrame(srcPatterns) : null;
   const ref = frame ? { cx: frame.cx, cy: frame.cy, R: frame.R } : null;
 
