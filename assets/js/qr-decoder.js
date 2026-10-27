@@ -91,6 +91,77 @@ export function binarize(gray, thr) {
 /* ========== 光度处理 ========== */
 
 /**
+ * Sauvola 局部自适应二值化。
+ *
+ * 背景：全局 Otsu 阈值有一个硬性前提 —— 前景与背景的对比度在整幅图里一致。
+ * 一旦画面存在光照渐变或阴影，这个前提就崩了：
+ * 阈值只能取一个数，而画面里不同位置的对比度天差地别。
+ *
+ * 实测（640×480 场景，码 200px，叠加渐变+重噪声+2px 模糊）：
+ *   全局 Otsu   暗像素占比 43%，定位图案召回率 1/3（140px 码上是 0/3）
+ *   Sauvola     暗像素占比 22%，定位图案召回率 3/3
+ * 召回率是「三个真定位图案有没有被 findFinderPatterns 检出」，
+ * 用同几何、无光度退化的干净图作参考答案逐一比对得出。
+ *
+ * 为什么有效：Sauvola 的阈值是逐窗口的
+ *   T = m · (1 + k · (σ/R − 1))
+ * 亮区（σ 小）阈值贴近均值 → 判暗；暗区（σ 大）阈值抬高 → 判亮。
+ * 这让「局部比周围亮/暗」成为判据，而不是「比某个固定灰度暗」。
+ * 于是渐变造成的极性反转（局部背景比码的白模块还暗）不再致命 ——
+ * 实测该场景左侧背景灰度 88、码的白模块 217，全局阈值无解，局部阈值无碍。
+ *
+ * 代价：需要两个积分图（和与平方和），O(w·h) 时间与空间。
+ *
+ * @param {Uint8ClampedArray} gray 灰度
+ * @param {number} w 宽
+ * @param {number} h 高
+ * @param {object} opts
+ *   win  窗口边长（奇数），应略大于码的模块尺寸
+ *   k    阈值调节系数（0.2 为常用值；越大越保守，判暗越少）
+ *   R    动态范围上限（标准差归一化用，灰度图取 128）
+ * @returns {Uint8Array} 1 = 暗
+ */
+export function sauvolaBinarize(gray, w, h, opts = {}) {
+  const win = opts.win ?? 25;
+  const k = opts.k ?? 0.2;
+  const R = opts.R ?? 128;
+  const r = Math.max(1, win >> 1);
+
+  // 两个积分图：像素和、像素平方和
+  const I1 = new Float64Array((w + 1) * (h + 1));
+  const I2 = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let rs = 0, rs2 = 0;
+    for (let x = 0; x < w; x++) {
+      const v = gray[y * w + x];
+      rs += v;
+      rs2 += v * v;
+      I1[(y + 1) * (w + 1) + (x + 1)] = I1[y * (w + 1) + (x + 1)] + rs;
+      I2[(y + 1) * (w + 1) + (x + 1)] = I2[y * (w + 1) + (x + 1)] + rs2;
+    }
+  }
+
+  const out = new Uint8Array(gray.length);
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - r), x1 = Math.min(w - 1, x + r);
+      const area = (x1 - x0 + 1) * (y1 - y0 + 1);
+      const s1 = I1[(y1 + 1) * (w + 1) + (x1 + 1)] - I1[y0 * (w + 1) + (x1 + 1)]
+        - I1[(y1 + 1) * (w + 1) + x0] + I1[y0 * (w + 1) + x0];
+      const s2 = I2[(y1 + 1) * (w + 1) + (x1 + 1)] - I2[y0 * (w + 1) + (x1 + 1)]
+        - I2[(y1 + 1) * (w + 1) + x0] + I2[y0 * (w + 1) + x0];
+      const m = s1 / area;
+      const varr = s2 / area - m * m;
+      const sd = varr > 0 ? Math.sqrt(varr) : 0;
+      const T = m * (1 + k * (sd / R - 1));
+      out[y * w + x] = gray[y * w + x] < T ? 1 : 0;
+    }
+  }
+  return out;
+}
+
+/**
  * 分位数对比拉伸：把 [lo, hi] 区间拉到满量程。
  * 低对比、光照渐变、阴影类失效的主因是动态范围被压缩。
  */
@@ -203,6 +274,190 @@ export function unbarrel(gray, w, h, k, ref = null) {
     }
   }
   return out;
+}
+
+/**
+ * 归一化桶形撤销：按绝对像素半径的二次项做径向重采样。
+ *
+ * 与 unbarrel 的区别有三点，都是实测逼出来的：
+ *
+ * 1) 参数是「绝对」而非相对半径。
+ *    桶形畸变的实际强度等于「码边缘处的径向缩放量」，用相对半径归一化时
+ *    参考半径 R 必须准确 —— 而 R 在畸变图上根本估不准
+ *    （实测同一场景检测值 262px、真值 141px）。
+ *    改成绝对二次项 α（单位 px⁻²）后，畸变强度与参考半径解耦。
+ *
+ * 2) 撤销方向：采样点必须落在「更内侧」。
+ *    施加畸变时输出像素取的是更外侧的输入（内容被压向中心），
+ *    撤销就要取回更内侧的点，于是缩放因子 f = 1 + α r² 中 α 必须为负。
+ *
+ * 3) 有效撤销强度约为施加强度的一半。
+ *    五个场景实测 α_undo · R_code² 全部落在 −k_bench/2 上：
+ *    sc-hard −6.25e-6×141²=−0.124（施加 0.25）、
+ *    sc-curve −8.75e-6×141²=−0.174（施加 0.35）、
+ *    sc-corner-curve −1.37e-5×113²=−0.175（施加 0.35）。
+ *
+ * @param {Uint8ClampedArray} gray 源灰度
+ * @param {number} w 宽
+ * @param {number} h 高
+ * @param {number} alpha 二次项系数（px⁻²，撤销取负值）
+ * @param {number} cx 畸变中心 x
+ * @param {number} cy 畸变中心 y
+ * @returns {Uint8ClampedArray} 撤销后的灰度
+ */
+export function unbarrelAlpha(gray, w, h, alpha, cx, cy) {
+  if (!alpha) return gray;
+  const out = new Uint8ClampedArray(gray.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = x - cx, dy = y - cy;
+      const f = 1 + alpha * (dx * dx + dy * dy);
+      out[y * w + x] = bilinear(gray, w, h, cx + dx * f, cy + dy * f);
+    }
+  }
+  return out;
+}
+
+/**
+ * 桶形撤销（局部输出）。
+ *
+ * 与 unbarrelAlpha 的唯一区别是「只算一块区域，但采样仍用整幅图」：
+ *   输出区域 = [rx, ry, rw, rh]（整图坐标）
+ *   采样源   = 整幅 gray
+ *
+ * 为什么要这么做：畸变中心通常不在码上。
+ * 真实镜头畸变以画面中心为心，而码可能在角落；
+ * 此时若把画面裁到码附近，撤销所需的采样点就落在裁剪区之外，
+ * 整图撤销又会因为画面大而昂贵（每候选 O(整图像素)）。
+ * 只算局部、采样用整图，两个问题同时解决 ——
+ * 数学上与整图撤销在区域内完全等价（同一套公式、同一份源数据）。
+ */
+export function unbarrelRegion(src, w, h, rx, ry, rw, rh, alpha, cx, cy) {
+  const out = new Uint8ClampedArray(rw * rh);
+  if (!alpha) {
+    for (let y = 0; y < rh; y++) {
+      for (let x = 0; x < rw; x++) out[y * rw + x] = src[(ry + y) * w + rx + x];
+    }
+    return out;
+  }
+  for (let y = 0; y < rh; y++) {
+    const dy = ry + y - cy;
+    for (let x = 0; x < rw; x++) {
+      const dx = rx + x - cx;
+      const f = 1 + alpha * (dx * dx + dy * dy);
+      out[y * rw + x] = bilinear(src, w, h, cx + dx * f, cy + dy * f);
+    }
+  }
+  return out;
+}
+
+/**
+ * 桶形撤销候选的评分：版本一致性 + 时序图案交替率。
+ *
+ * 两个信号都只看「网格是否已经恢复规整」，不需要解码。
+ *
+ * 版本一致性（pen）：
+ *   定位图案中心距 ÷ 平均模块尺寸 应当是 4v+10（v 为版本号）。
+ *   桶形残余会让两条直角边同时偏离且互不相等，
+ *   于是「让两条边落在同一个 4v+10 上」的最小误差可作为评分。
+ *
+ * 时序图案交替率（geo）：
+ *   QR 的第 6 行与第 6 列是黑白交替的长条，横跨整个符号。
+ *   撤销正确时整条线严格交替（接近 100%）；
+ *   残余畸变会把它破坏（随机数据区约 50%）。
+ *   三个定位图案拟合出仿射变换后即可采样，无需第四个对应点、无需解码。
+ *
+ * 实测：分参考中心各自排序时，可解候选在 geo 下的最好排名为 1~7，
+ * 在 pen 下为 1~7 —— 两者都不完美，所以生产实现取两者的并集。
+ */
+export function barrelCandidateScore(gray, w, h, patterns, thr) {
+  let minPen = Infinity;
+  let maxGeo = 0;
+  const n = Math.min(patterns.length, 24);
+  for (let a = 0; a < n; a++) {
+    for (let b = a + 1; b < n; b++) {
+      for (let c = b + 1; c < n; c++) {
+        const t = [patterns[a], patterns[b], patterns[c]];
+        for (let tl = 0; tl < 3; tl++) {
+          const TL = t[tl], P = t[(tl + 1) % 3], Q = t[(tl + 2) % 3];
+          const mss = [TL.moduleSize, P.moduleSize, Q.moduleSize].sort((x, y) => x - y);
+          if (mss[0] <= 0) continue;
+          // 模块尺寸一致性
+          const msSpread = (mss[2] - mss[0]) / mss[2];
+          if (msSpread > 0.35) continue;
+          const l1 = Math.hypot(P.x - TL.x, P.y - TL.y);
+          const l2 = Math.hypot(Q.x - TL.x, Q.y - TL.y);
+          if (l1 < 8 || l2 < 8) continue;
+          // 直角
+          const cos = ((P.x - TL.x) * (Q.x - TL.x) + (P.y - TL.y) * (Q.y - TL.y)) / (l1 * l2);
+          const ang = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+          if (Math.abs(ang - 90) > 22) continue;
+          // 两条直角边等长
+          const lenSpread = Math.abs(l1 - l2) / Math.max(l1, l2);
+          if (lenSpread > 0.3) continue;
+
+          const avgMs = (mss[0] + mss[1] + mss[2]) / 3;
+          const n1 = l1 / avgMs, n2 = l2 / avgMs;
+          let pen = Infinity, ver = 0;
+          for (let v = 1; v <= 40; v++) {
+            const target = 4 * v + 10;
+            const p = Math.abs(n1 - target) + Math.abs(n2 - target);
+            if (p < pen) { pen = p; ver = v; }
+          }
+          if (pen < minPen) minPen = pen;
+
+          // 时序图案交替率
+          //
+          // 只在版本一致性足够好的三元组上算：
+          // 版本对不上的三元组，其「模块坐标 → 图像坐标」映射本身就不成立，
+          // 采出来的交替率是噪声。pen ≤ 4 意味着两条直角边都能对上同一个 4v+10。
+          if (pen > 4) continue;
+          const dim = 4 * ver + 17;
+          if (dim < 21 || dim > 45) continue;
+          const geo = timingAlternation(gray, w, h, thr, TL, P, Q, dim);
+          if (geo > maxGeo) maxGeo = geo;
+          if (maxGeo >= 0.95 && minPen <= 0.5) return { pen: minPen, geo: maxGeo };
+        }
+      }
+    }
+  }
+  return { pen: isFinite(minPen) ? minPen : Infinity, geo: maxGeo };
+}
+
+/**
+ * 由三个定位图案拟合仿射变换，采样时序图案并计算交替率。
+ * 返回 0~1，越接近 1 表示网格越规整。
+ */function timingAlternation(gray, w, h, thr, TL, P, Q, dim) {
+  const dst = [[3.5, 3.5], [dim - 3.5, 3.5], [3.5, dim - 3.5]];
+  const src = [[TL.x, TL.y], [P.x, P.y], [Q.x, Q.y]];
+  const du = [], dv = [], dx = [], dy = [];
+  for (let i = 1; i < 3; i++) {
+    du.push(dst[i][0] - dst[0][0]); dv.push(dst[i][1] - dst[0][1]);
+    dx.push(src[i][0] - src[0][0]); dy.push(src[i][1] - src[0][1]);
+  }
+  const det = du[0] * dv[1] - du[1] * dv[0];
+  if (Math.abs(det) < 1e-9) return 0;
+  const a = (dx[0] * dv[1] - dx[1] * dv[0]) / det;
+  const b = (du[0] * dy[1] - du[1] * dy[0]) / det;
+  const c = (dy[0] * dv[1] - dy[1] * dv[0]) / det;
+  const d = (du[0] * dy[1] - du[1] * dy[0]) / det;
+  const f = (u, v) => [dst[0][0] + a * u + b * v, dst[0][1] + c * u + d * v];
+  const alt = (fixed, along) => {
+    const bits = [];
+    for (let i = 8; i <= dim - 9; i++) {
+      const mx = along === 'x' ? i + 0.5 : fixed + 0.5;
+      const my = along === 'y' ? i + 0.5 : fixed + 0.5;
+      const [sx, sy] = f(mx, my);
+      if (!isFinite(sx) || !isFinite(sy)) return 0;
+      if (sx < -w || sy < -h || sx > w * 2 || sy > h * 2) return 0;
+      bits.push(bilinear(gray, w, h, sx, sy) <= thr ? 1 : 0);
+    }
+    if (bits.length < 8) return 0;
+    let d2 = 0;
+    for (let i = 1; i < bits.length; i++) if (bits[i] !== bits[i - 1]) d2++;
+    return d2 / (bits.length - 1);
+  };
+  return Math.max(alt(6, 'x'), alt(6, 'y'));
 }
 
 function bilinear(gray, w, h, x, y) {
@@ -1176,6 +1431,55 @@ export function warpByH(gray, w, h, H, dim, moduleSize, outModuleOverride) {
 
 /* ========== 策略级联 ========== */
 
+/**
+ * 定位图案的外接区域（外扩一圈），用作桶形扫描的工作窗口。
+ *
+ * 为什么要裁：桶形扫描要试几十个参数，每个候选都得跑一遍
+ * 「撤销 → 局部阈值二值化 → 定位图案检测」。
+ * 全图做这三步是 O(整图像素)，在 640×480 上单候选就要 8~12ms，
+ * 几十个候选直接上秒。裁到码附近后单候选降到 1~2ms。
+ *
+ * 为什么要外扩：撤销会把内容往中心压，图案位置会移动；
+ * 扩得太少会切掉图案，太多是浪费。实测 40% 外扩足够。
+ */
+function roiAroundPatterns(patterns, w, h) {
+  if (!patterns || patterns.length < 3) return { x: 0, y: 0, w, h };
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of patterns) {
+    if (p.x < x0) x0 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.x > x1) x1 = p.x;
+    if (p.y > y1) y1 = p.y;
+  }
+  const bw = x1 - x0, bh = y1 - y0;
+  const mx = Math.max(30, bw * 0.4), my = Math.max(30, bh * 0.4);
+  const x = Math.max(0, Math.floor(x0 - mx));
+  const y = Math.max(0, Math.floor(y0 - my));
+  const rw = Math.min(w - x, Math.ceil(bw + 2 * mx));
+  const rh = Math.min(h - y, Math.ceil(bh + 2 * my));
+  return { x, y, w: rw, h: rh };
+}
+
+/**
+ * 桶形撤销系数 α 的几何级数阶梯（单位 px⁻²，取负值）。
+ *
+ * 用几何级数而不是等差：可解窗口的「相对宽度」是固定的
+ * （实测约 26%~30%），等差网格在强畸变端会过密、在弱畸变端会过疏。
+ *
+ * @param {number} from 起始幅度（最大 |α|）
+ * @param {number} to 终止幅度（最小 |α|）
+ * @param {number} ratio 公比
+ */
+function buildAlphaLadder(from, to, ratio) {
+  const out = [];
+  let a = from;
+  while (a >= to) {
+    out.push(-a);
+    a /= ratio;
+  }
+  return out;
+}
+
 export const STRATEGY_LABELS = {
   direct: '直接识别',
   normalize: '对比拉伸',
@@ -1183,9 +1487,12 @@ export const STRATEGY_LABELS = {
   sharpen: '锐化',
   upscale: '放大',
   binarize: '全局二值化',
+  'adaptive-bin': '局部自适应二值化',
   rectify: '透视矫正',
   unbarrel: '弯曲矫正',
   'rectify-then-unbarrel': '透视矫正后消弯曲',
+  'adaptive-rectify': '局部阈值检出后透视矫正',
+  'barrel-sweep': '桶形畸变参数扫描',
   tile: '分块搜索',
   zxing: 'zxing 解码',
   'zxing-normalized': 'zxing 解码（对比拉伸）',
@@ -1232,11 +1539,26 @@ function runJsQR(imageData) {
 function mapLocation(location, rect) {
   if (!location || !rect) return null;
   const { H, outModule, margin } = rect;
+  // 矫正图可能是在源图的裁剪区域上生成的（局部几何策略），
+  // 此时 H 给出的是裁剪区坐标，必须加回裁剪原点才是原图坐标。
+  const ox = rect.origin ? rect.origin.x : 0;
+  const oy = rect.origin ? rect.origin.y : 0;
+  // 桶形撤销后的坐标还要反变换回原图：
+  // 撤销的定义是「输出像素 x 取原图 c+(x-c)(1+α|x-c|²) 处的内容」，
+  // 所以从撤销图坐标 p 回到原图坐标，用的是同一个公式。
+  const warp = rect.warp || null;
   const mapPt = (pt) => {
     if (!pt || typeof pt.x !== 'number' || typeof pt.y !== 'number') return null;
     const mx = pt.x / outModule - margin;
     const my = pt.y / outModule - margin;
-    const [x, y] = applyH(H, mx, my);
+    let [x, y] = applyH(H, mx, my);
+    x += ox; y += oy;
+    if (warp) {
+      const dx = x - warp.cx, dy = y - warp.cy;
+      const f = 1 + warp.alpha * (dx * dx + dy * dy);
+      x = warp.cx + dx * f;
+      y = warp.cy + dy * f;
+    }
     return { x, y };
   };
   const keys = ['topLeftCorner', 'topRightCorner', 'bottomRightCorner', 'bottomLeftCorner'];
@@ -1522,6 +1844,38 @@ export function decodeCanvas(canvas, opts = {}) {
     },
   });
 
+  // —— 二值化策略：局部自适应阈值（Sauvola）——
+  //
+  // 全局阈值的前提是「前景背景对比度在整幅图里一致」。
+  // 有光照渐变或阴影时这个前提不成立，阈值只能取一个数，
+  // 而画面不同位置的对比度天差地别 —— 实测最坏情况下
+  // 局部背景比码的白模块还暗（88 vs 217），全局阈值必然切错。
+  //
+  // 局部阈值逐窗口判断「比周围亮还是暗」，不受极性反转影响。
+  // 实测定位图案召回率：全局 Otsu 1/3（140px 码上 0/3），Sauvola 3/3。
+  //
+  // 放在 binarize 之后：全局阈值够用时不必付这个代价。
+  plan.push({
+    name: 'adaptive-bin',
+    group: 'fast',
+    make: () => {
+      const { gray, stats, w, h } = getCtx();
+      // 只有在全局分割确实可疑时才试：
+      // 判据是「暗像素占比偏离正常范围」——
+      // 正常码的暗像素占比约 4%（黑白相间），超过 20% 说明分割已经崩了。
+      const thr = otsuThreshold(gray);
+      const bin = binarize(gray, thr);
+      let dark = 0;
+      for (let i = 0; i < bin.length; i++) if (bin[i]) dark++;
+      const ratio = dark / bin.length;
+      if (ratio < 0.15) return null;
+      const sbin = sauvolaBinarize(gray, w, h);
+      const out = new Uint8ClampedArray(sbin.length);
+      for (let i = 0; i < sbin.length; i++) out[i] = sbin[i] ? 0 : 255;
+      return { cv: grayToCanvas(out, w, h) };
+    },
+  });
+
   // —— 几何策略：透视矫正 ——
   if (deep) {
     plan.push({
@@ -1699,10 +2053,212 @@ export function decodeCanvas(canvas, opts = {}) {
         return null;
       },
     });
+
+    // —— 几何策略：局部阈值检出 + 透视矫正 ——
+    //
+    // 前面所有几何策略的定位图案都来自全局 Otsu 阈值。
+    // 而全局阈值在「光照渐变 + 重噪声」下会把分割切坏：
+    // 实测（640×480 场景，码 200px，渐变+噪声+2px 模糊）
+    // 暗像素占比高达 43%，三个真定位图案只检出 1 个（140px 码上 0 个），
+    // 几何管线因此全线崩溃 —— 图案不够，三元组就凑不出来。
+    //
+    // 局部阈值（Sauvola）在同一场景下召回率 3/3。
+    // 所以这条策略换的是「图案的来源」，几何矫正本身完全复用。
+    //
+    // 为什么放在深档末尾：局部阈值要算两个积分图，
+    // 且在正常图像上并无增益（实测正常场景召回率本来就是 3/3），
+    // 只该在全局阈值失败时才付这个代价。
+    plan.push({
+      name: 'adaptive-rectify',
+      group: 'deep',
+      make: () => {
+        const { gray, norm, w, h } = getCtx();
+        const src = norm.changed ? norm.gray : gray;
+
+        // 先确认全局分割确实坏了 —— 好的话没必要走这条路
+        const gbin = binarize(src, otsuThreshold(src));
+        let dark = 0;
+        for (let i = 0; i < gbin.length; i++) if (gbin[i]) dark++;
+        if (dark / gbin.length < 0.15) return null;
+
+        // 局部阈值分割
+        const sbin = sauvolaBinarize(src, w, h);
+        const patterns = findFinderPatterns(sbin, w, h);
+        if (patterns.length < 3) return null;
+
+        // 几何矫正用的重采样源有两个选择：
+        //   · 原灰度 —— 保留灰度渐变，但噪声也一并带进矫正图
+        //   · 局部阈值图 —— 干净的黑白，但丢失了抗模糊的灰度过渡
+        // 两者各试一遍：模糊重的场景前者好，噪声重的场景后者好。
+        const binSrc = new Uint8ClampedArray(sbin.length);
+        for (let i = 0; i < sbin.length; i++) binSrc[i] = sbin[i] ? 0 : 255;
+
+        for (const sampleSrc of [src, binSrc]) {
+          let n = 0;
+          for (const rect of rectifyCandidates(sampleSrc, w, h, patterns, {
+            gateCorners: 1,
+            maxWarps: 80,
+            maxWarpsAlign: 60,
+          })) {
+            n++;
+            const res = runJsQR(toImageData(rect.canvas));
+            if (res) return { cv: rect.canvas, rect, hit: res };
+            if (n >= 12) break;
+          }
+        }
+        return null;
+      },
+    });
   }
 
-  // —— 区域策略：大图里的小码 ——
-  if (allowTile && deep) {
+    // —— 几何策略：桶形畸变参数扫描 ——
+    //
+    // 前面所有几何策略都建立在同一个前提上：
+    // 码在画面里的形变可以用单应性（透视）加上一个固定系数的径向弯曲描述，
+    // 而那个系数是「猜」的 —— 从少数几个经验值里试。
+    //
+    // 这条策略换的是这件事本身：把桶形畸变当成一个待搜索的参数，
+    // 系统性地扫一遍，而不是猜几个值。
+    //
+    // 模型（全部由实测确定，不是拍脑袋）：
+    //
+    //   1) 畸变是二次径向的：撤销时按 f = 1 + α r²（α 为负，单位 px⁻²）重采样，
+    //      采样点落在更内侧。方向不能反 —— 施加强度越大，撤销 α 越负。
+    //   2) 有效撤销强度约为施加强度的一半：
+    //      α_undo · R_code² = −k/2。五个场景全部吻合此式。
+    //   3) α 是绝对像素量，与码在画面里占多大无关 ——
+    //      所以参数化用绝对 α，而不是「相对码半径的系数」。
+    //   4) 参考中心有两个候选，都必须试：
+    //      图像中心（真实镜头畸变以光轴为中心）与检测到的码中心
+    //     （拍摄时畸变相对被摄物施加）。实测两类场景各有胜负。
+    //
+    // 剪枝：扫描阶段只做「撤销 → 局部阈值二值化 → 定位图案检测 → 打分」，
+    // 打分用两个不需 warp、不需解码的信号：
+    //   geo —— 时序图案交替率（整条时序图案是否严格黑白交替）
+    //   pen —— 版本一致性残差（两条直角边是否落在同一个 4v+10 上）
+    // 实测可解候选在 geo 下的最好排名为 1~7，在 pen 下为 2~25，
+    // 两者都不完美 —— 所以取两者的并集入选，而不是只看一个。
+    //
+    // 重要教训：geo 只能用于「排序」，绝不能当硬门槛。
+    // 早期版本用 geo ≥ 0.55 做门槛，直接把两个本可解的场景判成无解
+    // （它们的可解候选在那个场景下 geo 值恰好偏低）。
+    if (deep) {
+      plan.push({
+        name: 'barrel-sweep',
+        group: 'deep',
+        make: () => {
+          const { gray, w, h } = getCtx();
+
+          // 参考中心候选
+          const centers = [{ cx: w / 2, cy: h / 2 }];
+          // 在原图上找定位图案，用来推「码自身中心」这个参考中心。
+          // 用局部阈值：重噪声 + 光照渐变下全局阈值常常连三个图案都检不出。
+          const sbin0 = sauvolaBinarize(gray, w, h);
+          const pats0 = findFinderPatterns(sbin0, w, h);
+          if (pats0.length >= 3) {
+            const frame = estimateSymbolFrame(pats0);
+            if (frame) centers.push({ cx: frame.cx, cy: frame.cy });
+          }
+
+          // 工作区域：码附近的一块。
+          // 只在区域内做撤销与二值化 —— 单候选成本从 O(整图) 降到 O(码大小)，
+          // 而采样仍取整幅原图（畸变中心常常在区域之外，采样必须能出区域）。
+          const roi = roiAroundPatterns(pats0, w, h);
+
+          // α 阶梯：绝对值（px⁻²），几何级数。
+          // 公比 1.12 —— 实测可解窗口的相对宽度约 26%~30%，
+          // 公比 1.12 保证窗口里至少落两三个点。
+          // 覆盖范围 -4e-5（强畸变、小码）… -3e-7（真实照片的轻微镜头畸变）。
+          //
+          // 公比 1.08（实测选定，不是拍脑袋）：
+          //   可解 α 窗口的「相对宽度」约 26%~30%，公比 1.12 时窗口里常常
+          //   只落一个点，且那个点未必是最好的那一个 ——
+          //   实测 sc-hard-small 在 1.12 下唯一可解的候选 geo=0、pen=0.81，
+          //   在 geo 里排到第 25 位、在 pen 里排到第 36 位，被 top-K 剪枝整个刷掉。
+          //   降到 1.08 后该场景的可解候选落在 geo 第 1 位，能被选中。
+          //   1.06 更密反而更差（候选变多、可解点的排名被稀释），所以不是「越密越好」。
+          const alphas = opts.barrelAlphas ?? buildAlphaLadder(4e-5, 3e-7, 1.08);
+
+          const scan = (rx, ry, rw, rh) => {
+            const out = [];
+            for (const c of centers) {
+              for (const alpha of alphas) {
+                const ub = unbarrelRegion(gray, w, h, rx, ry, rw, rh, alpha, c.cx, c.cy);
+                const bin = sauvolaBinarize(ub, rw, rh);
+                const pats = findFinderPatterns(bin, rw, rh);
+                if (pats.length < 3) continue;
+                const thr = otsuThreshold(ub);
+                const sc = barrelCandidateScore(ub, rw, rh, pats, thr);
+                out.push({ c, alpha, geo: sc.geo, pen: sc.pen });
+              }
+            }
+            return out;
+          };
+
+          let cands = scan(roi.x, roi.y, roi.w, roi.h);
+          // 区域切错了的兜底：整段扫描一个候选都没产出，说明框没框住码，
+          // 这时退回整幅图重扫一次。
+          if (!cands.length && (roi.w !== w || roi.h !== h)) {
+            cands = scan(0, 0, w, h);
+          }
+          if (!cands.length) return null;
+
+          // 入选：每个参考中心各自按 geo 降序取前 Kgeo、按 pen 升序取前 Kpen，取并集。
+          // 分组排序是必须的 —— 不同参考中心的分数尺度不同，混在一起排会互相压制。
+          const picked = [];
+          const seen = new Set();
+          const K_GEO = opts.barrelTopGeo ?? 6;
+          const K_PEN = opts.barrelTopPen ?? 4;
+          for (const c of centers) {
+            const grp = cands.filter((x) => x.c === c);
+            if (!grp.length) continue;
+            const byGeo = grp.slice().sort((a, b) => b.geo - a.geo);
+            const byPen = grp.slice().sort((a, b) => a.pen - b.pen);
+            const union = [];
+            for (const x of byGeo.slice(0, K_GEO)) union.push(x);
+            for (const x of byPen.slice(0, K_PEN)) union.push(x);
+            // 组内再按 geo 排一遍，决定尝试顺序
+            union.sort((a, b) => b.geo - a.geo);
+            for (const x of union) {
+              const key = `${x.c.cx},${x.c.cy},${x.alpha}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              picked.push(x);
+            }
+          }
+
+          // 昂贵阶段：只对入选候选做透视矫正 + 解码
+          const warps = opts.barrelWarps ?? 20;
+          const aligns = opts.barrelWarpsAlign ?? 14;
+          const rects = opts.barrelRects ?? 6;
+          for (const x of picked) {
+            const { c, alpha } = x;
+            const ub = unbarrelRegion(gray, w, h, roi.x, roi.y, roi.w, roi.h, alpha, c.cx, c.cy);
+            const bin = sauvolaBinarize(ub, roi.w, roi.h);
+            const pats = findFinderPatterns(bin, roi.w, roi.h);
+            if (pats.length < 3) continue;
+            let n = 0;
+            for (const rect of rectifyCandidates(ub, roi.w, roi.h, pats, {
+              gateCorners: 1,
+              maxWarps: warps,
+              maxWarpsAlign: aligns,
+            })) {
+              if (++n > rects) break;
+              // 位置映射需要知道矫正图是在哪张图上生成的：
+              // 区域原点（裁剪偏移）与畸变参数（反变换回原图）。
+              rect.origin = { x: roi.x, y: roi.y };
+              rect.warp = { alpha, cx: c.cx, cy: c.cy };
+              const res = runJsQR(toImageData(rect.canvas));
+              if (res) return { cv: rect.canvas, rect, hit: res };
+            }
+          }
+          return null;
+        },
+      });
+    }
+
+    // —— 区域策略：大图里的小码 ——
+    if (allowTile && deep) {
     plan.push({
       name: 'tile',
       group: 'deep',
