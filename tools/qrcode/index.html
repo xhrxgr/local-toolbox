@@ -6,14 +6,16 @@
   <meta name="description" content="二维码工具 —— 生成（自定义颜色/纠错/尺寸，PNG/SVG 下载）+ 图片识别，全部本地运行" />
   <title>二维码 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/qrcode-DVHwaouP.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-sbj_m4dM.js">
+  <script type="module" crossorigin src="/local-toolbox/assets/qrcode-Bdj99KhA.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-BCiCTKAo.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-DIQyydzc.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-CylBT3IK.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-yAVHF97_.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/jsQR-gdueYHHy.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-BG-86xnC.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/qr-decoder-Czm_dFKW.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/qr-zxing-CQRoxm_U.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BB6BlxOc.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/qrcode-CDS7UyzR.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/qrcode-gYQCeeDp.css">
 </head>
 <body>
   <main class="tool-container">
@@ -111,6 +113,8 @@
           <button class="btn btn-secondary" id="btn-qr-camera-stop">停止扫描</button>
         </div>
       </div>
+
+      <div class="qr-progress" id="qr-progress" hidden></div>
 
       <div class="qr-rec-actions" id="qr-rec-actions" hidden>
         <button class="btn btn-secondary" id="btn-qr-clear-rec">清空结果</button>

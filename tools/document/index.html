@@ -5,17 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="文档转换工具 —— PDF/Word/Excel/Markdown/HTML 本地互转，文件不上传云端" />
   <title>文档转换 - 网页工具箱</title>
-  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/document-CUSjKuMA.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-sbj_m4dM.js">
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/document-Dy64bJ0E.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-BCiCTKAo.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-DIQyydzc.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/toast-C63kdhUO.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-BG-86xnC.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-CylBT3IK.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-yAVHF97_.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/purify.es-D6UFXha2.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/purify.es-B434AEGD.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BB6BlxOc.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/document-DFZ2r4r6.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/document-DOrY7reo.css">
 </head>
 <body>
   <main class="doc-container">
@@ -72,6 +72,10 @@
           <input type="text" class="setting__input" id="pdf-extract-pages" placeholder="如：1, 3, 5-8" />
           <p class="setting__hint" id="pdf-extract-hint">逗号分隔单页或区间，页码从 1 开始</p>
         </div>
+        <p class="setting__hint setting__hint--related">
+          PDF 里如果有水印（页眉页脚文字、图片型 PDF 里的烧录水印），用
+          <a href="#" id="link-dewatermark">去水印工具</a> 处理 —— 它是像素级修复，需要框选位置。
+        </p>
       </div>
     </section>
 
@@ -252,6 +256,6 @@
 
     <!-- Toast 通知容器 -->
   </main>
-
+
 </body>
 </html>

@@ -1,0 +1,1 @@
+var e=`/local-toolbox/assets/zxing_reader-BCjuyud6.wasm`;export{e as default};
