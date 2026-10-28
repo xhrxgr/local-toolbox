@@ -7,8 +7,20 @@
  */
 import hotspotUrl from '../../scripts/hotspot-max-connections.bat?url';
 import toggleClockUrl from '../../scripts/toggle-clock-seconds.bat?url';
+import autostartUrl from '../../scripts/hotspot-autostart.zip?url';
 
 const SCRIPTS = [
+  {
+    id: 'hotspot-autostart',
+    name: '移动热点开机自启',
+    file: 'hotspot-autostart.zip',
+    url: autostartUrl,
+    os: 'Windows 10 / 11',
+    admin: true,
+    zip: true,
+    desc: '开机后自动打开 Windows 设置里的「移动热点」，不用每次手动开。走系统自带的移动热点接口，设置页里的开关状态会同步变化。',
+    points: ['解压后把 3 个文件放同一目录，双击 .bat 安装', '菜单式操作：安装 / 卸载 / 立即开关 / 查看状态', '开机时网络未就绪会自动等待重试（最多 180 秒）', '运行日志在 C:\\ProgramData\\MobileHotspotAutostart\\hotspot.log'],
+  },
   {
     id: 'hotspot',
     name: '移动热点连接数上限',
@@ -99,14 +111,17 @@ function renderScript(script) {
   link.href = script.url;
   link.download = script.file;
   link.textContent = '下载 ' + script.file;
-  const fileLink = document.createElement('a');
-  fileLink.className = 'script-card__file';
-  fileLink.href = script.url;
-  fileLink.target = '_blank';
-  fileLink.rel = 'noopener';
-  fileLink.textContent = '查看内容';
   actions.appendChild(link);
-  actions.appendChild(fileLink);
+  // zip 是压缩包，浏览器里打开没有意义，只有单文件脚本才提供「查看内容」
+  if (!script.zip) {
+    const fileLink = document.createElement('a');
+    fileLink.className = 'script-card__file';
+    fileLink.href = script.url;
+    fileLink.target = '_blank';
+    fileLink.rel = 'noopener';
+    fileLink.textContent = '查看内容';
+    actions.appendChild(fileLink);
+  }
 
   card.appendChild(head);
   card.appendChild(desc);

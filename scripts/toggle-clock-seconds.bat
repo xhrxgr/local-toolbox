@@ -1,63 +1,62 @@
 @echo off
-chcp 65001 >nul 2>&1
 setlocal
 
 :: ============================================================
-::  Windows 任务栏时钟显示秒数 · 一键切换脚本（可恢复）
-::  适用：Windows 10 / Windows 11
-::  原理：修改注册表 ShowSecondsInSystemClock 值并重启资源管理器
-::  默认行为：Windows 原生不含此项（即不显示秒），脚本可随时切回
+::  Windows ������ʱ����ʾ���� �� һ���л��ű����ɻָ���
+::  ���ã�Windows 10 / Windows 11
+::  ԭ�����޸�ע��� ShowSecondsInSystemClock ֵ��������Դ������
+::  Ĭ����Ϊ��Windows ԭ���������������ʾ�룩���ű�����ʱ�л�
 :: ============================================================
 
 set "regPath=HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
 set "regName=ShowSecondsInSystemClock"
 
-:: 读取当前值
+:: ��ȡ��ǰֵ
 set "currentValue=0"
 for /f "tokens=3" %%a in ('reg query "%regPath%" /v "%regName%" 2^>nul ^| findstr "%regName%"') do (
     set "currentValue=%%a"
 )
-:: 去掉 0x 前缀统一判断
+:: ȥ�� 0x ǰ׺ͳһ�ж�
 if "%currentValue:~0,2%"=="0x" set "currentValue=%currentValue:~2%"
 
 cls
-echo ════════════════════════════════════════════
-echo   任务栏时钟秒数显示 · 切换工具
-echo ════════════════════════════════════════════
+echo �T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T
+echo   ������ʱ��������ʾ �� �л�����
+echo �T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T�T
 echo.
 if "%currentValue%"=="1" (
-    echo   当前状态：已开启（显示秒数）
+    echo   ��ǰ״̬���ѿ�������ʾ������
     echo.
-    echo   [1] 关闭秒数显示（恢复 Windows 默认）
-    echo   [0] 退出
+    echo   [1] �ر�������ʾ���ָ� Windows Ĭ�ϣ�
+    echo   [0] �˳�
 ) else (
-    echo   当前状态：未开启（Windows 默认）
+    echo   ��ǰ״̬��δ������Windows Ĭ�ϣ�
     echo.
-    echo   [1] 开启秒数显示
-    echo   [0] 退出
+    echo   [1] ����������ʾ
+    echo   [0] �˳�
 )
 echo.
-set /p "choice=请选择: "
+set /p "choice=��ѡ��: "
 
 if not "%choice%"=="1" exit /b 0
 
-:: 切换
+:: �л�
 if "%currentValue%"=="1" (
-    echo [操作] 正在关闭秒数显示，恢复默认...
+    echo [����] ���ڹر�������ʾ���ָ�Ĭ��...
     reg add "%regPath%" /v "%regName%" /t REG_DWORD /d 0 /f >nul
 ) else (
-    echo [操作] 正在开启秒数显示...
+    echo [����] ���ڿ���������ʾ...
     reg add "%regPath%" /v "%regName%" /t REG_DWORD /d 1 /f >nul
 )
 
-:: 重启资源管理器使设置生效
-echo [操作] 正在重启资源管理器...
+:: ������Դ������ʹ������Ч
+echo [����] ����������Դ������...
 taskkill /f /im explorer.exe >nul 2>&1
 timeout /t 1 /nobreak >nul
 start explorer.exe
 
 echo.
-echo [完成] 设置已生效。
-echo        如需恢复，再次运行此脚本即可切回。
+echo [���] ��������Ч��
+echo        ����ָ����ٴ����д˽ű������лء�
 echo.
 pause

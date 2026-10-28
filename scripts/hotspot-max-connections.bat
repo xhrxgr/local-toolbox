@@ -1,34 +1,33 @@
 @echo off
-chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 :: ============================================================
-::  Windows ç³»ç»Ÿè‡ªå¸¦ã€Œç§»åŠ¨çƒ­ç‚¹ã€è¿æ¥æ•°ä¸Šé™ä¿®æ”¹è„šæœ¬ï¼ˆå¯æ¢å¤ï¼‰
-::  é€‚ç”¨ï¼šWindows 10 / Windows 11
-::  åŸç†ï¼šä¿®æ”¹æ³¨å†Œè¡¨ icssvc æœåŠ¡çš„ WifiMaxPeers å€¼
-::        ç³»ç»Ÿé»˜è®¤ä¸Šé™ 8 å°ï¼Œå¯è‡ªå®šä¹‰ 1-100
-::  æ³¨æ„ï¼šéœ€ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œï¼›ä¿®æ”¹åéœ€é‡å¯æˆ–é‡å¼€ç§»åŠ¨çƒ­ç‚¹
+::  Windows ÏµÍ³×Ô´ø¡¸ÒÆ¶¯ÈÈµã¡¹Á¬½ÓÊıÉÏÏŞĞŞ¸Ä½Å±¾£¨¿É»Ö¸´£©
+::  ÊÊÓÃ£ºWindows 10 / Windows 11
+::  Ô­Àí£ºĞŞ¸Ä×¢²á±í icssvc ·şÎñµÄ WifiMaxPeers Öµ
+::        ÏµÍ³Ä¬ÈÏÉÏÏŞ 8 Ì¨£¬¿É×Ô¶¨Òå 1-100
+::  ×¢Òâ£ºĞèÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ£»ĞŞ¸ÄºóĞèÖØÆô»òÖØ¿ªÒÆ¶¯ÈÈµã
 :: ============================================================
 
 set "regPath=HKLM\SYSTEM\CurrentControlSet\Services\icssvc\Settings"
 set "regName=WifiMaxPeers"
 
-:: æ£€æŸ¥ç®¡ç†å‘˜æƒé™
+:: ¼ì²é¹ÜÀíÔ±È¨ÏŞ
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [é”™è¯¯] è¯·å³é”®"ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œ"æ­¤è„šæœ¬ï¼
+    echo [´íÎó] ÇëÓÒ¼ü"ÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ"´Ë½Å±¾£¡
     echo.
     pause
     exit /b 1
 )
 
-:: è¯»å–å½“å‰å€¼
+:: ¶ÁÈ¡µ±Ç°Öµ
 set "currentValue="
 for /f "tokens=3" %%a in ('reg query "%regPath%" /v "%regName%" 2^>nul ^| findstr "%regName%"') do (
     set "currentValue=%%a"
 )
 
-:: è¯»å–é»˜è®¤å€¼ï¼ˆé¦–æ¬¡è¿è¡Œæ—¶å¤‡ä»½åŸå§‹çŠ¶æ€ï¼‰
+:: ¶ÁÈ¡Ä¬ÈÏÖµ£¨Ê×´ÎÔËĞĞÊ±±¸·İÔ­Ê¼×´Ì¬£©
 set "backupFile=%USERPROFILE%\hotspot_maxpeers_backup.txt"
 if not exist "%backupFile%" (
     if "%currentValue%"=="" (
@@ -40,133 +39,133 @@ if not exist "%backupFile%" (
 
 :menu
 cls
-echo â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-echo   Windows ç§»åŠ¨çƒ­ç‚¹ Â· è¿æ¥æ•°ä¸Šé™è®¾ç½®å·¥å…·
-echo â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+echo ¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T
+echo   Windows ÒÆ¶¯ÈÈµã ¡¤ Á¬½ÓÊıÉÏÏŞÉèÖÃ¹¤¾ß
+echo ¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T
 echo.
-echo   æ³¨å†Œè¡¨è·¯å¾„ï¼š%regPath%
+echo   ×¢²á±íÂ·¾¶£º%regPath%
 echo.
 if "%currentValue%"=="" (
-    echo   å½“å‰ä¸Šé™ï¼šç³»ç»Ÿé»˜è®¤ï¼ˆ8 å°ï¼‰
+    echo   µ±Ç°ÉÏÏŞ£ºÏµÍ³Ä¬ÈÏ£¨8 Ì¨£©
 ) else (
-    :: å»æ‰ 0x å‰ç¼€
+    :: È¥µô 0x Ç°×º
     set "displayVal=%currentValue%"
     if "!displayVal:~0,2!"=="0x" set "displayVal=!displayVal:~2!"
-    echo   å½“å‰ä¸Šé™ï¼š!displayVal! å°
+    echo   µ±Ç°ÉÏÏŞ£º!displayVal! Ì¨
 )
 echo.
-echo   [1] ä¿®æ”¹è¿æ¥æ•°ä¸Šé™
-echo   [2] æ¢å¤é»˜è®¤ï¼ˆåˆ é™¤è‡ªå®šä¹‰å€¼ï¼Œæ¢å¤ç³»ç»Ÿé»˜è®¤ 8 å°ï¼‰
-echo   [3] æŸ¥çœ‹å½“å‰è®¾ç½®
-echo   [0] é€€å‡º
+echo   [1] ĞŞ¸ÄÁ¬½ÓÊıÉÏÏŞ
+echo   [2] »Ö¸´Ä¬ÈÏ£¨É¾³ı×Ô¶¨ÒåÖµ£¬»Ö¸´ÏµÍ³Ä¬ÈÏ 8 Ì¨£©
+echo   [3] ²é¿´µ±Ç°ÉèÖÃ
+echo   [0] ÍË³ö
 echo.
-set /p "choice=è¯·é€‰æ‹©æ“ä½œ: "
+set /p "choice=ÇëÑ¡Ôñ²Ù×÷: "
 
 if "%choice%"=="1" goto set_max
 if "%choice%"=="2" goto restore
 if "%choice%"=="3" goto show_current
 if "%choice%"=="0" exit /b 0
-echo è¾“å…¥æ— æ•ˆã€‚
+echo ÊäÈëÎŞĞ§¡£
 timeout /t 1 /nobreak >nul
 goto menu
 
 :set_max
 cls
-echo â”€â”€ ä¿®æ”¹è¿æ¥æ•°ä¸Šé™ â”€â”€
+echo ©¤©¤ ĞŞ¸ÄÁ¬½ÓÊıÉÏÏŞ ©¤©¤
 echo.
-echo   ç³»ç»Ÿé»˜è®¤ä¸Šé™ä¸º 8 å°è®¾å¤‡ã€‚
-echo   å¯è®¾ç½®èŒƒå›´ 1-100ï¼ˆå®é™…å—ç½‘å¡ç¡¬ä»¶é™åˆ¶ï¼‰ã€‚
+echo   ÏµÍ³Ä¬ÈÏÉÏÏŞÎª 8 Ì¨Éè±¸¡£
+echo   ¿ÉÉèÖÃ·¶Î§ 1-100£¨Êµ¼ÊÊÜÍø¿¨Ó²¼şÏŞÖÆ£©¡£
 echo.
-set /p "newmax=è¯·è¾“å…¥æ–°çš„æœ€å¤§è¿æ¥æ•°ï¼ˆ1-100ï¼‰: "
+set /p "newmax=ÇëÊäÈëĞÂµÄ×î´óÁ¬½ÓÊı£¨1-100£©: "
 if "!newmax!"=="" goto menu
 
-:: æ•°å­—æ ¡éªŒ
+:: Êı×ÖĞ£Ñé
 set /a test_num=newmax 2>nul
 if "!test_num!"=="0" if not "!newmax!"=="0" (
-    echo [é”™è¯¯] è¯·è¾“å…¥æœ‰æ•ˆæ•°å­—ï¼
+    echo [´íÎó] ÇëÊäÈëÓĞĞ§Êı×Ö£¡
     pause
     goto menu
 )
 if !newmax! lss 1 (
-    echo [é”™è¯¯] æœ€å°å€¼ä¸º 1ã€‚
+    echo [´íÎó] ×îĞ¡ÖµÎª 1¡£
     set "newmax=1"
 )
 if !newmax! gtr 100 (
-    echo [è­¦å‘Š] è¶…è¿‡ 100ï¼Œå·²é™åˆ¶ä¸º 100ï¼ˆå®é™…å—ç½‘å¡ç¡¬ä»¶é™åˆ¶ï¼‰ã€‚
+    echo [¾¯¸æ] ³¬¹ı 100£¬ÒÑÏŞÖÆÎª 100£¨Êµ¼ÊÊÜÍø¿¨Ó²¼şÏŞÖÆ£©¡£
     set "newmax=100"
 )
 
 echo.
-echo å³å°†è®¾ç½®ï¼š
-echo   æœ€å¤§è¿æ¥æ•° = !newmax! å°
-echo   æ³¨å†Œè¡¨è·¯å¾„ = %regPath%
+echo ¼´½«ÉèÖÃ£º
+echo   ×î´óÁ¬½ÓÊı = !newmax! Ì¨
+echo   ×¢²á±íÂ·¾¶ = %regPath%
 echo.
-set /p "confirm=ç¡®è®¤ä¿®æ”¹ï¼Ÿ(Y/N): "
+set /p "confirm=È·ÈÏĞŞ¸Ä£¿(Y/N): "
 if /i not "!confirm!"=="Y" goto menu
 
-echo [æ“ä½œ] æ­£åœ¨å†™å…¥æ³¨å†Œè¡¨...
+echo [²Ù×÷] ÕıÔÚĞ´Èë×¢²á±í...
 reg add "%regPath%" /v "%regName%" /t REG_DWORD /d !newmax! /f >nul
 if %errorlevel% neq 0 (
-    echo [é”™è¯¯] æ³¨å†Œè¡¨å†™å…¥å¤±è´¥ï¼è¯·ç¡®è®¤ä»¥ç®¡ç†å‘˜èº«ä»½è¿è¡Œã€‚
+    echo [´íÎó] ×¢²á±íĞ´ÈëÊ§°Ü£¡ÇëÈ·ÈÏÒÔ¹ÜÀíÔ±Éí·İÔËĞĞ¡£
     pause
     goto menu
 )
 
-echo [å®Œæˆ] æœ€å¤§è¿æ¥æ•°å·²è®¾ç½®ä¸º !newmax! å°ã€‚
+echo [Íê³É] ×î´óÁ¬½ÓÊıÒÑÉèÖÃÎª !newmax! Ì¨¡£
 echo.
-echo   ç”Ÿæ•ˆæ–¹å¼ï¼ˆä»»é€‰å…¶ä¸€ï¼‰ï¼š
-echo   1. å…³é—­ç§»åŠ¨çƒ­ç‚¹å†é‡æ–°æ‰“å¼€ï¼ˆè®¾ç½® â†’ ç½‘ç»œå’Œ Internet â†’ ç§»åŠ¨çƒ­ç‚¹ï¼‰
-echo   2. é‡å¯ç”µè„‘
+echo   ÉúĞ§·½Ê½£¨ÈÎÑ¡ÆäÒ»£©£º
+echo   1. ¹Ø±ÕÒÆ¶¯ÈÈµãÔÙÖØĞÂ´ò¿ª£¨ÉèÖÃ ¡ú ÍøÂçºÍ Internet ¡ú ÒÆ¶¯ÈÈµã£©
+echo   2. ÖØÆôµçÄÔ
 echo.
-echo   å¦‚éœ€æ¢å¤é»˜è®¤ï¼Œé‡æ–°è¿è¡Œæ­¤è„šæœ¬é€‰æ‹© [2]ã€‚
+echo   ÈçĞè»Ö¸´Ä¬ÈÏ£¬ÖØĞÂÔËĞĞ´Ë½Å±¾Ñ¡Ôñ [2]¡£
 echo.
 pause
 goto menu
 
 :restore
 cls
-echo â”€â”€ æ¢å¤é»˜è®¤ â”€â”€
+echo ©¤©¤ »Ö¸´Ä¬ÈÏ ©¤©¤
 echo.
-echo æ­¤æ“ä½œå°†åˆ é™¤è‡ªå®šä¹‰çš„ WifiMaxPeers å€¼ï¼Œ
-echo æ¢å¤ç³»ç»Ÿé»˜è®¤ä¸Šé™ï¼ˆ8 å°ï¼‰ã€‚
+echo ´Ë²Ù×÷½«É¾³ı×Ô¶¨ÒåµÄ WifiMaxPeers Öµ£¬
+echo »Ö¸´ÏµÍ³Ä¬ÈÏÉÏÏŞ£¨8 Ì¨£©¡£
 echo.
-set /p "confirm=ç¡®è®¤æ¢å¤ï¼Ÿ(Y/N): "
+set /p "confirm=È·ÈÏ»Ö¸´£¿(Y/N): "
 if /i not "!confirm!"=="Y" goto menu
 
-echo [æ“ä½œ] æ­£åœ¨åˆ é™¤æ³¨å†Œè¡¨å€¼...
+echo [²Ù×÷] ÕıÔÚÉ¾³ı×¢²á±íÖµ...
 reg delete "%regPath%" /v "%regName%" /f >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [å®Œæˆ] å·²æ¢å¤ç³»ç»Ÿé»˜è®¤ï¼ˆ8 å°ï¼‰ã€‚
+    echo [Íê³É] ÒÑ»Ö¸´ÏµÍ³Ä¬ÈÏ£¨8 Ì¨£©¡£
 ) else (
-    echo [æç¤º] è¯¥å€¼å¯èƒ½ä¸å­˜åœ¨ï¼ˆå·²ç»æ˜¯é»˜è®¤çŠ¶æ€ï¼‰ã€‚
+    echo [ÌáÊ¾] ¸ÃÖµ¿ÉÄÜ²»´æÔÚ£¨ÒÑ¾­ÊÇÄ¬ÈÏ×´Ì¬£©¡£
 )
 
-:: æ¸…ç†å¤‡ä»½æ–‡ä»¶
+:: ÇåÀí±¸·İÎÄ¼ş
 if exist "%backupFile%" del "%backupFile%" >nul 2>&1
 
 echo.
-echo   ç”Ÿæ•ˆæ–¹å¼ï¼šå…³é—­ç§»åŠ¨çƒ­ç‚¹å†é‡æ–°æ‰“å¼€ï¼Œæˆ–é‡å¯ç”µè„‘ã€‚
+echo   ÉúĞ§·½Ê½£º¹Ø±ÕÒÆ¶¯ÈÈµãÔÙÖØĞÂ´ò¿ª£¬»òÖØÆôµçÄÔ¡£
 echo.
 pause
 goto menu
 
 :show_current
 cls
-echo â”€â”€ å½“å‰è®¾ç½® â”€â”€
+echo ©¤©¤ µ±Ç°ÉèÖÃ ©¤©¤
 echo.
-echo æ³¨å†Œè¡¨è·¯å¾„ï¼š%regPath%
+echo ×¢²á±íÂ·¾¶£º%regPath%
 echo.
 if "%currentValue%"=="" (
-    echo   WifiMaxPeers = ï¼ˆæœªè®¾ç½®ï¼Œç³»ç»Ÿé»˜è®¤ 8 å°ï¼‰
+    echo   WifiMaxPeers = £¨Î´ÉèÖÃ£¬ÏµÍ³Ä¬ÈÏ 8 Ì¨£©
 ) else (
     echo   WifiMaxPeers = %currentValue%
 )
 echo.
-echo å¤‡ä»½æ–‡ä»¶ï¼š%backupFile%
+echo ±¸·İÎÄ¼ş£º%backupFile%
 if exist "%backupFile%" (
-    for /f "tokens=*" %%b in ('type "%backupFile%"') do echo   åŸå§‹å€¼ = %%b
+    for /f "tokens=*" %%b in ('type "%backupFile%"') do echo   Ô­Ê¼Öµ = %%b
 ) else (
-    echo   åŸå§‹å€¼ = ï¼ˆæ— å¤‡ä»½ï¼‰
+    echo   Ô­Ê¼Öµ = £¨ÎŞ±¸·İ£©
 )
 echo.
 pause
