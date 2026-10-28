@@ -2,15 +2,11 @@
 /**
  * 校验 Windows 批处理与脚本的编码与行尾。
  *
- * 两种形态，各有要求：
+ * 三种形态，各有要求：
  *
- *   仓库里的源文件（scripts/ 下的 .bat / .cmd / .ps1）
- *     → UTF-8 + CRLF，不要 BOM
- *       便于编辑、diff、版本控制；GBK 文件在编辑器里容易显示成乱码，
- *       局部编辑也容易把编码改乱。
- *
- *   发布给用户的产物（zip 里的 .bat）
+ *   1. 直接分发的 .bat（scripts/ 根目录下）
  *     → GBK + CRLF，不要 BOM，不要 chcp 65001
+ *       这些文件用户从网页下载后直接双击运行，仓库形态 = 用户拿到的形态。
  *       cmd.exe 按「当前代码页」解码批处理，并按字节偏移续读。
  *       中文 Windows 的当前代码页是 936（GBK），同一个汉字在 GBK 里
  *       两字节、在 UTF-8 里三字节 —— 两边对不上时，偏移随汉字数量
@@ -25,19 +21,29 @@
  *       所以 .bat 用 GBK（中文 Windows 原生代码页）、行尾用 CRLF，
  *       且不能有 chcp 65001（那会把代码页切走）。
  *
- *   .ps1 → UTF-8 with BOM
+ *   2. 构建源（scripts/hotspot-autostart/ 子目录下的 .bat）
+ *     → UTF-8 + CRLF，不要 BOM
+ *       便于编辑、diff、版本控制。GBK 文件在编辑器里容易显示成乱码，
+ *       局部编辑也容易把编码改乱。构建时才转成 GBK 产物。
+ *
+ *   3. .ps1 → UTF-8 with BOM
  *     PowerShell 5.1 读无 BOM 的 UTF-8 会把中文当 ANSI 解析，直接语法报错。
+ *
+ * 另外校验分发 bat 的内嵌载荷能还原成与源 .ps1 完全一致的字节 ——
+ * 载荷写坏了用户拿到的是坏文件，而这种损坏在肉眼层面看不出来。
  *
  * 用法：node tools/scripts/check-script-encoding.mjs
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..');
 const scriptsDir = join(repoRoot, 'scripts');
+
+/* 载荷分隔标记，与 build-hotspot.mjs 保持一致 */
+const MARKER = '::PAYLOAD_B64::';
 
 function walk(dir) {
   const out = [];
@@ -67,89 +73,90 @@ function hasGbkCjk(buf) {
   return false;
 }
 
-const problems = [];
-const files = walk(scriptsDir);
-
-// —— 源文件 ——
-for (const p of files) {
-  const rel = relative(repoRoot, p);
-  const buf = readFileSync(p);
-  const lower = p.toLowerCase();
-  const lf = buf.includes(0x0a);
-  const crlf = buf.includes(0x0d0a);
-  const hasBom = buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
-
-  // .gbk.bat 是构建中间产物（GBK 版的发布用 bat），规则与源文件相反
-  if (lower.endsWith('.gbk.bat')) {
-    if (hasBom) problems.push(`${rel}: 带 BOM，cmd 会把 BOM 当命令的一部分`);
-    if (lf && !crlf) problems.push(`${rel}: LF 行尾，需 CRLF`);
-    if (hasUtf8Cjk(buf)) problems.push(`${rel}: 含 UTF-8 中文字节，应为 GBK`);
-    if (!hasGbkCjk(buf)) problems.push(`${rel}: 找不到 GBK 中文序列`);
-    continue;
-  }
-
-  if (lower.endsWith('.bat') || lower.endsWith('.cmd')) {
-    if (lf && !crlf) problems.push(`${rel}: LF 行尾，cmd 会算错字节偏移（需 CRLF）`);
-    if (hasBom) problems.push(`${rel}: 带 BOM，cmd 会把 BOM 当命令的一部分`);
-    if (buf.includes(Buffer.from('chcp 65001'))) {
-      problems.push(`${rel}: 不要 chcp 65001（会切走代码页导致 cmd 解析错位）`);
-    }
-    // scripts/ 根下的 .bat 通过 ?url 直接下载给用户，
-    // 仓库形态 = 用户拿到的形态 → 必须 GBK；
-    // hotspot-autostart/ 子目录的是构建源（打包时转 GBK 进 zip）→ UTF-8
-    const isBuildSource = rel.includes('hotspot-autostart');
-    if (isBuildSource) {
-      if (hasGbkCjk(buf) && !hasUtf8Cjk(buf)) {
-        problems.push(`${rel}: 构建源应为 UTF-8（打包时才转 GBK）`);
-      }
-    } else if (hasUtf8Cjk(buf)) {
-      problems.push(`${rel}: 直接分发的 .bat 必须 GBK（cmd 按 936 解码，UTF-8 会偏移错位）`);
-    }
-  } else if (lower.endsWith('.ps1')) {
-    if (!hasBom) problems.push(`${rel}: .ps1 缺 UTF-8 BOM，PowerShell 5.1 读无 BOM 的 UTF-8 会乱码`);
-    if (lf && !crlf) problems.push(`${rel}: LF 行尾，建议 CRLF`);
+/* 判据：能否被严格 UTF-8 解码。
+   GBK 的中文是两字节序列（如 0xC9 0xCF），在 UTF-8 里 0xC9 是
+   「双字节字符的起始字节」，其后必须跟一个 0x80-0xBF 的续字节。
+   GBK 文本里大量汉字的第二字节落在 0x40-0x7F（ASCII 区），
+   因此 GBK 文本几乎不可能同时是合法 UTF-8。
+   反过来，UTF-8 中文含大量 0xE4-0xE9 起始的三字节序列，
+   严格解码必然成功。
+   所以「严格解码成功且含中文」= UTF-8，「解码失败」= GBK。
+   比按字节模式猜测可靠 —— 0xE4 本身是 GBK 合法前导字节，
+   用字节模式会把 GBK 误判成 UTF-8。 */
+function isStrictUtf8(buf) {
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(buf);
+    return true;
+  } catch {
+    return false;
   }
 }
 
-// —— 发布产物（zip 里的 .bat 必须是 GBK）——
-const zipPath = join(scriptsDir, 'hotspot-autostart.zip');
-if (statSync(zipPath).isFile()) {
-  const ps = `
-$ErrorActionPreference='Stop'
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$zip = [System.IO.Compression.ZipFile]::OpenRead('${zipPath.replace(/\\/g, '\\\\')}')
-try {
-  foreach ($e in $zip.Entries) {
-    if (-not $e.Name.EndsWith('.bat')) { continue }
-    $s = $e.Open(); $ms = New-Object System.IO.MemoryStream; $s.CopyTo($ms); $s.Close()
-    $b = $ms.ToArray()
-    $hasBom = ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)
-    $utf8 = $false
-    for ($i=0; $i -lt $b.Length-2; $i++) {
-      if ($b[$i] -eq 0xE4 -and $b[$i+1] -ge 0x80 -and $b[$i+1] -le 0xBF -and $b[$i+2] -ge 0x80 -and $b[$i+2] -le 0xBF) { $utf8 = $true; break }
+function isPureCrlf(buf) {
+  for (let i = 0; i < buf.length; i++) {
+    if (buf[i] === 0x0a && (i === 0 || buf[i - 1] !== 0x0d)) return false;
+  }
+  return true;
+}
+
+function hasBom(buf) {
+  return buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
+}
+
+const problems = [];
+const files = walk(scriptsDir);
+
+for (const p of files) {
+  const rel = relative(repoRoot, p).replace(/\\/g, '/');
+  const buf = readFileSync(p);
+  const lower = p.toLowerCase();
+
+  // scripts/hotspot-autostart/ 子目录 = 构建源；scripts/ 根下 = 直接分发
+  const isBuildSource = rel.startsWith('scripts/hotspot-autostart/');
+
+  if (lower.endsWith('.bat') || lower.endsWith('.cmd')) {
+    if (buf.includes(0x0a) && !isPureCrlf(buf)) problems.push(`${rel}: 行尾不是纯 CRLF，cmd 会算错字节偏移`);
+    if (hasBom(buf)) problems.push(`${rel}: 带 BOM，cmd 会把 BOM 当命令的一部分`);
+    if (buf.includes(Buffer.from('chcp 65001'))) {
+      problems.push(`${rel}: 不要 chcp 65001（会切走代码页导致 cmd 解析错位）`);
     }
-    $crlf = $false; $bareLf = $false
-    for ($i=0; $i -lt $b.Length; $i++) {
-      if ($b[$i] -eq 0x0A) {
-        if ($i -gt 0 -and $b[$i-1] -eq 0x0D) { $crlf = $true } else { $bareLf = $true }
+    if (isBuildSource) {
+      if (!isStrictUtf8(buf)) {
+        problems.push(`${rel}: 构建源应为 UTF-8（严格解码失败，可能被存成了 GBK）`);
       }
+    } else if (isStrictUtf8(buf) && hasUtf8Cjk(buf)) {
+      problems.push(`${rel}: 直接分发的 .bat 必须 GBK（cmd 按 936 解码，UTF-8 会偏移错位）`);
     }
-    Write-Host ("$($e.Name)|$hasBom|$utf8|$crlf|$bareLf")
+  } else if (lower.endsWith('.ps1')) {
+    if (!hasBom(buf)) problems.push(`${rel}: .ps1 缺 UTF-8 BOM，PowerShell 5.1 读无 BOM 的 UTF-8 会乱码`);
+    if (buf.includes(0x0a) && !isPureCrlf(buf)) problems.push(`${rel}: .ps1 行尾应为纯 CRLF`);
   }
-} finally { $zip.Dispose() }
-`;
-  let out = '';
-  try {
-    out = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps], { encoding: 'utf8' });
-  } catch (e) {
-    problems.push(`无法检查 zip 产物: ${e.message}`);
-  }
-  for (const line of out.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const [name, hasBom, utf8, crlf, bareLf] = line.split('|');
-    if (hasBom === 'True') problems.push(`zip 内 ${name}: 带 BOM，cmd 会把 BOM 当命令的一部分`);
-    if (utf8 === 'True') problems.push(`zip 内 ${name}: 含 UTF-8 中文字节，应为 GBK`);
-    if (crlf !== 'True' || bareLf === 'True') problems.push(`zip 内 ${name}: 行尾不是纯 CRLF`);
+}
+
+// —— 分发 bat 的内嵌载荷必须能还原成源 .ps1 ——
+const distBat = join(scriptsDir, 'hotspot-autostart.bat');
+const srcPs1 = join(scriptsDir, 'hotspot-autostart', 'MobileHotspotAutostart.ps1');
+if (statSync(distBat).isFile() && statSync(srcPs1).isFile()) {
+  const distBytes = readFileSync(distBat);
+  const srcBytes = readFileSync(srcPs1);
+  // 用 Latin-1 读：字节与字符一一对应，载荷段是纯 ASCII，不受代码页影响
+  const text = distBytes.toString('latin1');
+  const idx = text.lastIndexOf(MARKER);
+  if (idx < 0) {
+    problems.push('scripts/hotspot-autostart.bat: 找不到内嵌载荷标记');
+  } else {
+    const payload = text.slice(idx + MARKER.length).replace(/\s+/g, '');
+    let decoded = null;
+    try {
+      decoded = Buffer.from(payload, 'base64');
+    } catch (e) {
+      problems.push('scripts/hotspot-autostart.bat: 载荷 base64 解码失败 — ' + e.message);
+    }
+    if (decoded && !decoded.equals(srcBytes)) {
+      problems.push(
+        `scripts/hotspot-autostart.bat: 内嵌载荷与源 .ps1 不一致（还原 ${decoded.length} 字节 / 源 ${srcBytes.length} 字节）`
+      );
+    }
   }
 }
 
@@ -158,4 +165,4 @@ if (problems.length) {
   for (const p of problems) console.error('  -', p);
   process.exit(1);
 }
-console.log(`脚本编码检查通过（源文件 ${files.length} 个 + 发布产物）`);
+console.log(`脚本编码检查通过（${files.length} 个文件）`);

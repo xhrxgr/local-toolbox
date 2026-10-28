@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 title 移动热点开机自启
 
 :: ============================================================
@@ -7,9 +7,13 @@ title 移动热点开机自启
 ::  适用：Windows 10 / Windows 11
 ::  原理：通过 WinRT 的 NetworkOperatorTetheringManager 开启热点，
 ::        与「设置 - 网络和 Internet - 移动热点」里的开关同一套接口，
-::        因此设置页里的开关状态会同步眮！�
+::        因此设置页里的开关状态会同步变化
 ::  自启：注册计划任务（SYSTEM 身份、系统启动时触发）
 ::  注意：需以管理员身份运行；本脚本不联网、不上传任何数据
+::
+::  单文件版：PowerShell 脚本以 base64 内嵌在本文件末尾，
+::  运行时自动释放到 %ProgramData%\MobileHotspotAutostart\。
+::  只需要这一个文件 —— 不用解压、不用把多个文件放一起。
 :: ============================================================
 
 set "taskName=MobileHotspotAutostart"
@@ -18,7 +22,7 @@ set "ps1File=%installDir%\MobileHotspotAutostart.ps1"
 
 :: ---------- 管理员权限检查 ----------
 net session >nul 2>&1
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo [错误] 请右键本文件，选择「以管理员身份运行」。
     echo.
     pause
@@ -41,6 +45,7 @@ echo.
 set "choice="
 set /p "choice=请选择操作: "
 
+if "%choice%"=="" exit /b 0
 if "%choice%"=="1" goto install
 if "%choice%"=="2" goto uninstall
 if "%choice%"=="3" goto run_now
@@ -48,24 +53,31 @@ if "%choice%"=="4" goto run_off
 if "%choice%"=="5" goto show_status
 if "%choice%"=="0" exit /b 0
 echo 输入无效。
-timeout /t 1 /nobreak >nul
+rem 用 ping 延时而不是 timeout —— timeout 会先被 PATH 里的同名程序抢走
+rem （Git Bash / Cygwin 都带 coreutils 的 timeout），参数格式不兼容会报错。
+ping -n 2 127.0.0.1 >nul 2>&1
 goto menu
 
-:: ---------- 释放脚本文件 ----------
+:: ---------- 释放内嵌脚本 ----------
 :release
 if not exist "%installDir%" mkdir "%installDir%" >nul 2>&1
-rem 载荷在 .bat 同目录（用户解压下载包的位置），不在 ProgramData。
-rem %~dp0 自带末尾反斜杠，直接拼文件名即可。
-set "payloadSrc=%~dp0payload.b64"
-if not exist "%payloadSrc%" (
-    echo [错误] 缺少载荷文件 payload.b64，
-    echo        请把它与 MobileHotspotAutostart.bat 放在同一目录后再运行。
+set "MHS_SELF=%~f0"
+set "MHS_PS1=%ps1File%"
+rem 从本文件末尾读出 base64 载荷并还原成 .ps1。
+rem 用 28591（Latin-1）读取：字节与字符一一对应，载荷段是纯 ASCII，
+rem 不受当前代码页影响。用 LastIndexOf 是因为标记串本身也出现在上面
+rem 的命令行里，取最后一次出现才是真正的载荷分隔符。
+rem 载荷被截断时 FromBase64String 会抛异常，这里吞掉它并返回非零，
+rem 免得用户看到一屏英文堆栈 —— 上面的中文提示已经说明该怎么办了。
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try{$b=[IO.File]::ReadAllBytes($env:MHS_SELF);$t=[Text.Encoding]::GetEncoding(28591).GetString($b);$m='::PAYLOAD_B64::';$i=$t.LastIndexOf($m);if($i -lt 0){exit 9};$c=$t.Substring($i+$m.Length) -replace '\s','';$d=[Convert]::FromBase64String($c);if($d.Length -lt 1000){exit 8};[IO.File]::WriteAllBytes($env:MHS_PS1,$d);exit 0}catch{exit 8}" 2>nul
+if errorlevel 1 (
+    echo [错误] 释放脚本失败，文件可能下载不完整。
+    echo        请重新下载完整的 hotspot-autostart.bat 再运行。
     pause
     exit /b 1
 )
-certutil -decode "%payloadSrc%" "%ps1File%" >nul 2>&1
 if not exist "%ps1File%" (
-    echo [错误] 释放脚本失败，请确认文件未被杀毒软件拦截。
+    echo [错误] 释放脚本失败，文件可能下载不完整。
     pause
     exit /b 1
 )
@@ -160,3 +172,8 @@ echo   若已安装开机自启，可执行：schtasks /Query /TN "%taskName%"
 echo.
 pause
 goto menu
+
+exit /b 0
+
+:: ===== 以下为构建时注入的 base64 载荷（PowerShell 脚本本体） =====
+rem ::PAYLOAD_B64::
