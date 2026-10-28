@@ -26,11 +26,11 @@ const CACHE_NAME = `toolbox-${SW_VERSION}`;
 const MAX_ENTRIES = 250;
 
 /* 带内容 hash 的静态资源：路径中含 8 位以上 hash 串 + 已知静态扩展名。
-   zip/bat/cmd/ps1 是实用脚本页的分发文件（tools/scripts/），
+   bat/cmd/ps1 是实用脚本页的分发文件（tools/scripts/），
    同样由构建产出、文件名带 hash —— 漏掉它们会走 SWR，
-   实测在 Service Worker 控制下页面内 fetch zip 得到 204 空响应，
+   实测在 Service Worker 控制下页面内 fetch 得到 204 空响应，
    卡片上的文件大小显示不出来，下载路径也因此不稳。 */
-const HASHED_ASSET_RE = /[.-][A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2?|png|jpe?g|gif|svg|webp|ico|wasm|data|onnx|txt|zip|bat|cmd|ps1)$/i;
+const HASHED_ASSET_RE = /[.-][A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2?|png|jpe?g|gif|svg|webp|ico|wasm|data|onnx|txt|bat|cmd|ps1)$/i;
 
 /* 跨域可缓存资源类型（ffmpeg core 的 .wasm/.js、tesseract 的 .traineddata.gz 等） */
 const CROSS_ORIGIN_ASSET_RE = /\.(?:js|mjs|wasm|data|onnx|traineddata|traineddata\.gz|gz|json|zip)(?:[?#]|$)/i;
