@@ -124,30 +124,45 @@ goto menu
 
 :restore
 cls
-echo ── 恢复默认 ──
+echo ── 恢复原始值 ──
 echo.
-echo 此操作将删除自定义的 WifiMaxPeers 值，
-echo 恢复系统默认上限（8 台）。
+echo 将按首次运行时的备份恢复 WifiMaxPeers：
+echo   备份为 default   → 删除自定义值，回到系统默认（8 台）
+echo   备份为具体数值   → 恢复成你当时的设置
 echo.
 set /p "confirm=确认恢复？(Y/N): "
 if /i not "!confirm!"=="Y" goto menu
 
-echo [操作] 正在删除注册表值...
-reg delete "%regPath%" /v "%regName%" /f >nul 2>&1
-if %errorlevel% equ 0 (
+if not exist "%backupFile%" (
+    echo [提示] 找不到备份文件，按「删除自定义值」处理。
+    reg delete "%regPath%" /v "%regName%" /f >nul 2>&1
     echo [完成] 已恢复系统默认（8 台）。
+    goto restore_done
+)
+rem 读取备份内容：default 或 0x 开头的十六进制
+set "savedValue="
+for /f "usebackq tokens=*" %%b in (`type "%backupFile%"`) do set "savedValue=%%b"
+if "%savedValue%"=="default" (
+    echo [操作] 备份记录为系统默认，正在删除自定义值...
+    reg delete "%regPath%" /v "%regName%" /f >nul 2>&1
+    echo [完成] 已恢复系统默认（8 台）。
+    goto restore_done
+)
+rem 0x 十六进制转十进制再写回（reg add 对十进制最稳）
+set "decVal="
+if "!savedValue:~0,2!"=="0x" set /a decVal=!savedValue! >nul 2>&1
+if "!decVal!"=="" set "decVal=!savedValue!"
+echo [操作] 正在恢复备份值 !decVal!...
+reg add "%regPath%" /v "%regName%" /t REG_DWORD /d !decVal! /f >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [完成] 已恢复为首次运行前的值（!decVal! 台）。
+    del "%backupFile%" >nul 2>&1
 ) else (
-    echo [提示] 该值可能不存在（已经是默认状态）。
+    echo [错误] 恢复失败，请确认以管理员身份运行。
+    echo        备份文件保留在 %backupFile%，修复后可再次恢复。
 )
 
-:: 清理备份文件
-if exist "%backupFile%" del "%backupFile%" >nul 2>&1
-
-echo.
-echo   生效方式：关闭移动热点再重新打开，或重启电脑。
-echo.
-pause
-goto menu
+:restore_done
 
 :show_current
 cls
