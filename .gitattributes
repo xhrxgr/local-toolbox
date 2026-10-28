@@ -1,0 +1,10 @@
+# dist 是纯构建产物，任何文件的字节都不该被 git 改动。
+#
+# 为什么这里还要放一份：部署 GitHub Pages 时用「临时索引」方式
+# （GIT_WORK_TREE 指向 dist），此刻 dist 就是 work tree 根，
+# 仓库根的 .gitattributes 在根之外、git 看不到 ——
+# 实测 .bat 的 CRLF 被转成了 LF（git 报「LF will be replaced by CRLF」
+# 的反向转换），而 cmd.exe 对 LF-only 批处理会算错字节偏移，
+# 把命令切成碎片（'set' 变 '/p'、'echo' 变 'cho'）。
+# 用户下载到的就是坏文件。zip 因为二进制启发式判定幸免。
+* -text
