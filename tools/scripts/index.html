@@ -6,10 +6,11 @@
   <meta name="description" content="Windows 本地实用脚本下载 —— 移动热点开机自启、热点连接数上限、任务栏时钟秒数一键切换，下载后本机运行" />
   <title>实用脚本 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/scripts-D458AjQT.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-sbj_m4dM.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BB6BlxOc.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scripts-B-TIOPn4.css">
+  <script type="module" crossorigin src="/local-toolbox/assets/scripts-D71vH-fu.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/text-match-qorsONaU.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/scripts-C5hSgaI2.css">
 </head>
 <body>
   <main class="tool-container">
@@ -18,6 +19,27 @@
         Windows 本地小工具：下载后在本机运行，不联网、不上传任何数据。
         每个脚本只改动对应的注册表项，并附带恢复方式。
       </div>
+
+      <div class="script-toolbar">
+        <div class="script-search">
+          <svg class="script-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="search"
+            id="script-search"
+            class="script-search__input"
+            placeholder="搜索脚本，如「热点」「时钟」「管理员」…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="搜索脚本"
+          >
+          <kbd class="script-search__shortcut">/</kbd>
+        </div>
+        <span class="script-count" id="script-count"></span>
+      </div>
+
       <div class="script-list" id="script-list"></div>
     </section>
 
