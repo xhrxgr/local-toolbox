@@ -3,6 +3,7 @@
  * 新增工具只需在此数组中添加一项
  */
 import { TOOLS } from '/assets/js/tool-registry.js';
+import { escapeHtml, highlightMatches } from '/assets/js/text-match.js';
 
 /**
  * 图标 SVG 映射（内联，避免额外请求）
@@ -154,26 +155,6 @@ function toPinyinInitials(str) {
 
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function escapeHtml(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * 高亮文本中所有匹配子串
- */
-function highlightMatches(text, queries) {
-  if (!queries.length) return escapeHtml(text);
-  const escaped = queries.map(escapeRegExp).filter((q) => q.length > 0);
-  if (!escaped.length) return escapeHtml(text);
-  const re = new RegExp('(' + escaped.join('|') + ')', 'gi');
-  return escapeHtml(text).replace(re, '<mark>$1</mark>');
 }
 
 /**

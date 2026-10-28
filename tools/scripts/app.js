@@ -4,10 +4,15 @@
  * 仓库 scripts/ 下的 Windows 批处理脚本通过 ?url 导入作为静态资源，
  * 由 Vite 打进产物（带 hash 便于缓存），页面提供下载入口。
  * 脚本本身不联网、不上传任何数据。
+ *
+ * 页面交互：
+ * - 顶部搜索框按名称/描述/用途/文件名过滤，命中处高亮；
+ * - 卡片用紧凑的单行列表布局，一条脚本占一行，纵向空间省得多。
  */
 import hotspotUrl from '../../scripts/hotspot-max-connections.bat?url';
 import toggleClockUrl from '../../scripts/toggle-clock-seconds.bat?url';
 import autostartUrl from '../../scripts/hotspot-autostart.bat?url';
+import { escapeHtml, highlightMatches } from '/assets/js/text-match.js';
 
 const SCRIPTS = [
   {
@@ -60,17 +65,75 @@ async function loadSize(url) {
   }
 }
 
-function renderScript(script) {
+/* ---------- 搜索 ---------- */
+
+/* 把查询串拆成词：按空白切分，各词之间是「与」关系 */
+function parseQuery(raw) {
+  return String(raw || '')
+    .split(/\s+/)
+    .map((w) => w.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/* 命中文本里是否包含全部关键词 */
+function matchesWords(haystack, words) {
+  const lower = haystack.toLowerCase();
+  return words.every((w) => lower.includes(w));
+}
+
+/* 一个脚本的可搜索文本：名称 + 描述 + 用途 + 文件名 */
+function searchableText(script) {
+  return [script.name, script.desc, script.file, ...(script.points || [])].join(' ');
+}
+
+/* ---------- 渲染 ---------- */
+
+/*
+ * 紧凑布局：一条脚本占一行。
+ * 左列是名称与描述，右列是标签与操作按钮。
+ * 描述里的命中词用 <mark> 高亮 —— 文本先经 escapeHtml 转义再拼进模板。
+ */
+function renderScript(script, words, sizeCache) {
   const card = document.createElement('article');
   card.className = 'script-card';
 
-  const head = document.createElement('div');
-  head.className = 'script-card__head';
+  const main = document.createElement('div');
+  main.className = 'script-card__main';
 
   const title = document.createElement('h3');
   title.className = 'script-card__title';
-  title.textContent = script.name;
-  head.appendChild(title);
+  title.innerHTML = highlightMatches(script.name, words);
+  main.appendChild(title);
+
+  const desc = document.createElement('p');
+  desc.className = 'script-card__desc';
+  desc.innerHTML = highlightMatches(script.desc, words);
+  // 单行截断后看不到全文，悬停提示补上
+  desc.title = script.desc;
+  main.appendChild(desc);
+
+  // 用途要点收进 details，默认折叠 —— 展开才占地方
+  if (script.points && script.points.length) {
+    const details = document.createElement('details');
+    details.className = 'script-card__points';
+
+    const summary = document.createElement('summary');
+    summary.className = 'script-card__points-summary';
+    summary.textContent = '用途';
+    details.appendChild(summary);
+
+    const ul = document.createElement('ul');
+    for (const p of script.points) {
+      const li = document.createElement('li');
+      li.innerHTML = highlightMatches(p, words);
+      ul.appendChild(li);
+    }
+    details.appendChild(ul);
+    main.appendChild(details);
+  }
+
+  const side = document.createElement('div');
+  side.className = 'script-card__side';
 
   const tags = document.createElement('div');
   tags.className = 'script-card__tags';
@@ -81,27 +144,15 @@ function renderScript(script) {
   if (script.admin) {
     const adminTag = document.createElement('span');
     adminTag.className = 'script-card__tag script-card__tag--warn';
-    adminTag.textContent = '需管理员权限';
+    adminTag.textContent = '需管理员';
     tags.appendChild(adminTag);
   }
   const sizeTag = document.createElement('span');
   sizeTag.className = 'script-card__tag';
-  sizeTag.dataset.role = 'size';
-  sizeTag.textContent = '—';
+  sizeTag.dataset.sizeFor = script.id;
+  sizeTag.textContent = (sizeCache && sizeCache.get(script.id)) || '—';
   tags.appendChild(sizeTag);
-  head.appendChild(tags);
-
-  const desc = document.createElement('p');
-  desc.className = 'script-card__desc';
-  desc.textContent = script.desc;
-
-  const points = document.createElement('ul');
-  points.className = 'script-card__points';
-  for (const p of script.points) {
-    const li = document.createElement('li');
-    li.textContent = p;
-    points.appendChild(li);
-  }
+  side.appendChild(tags);
 
   const actions = document.createElement('div');
   actions.className = 'script-card__actions';
@@ -109,36 +160,92 @@ function renderScript(script) {
   link.className = 'btn btn-primary';
   link.href = script.url;
   link.download = script.file;
-  link.textContent = '下载 ' + script.file;
+  link.textContent = '下载';
   actions.appendChild(link);
-  // zip 是压缩包，浏览器里打开没有意义，只有单文件脚本才提供「查看内容」
-  if (!script.zip) {
-    const fileLink = document.createElement('a');
-    fileLink.className = 'script-card__file';
-    fileLink.href = script.url;
-    fileLink.target = '_blank';
-    fileLink.rel = 'noopener';
-    fileLink.textContent = '查看内容';
-    actions.appendChild(fileLink);
-  }
+  const fileLink = document.createElement('a');
+  fileLink.className = 'script-card__file';
+  fileLink.href = script.url;
+  fileLink.target = '_blank';
+  fileLink.rel = 'noopener';
+  fileLink.textContent = '查看内容';
+  actions.appendChild(fileLink);
+  side.appendChild(actions);
 
-  card.appendChild(head);
-  card.appendChild(desc);
-  card.appendChild(points);
-  card.appendChild(actions);
+  card.appendChild(main);
+  card.appendChild(side);
   return card;
+}
+
+function renderEmpty(query) {
+  const box = document.createElement('div');
+  box.className = 'script-empty';
+  const text = document.createElement('p');
+  text.className = 'script-empty__text';
+  text.innerHTML = '未找到匹配「' + escapeHtml(query) + '」的脚本';
+  box.appendChild(text);
+  const hint = document.createElement('p');
+  hint.className = 'script-empty__hint';
+  hint.textContent = '换个关键词试试，或清空搜索框查看全部脚本';
+  box.appendChild(hint);
+  return box;
 }
 
 function initScripts() {
   const list = document.getElementById('script-list');
+  const search = document.getElementById('script-search');
+  const count = document.getElementById('script-count');
   if (!list) return;
-  list.innerHTML = '';
+
+  /* 文件大小缓存：
+     每次搜索都会重建卡片，若不缓存，重建后 size 标签会回到「—」
+     且不再更新（原来的 loadSize 回调绑在旧节点上）。 */
+  const sizeCache = new Map();
+
+  function apply(raw) {
+    const words = parseQuery(raw);
+    list.innerHTML = '';
+
+    const hits = SCRIPTS.filter((s) => matchesWords(searchableText(s), words));
+    for (const s of hits) {
+      list.appendChild(renderScript(s, words, sizeCache));
+    }
+    if (!hits.length) {
+      list.appendChild(renderEmpty(raw.trim()));
+    }
+    if (count) {
+      count.textContent = words.length ? `${hits.length} / ${SCRIPTS.length}` : `${SCRIPTS.length} 个脚本`;
+    }
+  }
+
+  if (search) {
+    search.addEventListener('input', () => apply(search.value));
+    // 回车不提交表单，避免页面刷新
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') e.preventDefault();
+    });
+    // 快捷键：/ 聚焦搜索框，Esc 清空
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        search.focus();
+        search.select();
+      } else if (e.key === 'Escape' && document.activeElement === search) {
+        search.value = '';
+        apply('');
+        search.blur();
+      }
+    });
+  }
+
+  apply('');
+
+  // 取一次文件大小，顺带把脚本预热进浏览器缓存；结果写进缓存供重建时复用
   for (const script of SCRIPTS) {
-    const card = renderScript(script);
-    list.appendChild(card);
     loadSize(script.url).then((size) => {
-      const tag = card.querySelector('[data-role="size"]');
-      if (tag && size) tag.textContent = size;
+      if (!size) return;
+      sizeCache.set(script.id, size);
+      const tag = list.querySelector(`[data-size-for="${script.id}"]`);
+      if (tag) tag.textContent = size;
     });
   }
 }

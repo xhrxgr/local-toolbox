@@ -18,6 +18,27 @@
         Windows 本地小工具：下载后在本机运行，不联网、不上传任何数据。
         每个脚本只改动对应的注册表项，并附带恢复方式。
       </div>
+
+      <div class="script-toolbar">
+        <div class="script-search">
+          <svg class="script-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="search"
+            id="script-search"
+            class="script-search__input"
+            placeholder="搜索脚本，如「热点」「时钟」「管理员」…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="搜索脚本"
+          >
+          <kbd class="script-search__shortcut">/</kbd>
+        </div>
+        <span class="script-count" id="script-count"></span>
+      </div>
+
       <div class="script-list" id="script-list"></div>
     </section>
 

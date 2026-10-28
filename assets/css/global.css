@@ -118,6 +118,17 @@ button {
   color: #fff;
 }
 
+/* 暗色主题下 --accent 是浅紫（#818cf8），白字对比度只有 2.98（WCAG AA 要求 4.5），
+   全站主按钮都受影响。改用深色文字：对比度 5.98，且保留品牌紫不变。 */
+[data-theme="dark"] .btn-primary {
+  color: #0f172a;
+}
+
+[data-theme="dark"] .btn-primary:hover,
+[data-theme="dark"] .btn-primary:focus-visible {
+  color: #0f172a;
+}
+
 .btn-primary:hover {
   background: var(--accent-hover);
   /* 必须显式给回白色文字：以 <a class="btn btn-primary"> 形式使用时，

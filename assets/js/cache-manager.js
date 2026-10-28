@@ -10,6 +10,8 @@
  * 缓存策略本身见 public/sw.js。
  */
 
+import { escapeHtml } from '/assets/js/text-match.js';
+
 import { TOOLS } from '/assets/js/tool-registry.js';
 import { armConfirm } from '/assets/js/confirm.js';
 
@@ -475,12 +477,6 @@ function flashBtn(btn, text, cls, onRestore) {
     // 避免「按钮说已开启、摘要说未开启」的中间态）
     if (onRestore) onRestore();
   }, 1500);
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]));
 }
 
 export { ICON_DB };
