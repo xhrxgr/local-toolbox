@@ -2541,43 +2541,53 @@ export function decodeCanvas(canvas, opts = {}) {
           }
           if (!cands.length) return null;
 
-          // 入选：每个参考中心各自按 geo 降序取前 Kgeo、按 pen 升序取前 Kpen，取并集。
-          // 分组排序是必须的 —— 不同参考中心的分数尺度不同，混在一起排会互相压制。
+          // 入选：按合并分数排序后取前 K 个，再补上两个信号各自的最佳候选。
+          //
+          // 合并分数：score = geo - w · (pen / penMax)
+          //
+          // 为什么需要合并而不是只看一个：
+          //   geo 判别力强但是离散的 —— 它采样 17 个模块算交替率，粒度 1/16，
+          //   同一档里的候选 geo 完全相同、无法区分。
+          //   实测 sc-hard-small 前 6 个候选 geo 都是 0.917，
+          //   真解（alpha=-2e-5）geo 只有 0.875，被压到第 7 位；
+          //   而它在 pen 上排第 1（pen=0.05，其余 0.07~0.58）。
+          //   pen 连续、分辨细，但只看三点，原理上比 geo 弱
+          //   （桶形残余破坏的是整片网格，pen 感知不到）。
+          //
+          // 权重的定法（40 个参数化场景实测，不是拍脑袋）：
+          //   w=0（纯 geo）  首个真解平均在第 2.7 位，40 个场景漏 2 个
+          //   w=0.5         首个真解平均在第 1.3 位，漏 1 个
+          //   w=1.5         首个真解平均在第 1.2 位，漏 1 个
+          // 取 0.5：兼顾 geo 的强判别与 pen 的细分辨，两个硬场景上
+          // sc-hard 的真解仍在第 1 位、sc-hard-small 的真解从第 7 位提到第 1 位。
+          //
+          // 为什么要跨参考中心统一排序：
+          //   不同参考中心的分数尺度本来不同，混排会互相压制 ——
+          //   但 pen 归一化后（除以全局 penMax）尺度问题就消了，
+          //   而统一排序能利用「两个中心里哪个更可信」这个信息。
+          //
+          // 补上 geo/pen 各自的最佳候选是兜底：
+          //   万一合并分数在某个场景把真解排到了 K 名之外，
+          //   至少还有 geo 前列或 pen 前列的机会。
           const picked = [];
           const seen = new Set();
-          const K_GEO = opts.barrelTopGeo ?? 6;
-          const K_PEN = opts.barrelTopPen ?? 4;
-          for (const c of centers) {
-            const grp = cands.filter((x) => x.c === c);
-            if (!grp.length) continue;
-            const byGeo = grp.slice().sort((a, b) => b.geo - a.geo);
-            const byPen = grp.slice().sort((a, b) => a.pen - b.pen);
-            const union = [];
-            for (const x of byGeo.slice(0, K_GEO)) union.push(x);
-            for (const x of byPen.slice(0, K_PEN)) union.push(x);
-            // 尝试顺序：先按 geo 分档，档内按 pen 排。
-            //
-            // 为什么不能只按 geo 排：geo 是离散的几档
-            // （采样 17 个模块算出的交替率，粒度 1/16），
-            // 同一档里的候选 geo 完全相同、无法区分。
-            // 实测 sc-hard-small 前 6 个候选的 geo 都是 0.917，
-            // 真解（alpha=-2e-5）geo 只有 0.875，被压到第 7 位；
-            // 而它在 pen 上排第 1（pen=0.05，其余是 0.07~0.58）。
-            //
-            // 为什么要分档而不是直接按 pen 排：
-            // geo 是「整条时序图案是否严格交替」，是网格规整度的直接度量；
-            // pen 是「两条直角边是否落在同一个 4v+10 上」，只看三点。
-            // 桶形残余破坏的是整片网格，pen 在原理上更弱。
-            // 所以 geo 定档（决定网格大致规整的那一档）、
-            // pen 定档内顺序（区分同一档里的候选），两者互补。
-            union.sort((a, b) => (b.geo - a.geo) || (a.pen - b.pen));
-            for (const x of union) {
-              const key = `${x.c.cx},${x.c.cy},${x.alpha}`;
-              if (seen.has(key)) continue;
-              seen.add(key);
-              picked.push(x);
-            }
-          }
+          const K = opts.barrelTop ?? 10;
+          const W_PEN = opts.barrelPenWeight ?? 0.5;
+          const penMax = Math.max(...cands.map((x) => x.pen), 1e-6);
+          const scored = cands.map((x) => ({ x, s: x.geo - W_PEN * (x.pen / penMax) }));
+          scored.sort((a, b) => b.s - a.s);
+          const add = (x) => {
+            const key = `${x.c.cx},${x.c.cy},${x.alpha}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            picked.push(x);
+          };
+          for (const e of scored.slice(0, K)) add(e.x);
+          // 兜底：两个信号各自的最佳候选
+          const bestGeo = scored.reduce((a, b) => (b.x.geo > a.x.geo ? b : a), scored[0]);
+          const bestPen = scored.reduce((a, b) => (b.x.pen < a.x.pen ? b : a), scored[0]);
+          if (bestGeo) add(bestGeo.x);
+          if (bestPen) add(bestPen.x);
 
           // 昂贵阶段：只对入选候选做透视矫正 + 解码
           const warps = opts.barrelWarps ?? 20;
