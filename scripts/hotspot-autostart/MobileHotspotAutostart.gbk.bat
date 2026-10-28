@@ -109,8 +109,20 @@ if errorlevel 1 (
     echo [完成] 已删除开机自启任务。
 )
 echo.
-echo   提示：程序文件仍保留在 %installDir%
-echo   如需彻底删除，可手动删除该目录。
+set /p "delFiles=是否同时删除程序文件（%installDir% 共约 20 KB）？(Y/N): "
+if /i not "%delFiles%"=="Y" (
+    echo   程序文件保留在 %installDir%，重新运行此脚本选 [1] 即可再次启用。
+    goto uninstall_done
+)
+rem 卸载顺带删文件 = 完全还原到安装前；目录删掉后日志也随之消失
+rd /s /q "%installDir%" >nul 2>&1
+if exist "%installDir%" (
+    echo [错误] 删除失败，可能有文件被占用，请手动删除 %installDir%
+) else (
+    echo [完成] 程序文件已删除，已还原到安装前的状态。
+)
+
+:uninstall_done
 echo.
 pause
 goto menu
