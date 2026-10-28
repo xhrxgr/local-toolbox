@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>QR Bench</title></head>
+<body>
+<script type="module">
+import QRCode from 'qrcode';
+import jsQR from 'jsqr';
+import {
+  solveH, applyH, barrel, barrelAniso, barrelLocal,
+  gradient, invert, contrast, blur, noise, occlude,
+  persp, rot, resize, seedRng, rng, curve, scene, sceneAniso, sceneLocal,
+  ANISO_CASES, LOCAL_CASES,
+} from './bench-scenes.js';
+
+const TEXT = 'https://example.com/bench/2026-10-27?qr=stability-test';
+
+/* ---------- 基础：生成原始二维码位图 ---------- */
+async function makeQR(size = 512, ec = 'M') {
+  const url = await QRCode.toDataURL(TEXT, { errorCorrectionLevel: ec, width: size, margin: 2 });
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+  ctx.drawImage(img, 0, 0, size, size);
+  return c;
+}
+
+/* ---------- 单应性矩阵（4 点透视映射） ---------- */
+
+
+/* ---------- 变形用例集合 ---------- */
+const CASES = [
+  { name: 'baseline', label: '基准（无变形）', fn: (c) => c },
+  { name: 'persp-15', label: '透视 15°', fn: (c) => persp(c, 0.15) },
+  { name: 'persp-30', label: '透视 30°', fn: (c) => persp(c, 0.30) },
+  { name: 'persp-45', label: '透视 45°', fn: (c) => persp(c, 0.45) },
+  { name: 'persp-60', label: '透视 60°', fn: (c) => persp(c, 0.60) },
+  { name: 'rotate-30', label: '旋转 30°', fn: (c) => rot(c, 30) },
+  { name: 'rotate-45', label: '旋转 45°', fn: (c) => rot(c, 45) },
+  { name: 'rotate-90', label: '旋转 90°', fn: (c) => rot(c, 90) },
+  { name: 'rotate-arbit', label: '旋转 17°+37°', fn: (c) => rot(rot(c, 17), 37) },
+  { name: 'scale-64', label: '缩小到 64px', fn: (c) => resize(c, 64) },
+  { name: 'scale-48', label: '缩小到 48px', fn: (c) => resize(c, 48) },
+  { name: 'scale-32', label: '缩小到 32px', fn: (c) => resize(c, 32) },
+  { name: 'blur-2', label: '模糊 2px', fn: (c) => blur(c, 2) },
+  { name: 'blur-4', label: '模糊 4px', fn: (c) => blur(c, 4) },
+  { name: 'blur-6', label: '模糊 6px', fn: (c) => blur(c, 6) },
+  { name: 'lowcontrast', label: '低对比（灰底浅墨）', fn: (c) => contrast(c, 0.18) },
+  { name: 'faint', label: '极淡（对比 0.08）', fn: (c) => contrast(c, 0.08) },
+  { name: 'invert', label: '反色（白字黑底）', fn: (c) => invert(c) },
+  { name: 'invert-persp', label: '反色 + 透视 30°', fn: (c) => invert(persp(c, 0.30)) },
+  { name: 'noise-light', label: '轻噪声', fn: (c) => { seedRng(2001); return noise(c, 0.10); } },
+  { name: 'noise-heavy', label: '重噪声', fn: (c) => { seedRng(2002); return noise(c, 0.30); } },
+  { name: 'gradient', label: '光照渐变', fn: (c) => gradient(c) },
+  { name: 'occlude-10', label: '遮挡 10%', fn: (c) => occlude(c, 0.10) },
+  { name: 'occlude-25', label: '遮挡 25%', fn: (c) => occlude(c, 0.25) },
+  { name: 'curve', label: '桶形弯曲', fn: (c) => curve(c, 0.35) },
+  { name: 'persp-30-blur-3', label: '透视 30% + 模糊 3px', fn: (c) => blur(persp(c, 0.30), 3) },
+  { name: 'persp-45-scale-96', label: '透视 45° + 缩小 96px', fn: (c) => resize(persp(c, 0.45), 96) },
+  { name: 'persp-30-curve', label: '透视 30° + 弯曲', fn: (c) => curve(persp(c, 0.30), 0.30) },
+  { name: 'noisy-scene', label: '真实场景：透视+噪声+渐变+遮挡', fn: (c) => { seedRng(2003); return occlude(gradient(noise(persp(c, 0.28), 0.18)), 0.15); } },
+];
+
+/* ---------- 非等向桶形弯曲 ----------
+ *
+ * 桶形畸变的标准模型是径向的：f = 1 + k·(r/R)²，r 是到中心的欧氏距离。
+ * 但真实镜头畸变未必各向同性 —— 横向与纵向的弯曲强度可以不同。
+ * 径向模型无法表达这种形变，需要能处理一般形变的模型（如薄板样条）。
+ *
+ * 这里按方向余弦的平方把两个方向的强度混合：
+ *   k(θ) = kx·cos²θ + ky·sin²θ
+ * cos²θ = dx²/r²，sin²θ = dy²/r²。
+ * kx = ky 时退化为标准径向模型（用于验证测试台本身正确）。
+ */
+
+/* ---------- 摄像头场景用例：码是画面里的小目标 ---------- */
+/*
+ * 上面 29 个用例都有一个共同前提：码铺满整幅画面。
+ * 真实摄像头不是这样 —— 码只占画面一小块，
+ * 而镜头畸变、畸变参考系、光照不均都相对整幅画面/被摄物发生。
+ * 这一组用例把码放进 640×480 的场景里，模拟真实取景。
+ */
+const SCENE_CASES = [
+  { name: 'sc-basic', label: '场景 200px 居中', fn: (c) => scene(c, { size: 200 }) },
+  { name: 'sc-curve', label: '场景 + 桶形弯曲', fn: (c) => scene(c, { size: 200, curve: 0.35 }) },
+  { name: 'sc-persp30', label: '场景 + 透视 30°', fn: (c) => scene(c, { size: 200, persp: 0.30 }) },
+  { name: 'sc-persp30-curve', label: '场景 + 透视 30° + 弯曲', fn: (c) => scene(c, { size: 200, persp: 0.30, curve: 0.30 }) },
+  { name: 'sc-grad-noise', label: '场景 + 光照渐变 + 噪声', fn: (c) => scene(c, { size: 200, grad: true, noise: 0.18, seed: 1001 }) },
+  { name: 'sc-hard', label: '场景 + 透视+弯曲+渐变+噪声+模糊', fn: (c) => scene(c, { size: 200, persp: 0.28, curve: 0.25, grad: true, noise: 0.18, blur: 2, seed: 1002 }) },
+  { name: 'sc-small-140', label: '场景 140px', fn: (c) => scene(c, { size: 140 }) },
+  { name: 'sc-small-140-curve', label: '场景 140px + 弯曲', fn: (c) => scene(c, { size: 140, curve: 0.35 }) },
+  { name: 'sc-corner', label: '场景 + 偏置角落 160px', fn: (c) => scene(c, { size: 160, cx: 150, cy: 140 }) },
+  { name: 'sc-corner-curve', label: '场景 + 偏置角落 + 弯曲', fn: (c) => scene(c, { size: 160, cx: 150, cy: 140, curve: 0.35 }) },
+  { name: 'sc-hard-small', label: '场景 140px + 全部退化', fn: (c) => scene(c, { size: 140, persp: 0.28, curve: 0.25, grad: true, noise: 0.18, blur: 2, seed: 1003 }) },
+  { name: 'sc-invert', label: '场景 + 反色', fn: (c) => scene(c, { size: 200, invert: true }) },
+];
+
+/**
+ * 非等向桶形场景：横向与纵向弯曲强度不同。
+ * kx = ky 时与 SCENE_CASES 里的桶形用例等价。
+ */
+
+
+/**
+ * 把码放进 640×480 场景，叠加各类退化。
+ * 顺序：透视 → 桶形弯曲（相对码自身） → 光照渐变 → 噪声 → 模糊。
+ */
+
+/**
+ * 桶形弯曲，参考系是「被摄码自身」（中心 cx/cy、归一化半径 R），
+ * 而不是整幅画面 —— 镜头畸变是相对被摄物施加的。
+ */
+
+
+
+/* ---------- 解码：基线（单次 jsQR 直调） ---------- */
+function decodeBaseline(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const r = jsQR(d.data, d.width, d.height);
+  return r ? r.data : null;
+}
+
+/* ---------- 汇总：基线 vs 增强管线 ---------- */
+import { decodeCanvas } from '/assets/js/qr-decoder.js';
+
+window.__benchBoth = async () => {
+  const base = await makeQR(512, 'M');
+  const rows = [];
+  for (const cs of CASES) {
+    // 每个用例用独立副本（变形函数会就地修改）
+    const cp = document.createElement('canvas');
+    cp.width = base.width; cp.height = base.height;
+    cp.getContext('2d').drawImage(base, 0, 0);
+    let out;
+    try { out = cs.fn(cp); } catch (e) {
+      rows.push({ name: cs.name, label: cs.label, err: String(e) });
+      continue;
+    }
+
+    const t0 = performance.now();
+    const b = decodeBaseline(out);
+    const msBase = performance.now() - t0;
+
+    const t1 = performance.now();
+    let e = null;
+    let strat = null;
+    try {
+      const r = decodeCanvas(out, { maxSide: 1400, deep: true, allowTile: true });
+      if (r) { e = r.data; strat = r.strategy; }
+    } catch (err) {
+      strat = 'ERR:' + err.message;
+    }
+    const msEnh = performance.now() - t1;
+
+    rows.push({
+      name: cs.name, label: cs.label, w: out.width, h: out.height,
+      baseOk: b === TEXT, enhOk: e === TEXT, strat,
+      msBase: Math.round(msBase), msEnh: Math.round(msEnh),
+    });
+  }
+  return rows;
+};
+
+/* ---------- 汇总输出 ---------- */
+window.__summary = async () => {
+  const rows = await window.__benchBoth();
+  const ok = rows.filter((x) => x.enhOk);
+  const bad = rows.filter((x) => !x.enhOk);
+  const avg = ok.length ? ok.reduce((a, b) => a + b.msEnh, 0) / ok.length : 0;
+  const max = ok.length ? Math.max(...ok.map((x) => x.msEnh)) : 0;
+  const strat = {};
+  for (const x of ok) strat[x.strat] = (strat[x.strat] || 0) + 1;
+  const lines = [
+    `ENH ${ok.length}/${rows.length}  base ${rows.filter((x) => x.baseOk).length}/${rows.length}`,
+    `avg(ms of ok) ${avg.toFixed(0)}  max ${max.toFixed(0)}`,
+    'FAIL: ' + bad.map((x) => `${x.name}(${x.msEnh}ms)`).join('  '),
+    'strat: ' + JSON.stringify(strat),
+  ];
+  return lines.join(' | ');
+};
+
+window.__SCENE_CASES = SCENE_CASES;
+
+/**
+ * 非等向桶形场景：与 scene() 相同，但桶形用各向异性的版本。
+ */
+
+/* ---------- 局部弯曲（非径向） ----------
+ *
+ * 径向桶形是「以某点为中心的二次缩放」，能表达镜头畸变，
+ * 但表达不了「画面局部被弯折」这类形变 ——
+ * 例如纸张弯曲、物体被轻微揉皱、镜头边缘的像差。
+ *
+ * 这里用两个正交方向的正弦波叠加做形变：
+ *   dx' = dx + A·sin(2π·dx/λ)·cos(2π·dy/λ)
+ *   dy' = dy + A·sin(2π·dy/λ)
+ * A=0 时退化为无形变（用于验证测试台本身正确）。
+ */
+
+/**
+ * 局部弯曲场景：径向模型表达不了的形变。
+ *
+ * 已知缺口（2026-10-28 实测）：
+ *   波形弯曲 A=4px（码 200px 的 2%）就解不出来，
+ *   而同强度的径向弯曲能解。
+ *   根因已定位：三个定位图案的位置几乎没变（差 1px），
+ *   但单应性模型表达不了局部弯曲 —— 矫正后模块网格仍然被弯着。
+ *
+ *   要解决需要能表达一般形变的模型（薄板样条等），
+ *   而 QR 码上可靠的对应点只有 4 个（3 个定位图案 + 1 个对齐图案），
+ *   4 个控制点的样条退化成仿射，起不到作用。
+ *   补充控制点的路子（沿时序图案做模块级相位追踪）实测不稳定。
+ *
+ *   所以这一组是「已知缺口」的记录，不是待通过的用例。
+ *   它保留在基准里，是为了让未来的改进有明确的对比基准。
+ */
+
+
+window.__LOCAL_CASES = LOCAL_CASES;
+window.__sceneLocal = sceneLocal;
+window.__ANISO_CASES = ANISO_CASES;
+window.__sceneAniso = sceneAniso;
+
+
+window.__asyncBench = async () => {
+  const dm = await import('/assets/js/qr-decoder.js');
+  const results = [];
+  for (const cs of window.__CASES) {
+    const base = await window.__makeQR(512, 'M');
+    const cp = document.createElement('canvas');
+    cp.width = base.width; cp.height = base.height;
+    cp.getContext('2d').drawImage(base, 0, 0);
+    const out = cs.fn(cp);
+    const t = performance.now();
+    let r = null;
+    try {
+      r = await dm.decodeCanvasAsync(out, { maxSide: 1400, deep: true, allowTile: true });
+    } catch (e) {
+      results.push({ name: cs.name, err: String(e) });
+      continue;
+    }
+    results.push({
+      name: cs.name,
+      ok: !!(r && r.data),
+      strat: r ? r.strategy : null,
+      ms: Math.round(performance.now() - t),
+    });
+  }
+  return results;
+};
+
+window.__asyncBenchScene = async () => {
+  const dm = await import('/assets/js/qr-decoder.js');
+  const results = [];
+  for (const cs of window.__SCENE_CASES) {
+    const base = await window.__makeQR(512, 'M');
+    const cp = document.createElement('canvas');
+    cp.width = base.width; cp.height = base.height;
+    cp.getContext('2d').drawImage(base, 0, 0);
+    const out = cs.fn(cp);
+    const t = performance.now();
+    let r = null;
+    try {
+      r = await dm.decodeCanvasAsync(out, { maxSide: 1400, deep: true, allowTile: true });
+    } catch (e) {
+      results.push({ name: cs.name, err: String(e) });
+      continue;
+    }
+    results.push({
+      name: cs.name,
+      ok: !!(r && r.data),
+      strat: r ? r.strategy : null,
+      ms: Math.round(performance.now() - t),
+    });
+  }
+  return results;
+};
+
+/* ---------- 真实照片样本 ----------
+ *
+ * 合成用例的退化参数是「人造的组合」，真实照片的畸变、光照、背景都不同。
+ * 2026-10-28 的 ROI 加速就是在真实样本上发现问题的：
+ * 用「几何最自洽的三元组」定 ROI 时，一张强透视的梯形码照片上
+ * 三元组选错了（角偏差 72°、符号边长估成 83px，真实 200px），
+ * 裁出来的区域只有整幅图的 27% 且完全裁歪。
+ *
+ * 所以真实样本必须有回归保护，不能只靠合成用例。
+ */
+window.__REAL_SAMPLES = [
+  { name: 'real-scan', file: 'samples/real-scan.png' },
+];
+
+window.__asyncBenchReal = async () => {
+  const dm = await import('/assets/js/qr-decoder.js');
+  const results = [];
+  for (const s of window.__REAL_SAMPLES) {
+    let out = null;
+    try {
+      const img = new Image();
+      img.src = s.file;
+      await img.decode();
+      out = document.createElement('canvas');
+      out.width = img.naturalWidth; out.height = img.naturalHeight;
+      out.getContext('2d', { willReadFrequently: true }).drawImage(img, 0, 0);
+    } catch (e) {
+      results.push({ name: s.name, err: '加载失败: ' + String(e) });
+      continue;
+    }
+    const t = performance.now();
+    let r = null;
+    try {
+      r = await dm.decodeCanvasAsync(out, { maxSide: 1400, deep: true, allowTile: true });
+    } catch (e) {
+      results.push({ name: s.name, err: String(e) });
+      continue;
+    }
+    results.push({
+      name: s.name,
+      ok: !!(r && r.data),
+      strat: r ? r.strategy : null,
+      text: r ? r.data : null,
+      ms: Math.round(performance.now() - t),
+    });
+  }
+  return results;
+};
+
+
+window.__asyncBenchLocal = async () => {
+  const dm = await import('/assets/js/qr-decoder.js');
+  const results = [];
+  for (const cs of window.__LOCAL_CASES) {
+    const base = await window.__makeQR(512, 'M');
+    const cp = document.createElement('canvas');
+    cp.width = base.width; cp.height = base.height;
+    cp.getContext('2d').drawImage(base, 0, 0);
+    const out = window.__sceneLocal(cp, cs);
+    const t = performance.now();
+    let r = null;
+    try {
+      r = await dm.decodeCanvasAsync(out, { maxSide: 1400, deep: true, allowTile: true });
+    } catch (e) {
+      results.push({ name: cs.name, err: String(e) });
+      continue;
+    }
+    results.push({
+      name: cs.name,
+      ok: !!(r && r.data),
+      strat: r ? r.strategy : null,
+      ms: Math.round(performance.now() - t),
+    });
+  }
+  return results;
+};
+
+window.__asyncBenchAniso = async () => {
+  const dm = await import('/assets/js/qr-decoder.js');
+  const results = [];
+  for (const cs of window.__ANISO_CASES) {
+    const base = await window.__makeQR(512, 'M');
+    const cp = document.createElement('canvas');
+    cp.width = base.width; cp.height = base.height;
+    cp.getContext('2d').drawImage(base, 0, 0);
+    const out = window.__sceneAniso(cp, cs);
+    const t = performance.now();
+    let r = null;
+    try {
+      r = await dm.decodeCanvasAsync(out, { maxSide: 1400, deep: true, allowTile: true });
+    } catch (e) {
+      results.push({ name: cs.name, err: String(e) });
+      continue;
+    }
+    results.push({
+      name: cs.name,
+      ok: !!(r && r.data),
+      strat: r ? r.strategy : null,
+      ms: Math.round(performance.now() - t),
+    });
+  }
+  return results;
+};
+
+window.__CASES = CASES;
+window.__makeQR = makeQR;
+window.__scene = scene;
+window.__loadZxing = () => import('zxing-wasm');
+window.__jsQR = jsQR;
+
+window.__TEXT = TEXT;
+window.__ready = true;
+</script>
+</body>
+</html>
