@@ -6,15 +6,17 @@
   <meta name="description" content="正则测试器 —— 实时匹配/高亮/捕获组/替换预览，全部本地运行" />
   <title>正则测试 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/regex-D7_rpCiv.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/regex-C1XrNmRV.css">
+  <script type="module" crossorigin src="/local-toolbox/assets/regex-k23qoP6z.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/regex-RXupWa5b.css">
 </head>
 <body>
   <main class="tool-container">
+    <!-- 桌面端：正则输入全宽一行，下方测试文本与高亮预览左右分栏 -->
+    <div class="regex-layout">
     <!-- ========== 输入区 ========== -->
-    <section class="regex-input-panel glass">
+    <section class="regex-input-panel glass regex-layout__full">
       <div class="panel-desc">输入正则表达式与标志位，实时匹配测试文本。支持捕获组、命名组与替换预览。</div>
 
       <div class="regex-input-row">
@@ -50,13 +52,18 @@
       </div>
 
       <div class="regex-error" id="regex-error"></div>
+    </section>
 
+    <!-- 测试文本：桌面端与右侧结果区并排 -->
+    <section class="regex-test-panel glass regex-layout__in">
       <div class="codec-row">
         <label class="codec-label">测试文本</label>
         <textarea id="regex-text" class="codec-input" placeholder="输入测试文本..." rows="6"></textarea>
       </div>
     </section>
 
+    <!-- 右侧结果区：统计 + Tab + 各结果面板 -->
+    <div class="regex-layout__out">
     <!-- ========== 结果统计 ========== -->
     <div class="result-stats" id="result-count"></div>
 
@@ -91,6 +98,8 @@
         <textarea id="replace-output" class="codec-output" rows="5" readonly></textarea>
       </div>
     </section>
+    </div>
+    </div>
   </main>
 
 </body>

@@ -6,16 +6,16 @@
   <meta name="description" content="二维码工具 —— 生成（自定义颜色/纠错/尺寸，PNG/SVG 下载）+ 图片识别，全部本地运行" />
   <title>二维码 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/qrcode-B1cN5SPI.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/qrcode-CZuIbjFF.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-CylBT3IK.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-yAVHF97_.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/qr-decoder-B8HGxZaN.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/qr-zxing-BhRNlsFY.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/qrcode-gYQCeeDp.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/qrcode-B5m61jmL.css">
 </head>
 <body>
   <main class="tool-container">
@@ -26,15 +26,15 @@
     </nav>
 
     <!-- ========== 生成 ========== -->
-    <section class="mode-panel mode-panel--active glass" id="panel-generate">
+    <section class="mode-panel mode-panel--active glass qr-io" id="panel-generate">
       <div class="panel-desc">输入文本实时生成二维码，支持自定义纠错级别、尺寸、前景/背景色，可下载 PNG 或 SVG。全部本地运行。</div>
 
-      <div class="qr-gen-row">
+      <div class="qr-gen-row qr-io__in">
         <label class="qr-label" for="qr-text">文本内容</label>
         <textarea class="qr-input" id="qr-text" placeholder="输入文本生成二维码..." rows="4"></textarea>
       </div>
 
-      <div class="qr-options">
+      <div class="qr-options qr-io__opts">
         <div class="qr-option">
           <span class="qr-option__label">纠错级别</span>
           <div class="qr-ecl" id="qr-ecl">
@@ -62,21 +62,23 @@
         </div>
       </div>
 
-      <div class="qr-gen-actions">
+      <div class="qr-gen-actions qr-io__act">
         <button class="btn btn-primary" id="btn-qr-generate">生成</button>
       </div>
 
-      <div class="qr-preview-area" id="qr-preview-area">
-        <div class="qr-preview-empty" id="qr-preview-empty">输入文本后将自动生成二维码</div>
-        <img class="qr-preview-img" id="qr-preview-img" alt="二维码预览" hidden />
-      </div>
+      <div class="qr-io__out">
+        <div class="qr-preview-area" id="qr-preview-area">
+          <div class="qr-preview-empty" id="qr-preview-empty">输入文本后将自动生成二维码</div>
+          <img class="qr-preview-img" id="qr-preview-img" alt="二维码预览" hidden />
+        </div>
 
-      <div class="qr-download" id="qr-download">
-        <button class="btn btn-secondary" id="btn-qr-png" disabled>下载 PNG</button>
-        <button class="btn btn-secondary" id="btn-qr-svg" disabled>下载 SVG</button>
-      </div>
+        <div class="qr-download" id="qr-download">
+          <button class="btn btn-secondary" id="btn-qr-png" disabled>下载 PNG</button>
+          <button class="btn btn-secondary" id="btn-qr-svg" disabled>下载 SVG</button>
+        </div>
 
-      <div class="qr-meta" id="qr-meta"></div>
+        <div class="qr-meta" id="qr-meta"></div>
+      </div>
     </section>
 
     <!-- ========== 识别 ========== -->

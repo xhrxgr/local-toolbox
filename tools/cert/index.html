@@ -6,15 +6,17 @@
   <meta name="description" content="SSL/TLS 证书解析工具 —— 粘贴 PEM 证书或上传 .crt/.cer 文件，本地解析证书主题、签发者、有效期、SAN、公钥、签名算法、SHA-256 指纹等信息" />
   <title>证书解析 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/cert-UCQ8psQN.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/cert-Dpb8tQ4q.css">
+  <script type="module" crossorigin src="/local-toolbox/assets/cert-C5LdDIRa.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/cert-CppUIxWd.css">
 </head>
 <body>
   <main class="tool-container">
+    <!-- 桌面端：左侧证书输入，右侧解析结果（见 style.css 的 .cert-layout） -->
+    <div class="cert-layout">
     <!-- 输入区 -->
-    <section class="input-section glass">
+    <section class="input-section glass cert-layout__in">
       <h2 class="section-title">证书输入</h2>
       <div class="input-row">
         <textarea class="cert-input" id="cert-input" placeholder="粘贴 PEM 格式证书：&#10;-----BEGIN CERTIFICATE-----&#10;MIIFazCCBFOgAwIBAgISA2Q3...&#10;-----END CERTIFICATE-----" rows="8"></textarea>
@@ -30,6 +32,8 @@
       </div>
     </section>
 
+    <!-- 右侧结果区：错误提示 / 解析结果 / 空状态 -->
+    <div class="cert-layout__out">
     <!-- 错误提示 -->
     <section class="error-section" id="error-section" hidden></section>
 
@@ -79,6 +83,8 @@
     <section class="empty-state" id="empty-state">
       粘贴 PEM / DER Hex / DER Base64 证书后点击"解析证书"
     </section>
+    </div>
+    </div>
   </main>
 
 </body>

@@ -6,17 +6,20 @@
   <meta name="description" content="文本工具集 —— 统计/大小写/去重/排序/翻转/替换/Tab空格转换，全部本地处理" />
   <title>文本工具 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/text-DuskAP5J.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
+  <script type="module" crossorigin src="/local-toolbox/assets/text-BH0ENwMO.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-yAVHF97_.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/text-Cf-P9ZY0.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/text-CSZHsK4u.css">
 </head>
 <body>
   <main class="tool-container">
     <section class="mode-panel glass mode-panel--active">
       <div class="panel-desc">综合文本处理：统计字数/行数、大小写转换、去重、排序、翻转、字符串替换、Tab↔空格互转。全部本地处理。</div>
 
+      <!-- 桌面端：输入与输出左右分栏（见 style.css 的 .text-grid 区域定义） -->
+      <div class="text-grid">
+      <div class="text-grid__input">
       <div class="codec-row">
         <label class="codec-label" for="text-input">输入文本</label>
         <textarea class="codec-input" id="text-input" placeholder="粘贴或输入文本..." rows="8"></textarea>
@@ -105,7 +108,9 @@
         <button class="btn btn-secondary" id="btn-swap">用结果替换输入</button>
         <button class="btn btn-secondary" id="btn-clear">清空</button>
       </div>
+      </div>
 
+      <div class="text-grid__output">
       <!-- 统计结果 -->
       <div class="text-stats" id="text-stats" hidden>
         <div class="stat-card"><span class="stat-card__label">字符数</span><span class="stat-card__value" id="stat-chars">0</span></div>
@@ -125,6 +130,8 @@
       <div class="codec-actions">
         <button class="btn btn-secondary" id="btn-copy">复制输出</button>
         <span class="text-meta" id="text-meta"></span>
+      </div>
+      </div>
       </div>
     </section>
   </main>

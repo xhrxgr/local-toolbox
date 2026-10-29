@@ -6,13 +6,13 @@
   <meta name="description" content="SQL 美化/压缩 + CRON 表达式生成与解释器，全部本地处理" />
   <title>SQL/CRON - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/sqlcron-gXs71K88.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/sqlcron-j8-24OMQ.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-yAVHF97_.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/sqlcron-IV1-oClf.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/sqlcron-BkQTzXGW.css">
 </head>
 <body>
   <main class="tool-container">
@@ -23,7 +23,7 @@
     </nav>
 
     <!-- ========== SQL 格式化 ========== -->
-    <section class="mode-panel mode-panel--active glass" id="panel-sql">
+    <section class="mode-panel mode-panel--active glass sql-io" id="panel-sql">
       <div class="panel-desc">SQL 美化与压缩，支持 MySQL / PostgreSQL / Oracle / SQLite 等多种方言，可选 Tab/空格缩进。</div>
 
       <div class="sql-controls">
@@ -60,23 +60,23 @@
         </label>
       </div>
 
-      <div class="codec-row">
+      <div class="codec-row shell-io__in">
         <label class="codec-label" for="sql-input">SQL 输入</label>
         <textarea class="codec-input" id="sql-input" placeholder="SELECT * FROM users WHERE id = 1" rows="6"></textarea>
       </div>
 
-      <div class="codec-actions">
+      <div class="codec-actions shell-io__act">
         <button class="btn btn-primary" id="btn-sql-format">格式化</button>
         <button class="btn btn-secondary" id="btn-sql-clear">清空</button>
         <button class="btn btn-secondary" id="btn-sql-copy">复制结果</button>
       </div>
 
-      <div class="codec-row">
+      <div class="codec-row shell-io__out">
         <label class="codec-label">结果</label>
         <textarea class="codec-input" id="sql-output" rows="10" readonly></textarea>
       </div>
 
-      <div class="sql-meta" id="sql-meta"></div>
+      <div class="sql-meta sql-io__meta" id="sql-meta"></div>
     </section>
 
     <!-- ========== CRON 解释 ========== -->

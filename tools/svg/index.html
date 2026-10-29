@@ -6,17 +6,19 @@
   <meta name="description" content="SVG 优化器 —— 去除冗余 XML 声明/注释/编辑器命名空间/默认值属性/空元素并压缩空白，纯字符串处理，全部本地运行" />
   <title>SVG 优化器 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/svg-CuWoP5qh.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Csr89AbW.js">
+  <script type="module" crossorigin src="/local-toolbox/assets/svg-mJ2bgOy9.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-CylBT3IK.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-yAVHF97_.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-CeJxgwEl.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/svg-Wa53SiO5.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/svg-CVH1Hg61.css">
 </head>
 <body>
   <main class="tool-container">
+    <!-- 桌面端：左侧输入与选项，右侧预览对比（见 style.css 的 .svg-layout） -->
+    <div class="svg-layout">
     <!-- ========== 输入与选项 ========== -->
-    <section class="glass svg-panel">
+    <section class="glass svg-panel svg-layout__in">
       <div class="panel-desc">SVG 优化器，去除冗余 XML 声明、DOCTYPE、注释、编辑器命名空间、metadata、空元素并压缩空白。纯字符串/正则处理，不依赖 DOMParser，全部本地运行。</div>
 
       <!-- 拖放区 -->
@@ -77,7 +79,7 @@
     </section>
 
     <!-- ========== 预览对比 ========== -->
-    <section class="glass svg-panel">
+    <section class="glass svg-panel svg-layout__out">
       <div class="panel-desc">预览对比（棋盘格背景表示透明区域）</div>
       <div class="svg-preview-grid">
         <div class="svg-preview-box">
@@ -94,6 +96,7 @@
         </div>
       </div>
     </section>
+    </div>
   </main>
 
 </body>
