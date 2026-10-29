@@ -212,6 +212,41 @@
   margin-left: auto;
 }
 
+/* ========== 桌面端双栏 ==========
+   输入与操作在左、输出与统计在右。
+   窄屏（≤1024px）回到单列竖排 —— 见文件末尾的媒体查询。 */
+.text-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.text-grid__input,
+.text-grid__output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+@media (min-width: 1025px) {
+  .text-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  /* 分栏后纵向空间翻倍，文本框可以吃满 */
+  .text-grid .codec-input {
+    min-height: 300px;
+  }
+
+  /* 统计卡片在右栏变窄，改为两列 */
+  .text-grid .text-stats {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
   .codec-actions {
     gap: var(--space-sm);

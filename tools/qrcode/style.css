@@ -318,8 +318,7 @@
   padding: var(--space-lg);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
+  border-radius: var(--radius-md);}
 
 .qr-preview-empty {
   color: var(--text-secondary);
@@ -612,6 +611,52 @@
   display: flex;
   justify-content: center;
   gap: var(--space-sm);
+}
+
+/* ========== 桌面端双栏 ==========
+   左：文本输入与生成选项；右：二维码预览与下载。
+   窄屏（≤1024px）回到单列竖排。 */
+@media (min-width: 1025px) {
+  body .mode-panel.qr-io.mode-panel--active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'in   out'
+      'opts out'
+      'act  out';
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  body .mode-panel.qr-io > .qr-io__in {
+    grid-area: in;
+  }
+
+  body .mode-panel.qr-io > .qr-io__opts {
+    grid-area: opts;
+  }
+
+  body .mode-panel.qr-io > .qr-io__act {
+    grid-area: act;
+    justify-content: flex-start;
+  }
+
+  body .mode-panel.qr-io > .qr-io__out {
+    grid-area: out;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-width: 0;
+  }
+
+  /* 分栏后纵向空间翻倍，文本框与预览区可以吃满 */
+  body .mode-panel.qr-io .qr-input {
+    min-height: 200px;
+  }
+
+  body .mode-panel.qr-io .qr-preview-area {
+    min-height: 420px;
+  }
 }
 
 /* ========== 响应式 ========== */

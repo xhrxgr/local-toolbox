@@ -22,19 +22,19 @@
     </nav>
 
     <!-- ========== Base64 ========== -->
-    <section class="mode-panel mode-panel--active glass" id="panel-base64">
+    <section class="mode-panel mode-panel--active glass shell-io" id="panel-base64">
       <div class="panel-desc">Base64 编解码，支持 UTF-8 中文（自动处理多字节字符，避免乱码）。</div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__in">
         <label class="codec-label">输入</label>
         <textarea class="codec-input" id="b64-input" placeholder="输入文本或 Base64 字符串" rows="5"></textarea>
       </div>
-      <div class="codec-actions">
+      <div class="codec-actions shell-io__act">
         <button class="btn btn-primary" id="btn-b64-encode">编码 →</button>
         <button class="btn btn-secondary" id="btn-b64-decode">← 解码</button>
         <button class="btn btn-secondary" id="btn-b64-swap">↑↓ 交换</button>
         <button class="btn btn-secondary" id="btn-b64-clear">清空</button>
       </div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__out">
         <label class="codec-label">输出</label>
         <textarea class="codec-output" id="b64-output" placeholder="结果" rows="5" readonly></textarea>
       </div>
@@ -42,13 +42,13 @@
     </section>
 
     <!-- ========== URL 编码 ========== -->
-    <section class="mode-panel glass" id="panel-url">
+    <section class="mode-panel glass shell-io" id="panel-url">
       <div class="panel-desc">URL 编解码，支持 encodeURIComponent（编码所有特殊字符）和 encodeURI（保留 URL 结构）两种模式。</div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__in">
         <label class="codec-label">输入</label>
         <textarea class="codec-input" id="url-input" placeholder="输入 URL 或文本" rows="5"></textarea>
       </div>
-      <div class="codec-actions">
+      <div class="codec-actions shell-io__act">
         <select class="codec-select" id="url-mode">
           <option value="component">encodeURIComponent（编码所有特殊字符）</option>
           <option value="uri">encodeURI（保留 :/?#[]@!$&'()*+,;=）</option>
@@ -58,7 +58,7 @@
         <button class="btn btn-secondary" id="btn-url-swap">↑↓ 交换</button>
         <button class="btn btn-secondary" id="btn-url-clear">清空</button>
       </div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__out">
         <label class="codec-label">输出</label>
         <textarea class="codec-output" id="url-output" placeholder="结果" rows="5" readonly></textarea>
       </div>
@@ -66,13 +66,13 @@
     </section>
 
     <!-- ========== ASCII ========== -->
-    <section class="mode-panel glass" id="panel-ascii">
+    <section class="mode-panel glass shell-io" id="panel-ascii">
       <div class="panel-desc">ASCII / 字符编码转换，支持文本与 ASCII 码（十进制 / 十六进制 / 二进制）双向转换。</div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__in">
         <label class="codec-label">输入</label>
         <textarea class="codec-input" id="ascii-input" placeholder="输入文本或 ASCII 码（用空格、逗号或 0x 前缀分隔）" rows="5"></textarea>
       </div>
-      <div class="codec-actions">
+      <div class="codec-actions shell-io__act">
         <select class="codec-select" id="ascii-mode">
           <option value="dec">文本 → 十进制</option>
           <option value="hex">文本 → 十六进制 (0xXX)</option>
@@ -83,7 +83,7 @@
         <button class="btn btn-secondary" id="btn-ascii-swap">↑↓ 交换</button>
         <button class="btn btn-secondary" id="btn-ascii-clear">清空</button>
       </div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__out">
         <label class="codec-label">输出</label>
         <textarea class="codec-output" id="ascii-output" placeholder="结果" rows="5" readonly></textarea>
       </div>
@@ -91,13 +91,13 @@
     </section>
 
     <!-- ========== Unicode ========== -->
-    <section class="mode-panel glass" id="panel-unicode">
+    <section class="mode-panel glass shell-io" id="panel-unicode">
       <div class="panel-desc">Unicode 转换，支持文本与 \uXXXX / U+XXXX 转义双向转换，并显示每个字符的码点。</div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__in">
         <label class="codec-label">输入</label>
         <textarea class="codec-input" id="uni-input" placeholder="输入文本或 Unicode 转义（如 \\u4e2d\\u6587 或 U+4E2D U+6587）" rows="5"></textarea>
       </div>
-      <div class="codec-actions">
+      <div class="codec-actions shell-io__act">
         <select class="codec-select" id="uni-mode">
           <option value="escape">文本 → \uXXXX 转义</option>
           <option value="codepoint">文本 → U+XXXX 码点</option>
@@ -107,7 +107,7 @@
         <button class="btn btn-secondary" id="btn-uni-swap">↑↓ 交换</button>
         <button class="btn btn-secondary" id="btn-uni-clear">清空</button>
       </div>
-      <div class="codec-row">
+      <div class="codec-row shell-io__out">
         <label class="codec-label">输出</label>
         <textarea class="codec-output" id="uni-output" placeholder="结果" rows="5" readonly></textarea>
       </div>

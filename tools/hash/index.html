@@ -46,7 +46,7 @@
     </section>
 
     <!-- ========== 哈希计算 ========== -->
-    <section class="mode-panel glass" id="panel-hash">
+    <section class="mode-panel glass hash-io" id="panel-hash">
       <div class="panel-desc">哈希计算，支持 MD5 / SHA-1 / SHA-256 / SHA-512，可选 HMAC 模式，支持文本与文件输入。全部本地运行。</div>
 
       <div class="hash-controls">
@@ -63,12 +63,12 @@
         <input type="text" class="hmac-key" id="hash-hmac-key" placeholder="HMAC 密钥" hidden />
       </div>
 
-      <div class="codec-row">
+      <div class="codec-row hash-io__text">
         <label class="codec-label">文本输入</label>
         <textarea class="codec-input" id="hash-text" placeholder="输入要计算哈希的文本（Ctrl+Enter 计算）" rows="5"></textarea>
       </div>
 
-      <div class="hash-dropzone" id="hash-dropzone" tabindex="0">
+      <div class="hash-dropzone hash-io__drop" id="hash-dropzone" tabindex="0">
         <svg class="hash-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <div class="hash-dropzone__text">
           <span class="hash-dropzone__primary">拖入文件计算哈希</span>
@@ -77,12 +77,12 @@
         <input type="file" id="hash-file" hidden />
       </div>
 
-      <div class="codec-actions">
+      <div class="codec-actions hash-io__act">
         <button class="btn btn-primary" id="btn-hash-compute">计算哈希</button>
         <button class="btn btn-secondary" id="btn-hash-clear">清空</button>
       </div>
 
-      <div class="hash-result" id="hash-result" hidden>
+      <div class="hash-result hash-io__out" id="hash-result" hidden>
         <div class="hash-result__row">
           <label class="hash-result__label">Hex</label>
           <textarea class="hash-result__value" id="hash-hex" readonly rows="2"></textarea>

@@ -427,6 +427,44 @@
   border-radius: var(--radius-md);
 }
 
+/* ========== 桌面端双栏 ==========
+   左列：文本输入 + 文件拖放；右列：哈希结果；按钮横跨底部。
+   窄屏（≤1024px）回到单列竖排。 */
+@media (min-width: 1025px) {
+  body .mode-panel.hash-io.mode-panel--active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'text out'
+      'drop out'
+      'act  act';
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  body .mode-panel .hash-io__text {
+    grid-area: text;
+  }
+
+  body .mode-panel .hash-io__drop {
+    grid-area: drop;
+  }
+
+  body .mode-panel .hash-io__act {
+    grid-area: act;
+    justify-content: flex-start;
+  }
+
+  body .mode-panel .hash-io__out {
+    grid-area: out;
+  }
+
+  /* 分栏后纵向空间翻倍，文本框可以吃满 */
+  body .mode-panel .hash-io__text .codec-input {
+    min-height: 260px;
+  }
+}
+
 .hash-result__row {
   display: flex;
   align-items: flex-start;

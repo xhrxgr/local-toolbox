@@ -1,3 +1,15 @@
+/* header 与内容区同宽（见 assets/css/global.css 的 .tool-header__inner）
+   本页是全宽布局（.dw-app 用 padding 而非 max-width），
+   header 内层也要留出同样的内边距，两侧才对齐。 */
+:root {
+  --shell-max-width: 1440px;
+}
+
+body.shell-full .tool-header {
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
+}
+
 /* 去水印工具样式 */
 
 .dw-app {

@@ -18,6 +18,21 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ========== 桌面端外壳（2026-10-29 确立）==========
+   此前 30+ 个工具页共用同一套「窄容器 + 单列竖排」布局：
+   容器宽度多锁在 880px，1440px 屏上只占 61%，左右各空 280px，
+   整页看上去像把手机界面放在宽屏中央。
+
+   桌面端的做法是让内容区用上横向空间，并让输入与输出左右分栏
+   （json / diff / markdown / image 已经是这个形态，只是没推广）。
+
+   断点：≤1024px 一律回到单列竖排（平板竖屏与手机用同一套），
+   1024px 以上才启用宽屏形态。 */
+:root {
+  /* 宽屏内容区宽度。1440px 屏上占 83%，与 json 页原有的 1200px 一致 */
+  --shell-max-width: 1200px;
+}
+
 body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -184,6 +199,24 @@ button {
   z-index: 100;
 }
 
+/* 头部内层：与正文容器同宽、同一左右边界。
+   此前 header 的子元素直接铺满整屏宽度（1440px 屏上返回按钮在 x=16），
+   而正文容器居中只有 880px（从 x=280 开始）—— 两者不在同一条视觉轴上，
+   整页看上去像「手机界面居中放在宽屏上」。
+
+   宽度跟随正文：默认 1200px；窄内容页（body.shell-narrow）880px；
+   用自定义容器类的页面（dw-app / doc-container / ffmpeg-container 等）
+   在自己的 style.css 里覆盖 --shell-max-width 即可对齐。 */
+.tool-header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: var(--shell-max-width, 1200px);
+  margin: 0 auto;
+}
+
 .tool-header .back {
   display: inline-flex;
   align-items: center;
@@ -240,12 +273,134 @@ button {
   width: 16px;
   height: 16px;
 }
+
+/* ========== 宽屏适配（桌面端）==========
+   1) 内容容器放宽到 1200px —— 各工具页自己写的 max-width 会被这里覆盖
+      （选择器特异性：.tool-container 是 0,1,0，这里同样是 0,1,0，
+      但放在各工具 style.css 之后加载的 global.css 里… 实际上顺序不可靠，
+      所以用 :where() 提高工具页的选择器特异性需求，见下方说明）。
+   2) 输入与输出左右分栏 —— .shell-split 是通用双栏容器，
+      各工具只要把「输入区」和「输出区」包进去即可。 */
+@media (min-width: 1025px) {
+  /* 内容容器放宽到 1200px。
+     各工具页在各自的 style.css 里写了 .tool-container { max-width: 880px }，
+     而那些样式表在 global.css 之后加载 —— 同特异性时后加载的会赢。
+     所以这里用 `body .tool-container`（0,1,1）压过工具页的 `.tool-container`（0,1,0），
+     不受加载顺序影响，一处生效带动全站 30+ 工具页。
+     需要更宽的页面（如 markdown 编辑器）可在自己的 style.css 里
+     覆盖 --shell-max-width。 */
+  body .tool-container {
+    max-width: var(--shell-max-width);
+  }
+
+  /* 通用双栏：输入在左、输出在右，中间留缝。
+     两栏等宽，各自独立滚动高度由内容决定。 */
+  .shell-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  /* 三栏变体：输入 / 输出 / 辅助信息 */
+  .shell-split--3 {
+    grid-template-columns: 1fr 1fr 260px;
+  }
+
+  /* 宽屏下让 textarea 更高 —— 单列时高度受屏幕限制，
+     分栏后纵向空间是原来的两倍，文本框可以吃满。 */
+  .shell-split .field-input,
+  .shell-split textarea {
+    min-height: 320px;
+  }
+
+  /* ========== 「输入 → 操作 → 输出」型工具的通用双栏 ==========
+     多数编解码/文本工具的骨架都是这三段：
+       输入区 → 操作按钮 → 输出区
+     单列时三者竖排，桌面端看着像手机界面放大。
+
+     这里用 grid-template-areas 把输入与输出分列左右、操作按钮横跨底部。
+     **不需要改 HTML** —— 各工具给面板加上 .shell-io 类即可，
+     再用 .shell-io__in / .shell-io__out 标出哪块是输入、哪块是输出
+     （不标的话靠 :first-of-type 猜，但有的页面输入区不是第一个同类型元素）。
+     窄屏（≤1024px）保持原有的竖排顺序。
+
+     选择器写成 `body .shell-io`（0,1,1）是为了压过各工具的
+     `.mode-panel--active { display: flex }`（0,1,0）——
+     那些样式表在 global.css 之后加载，同特异性时后加载的会赢。 */
+  /* 只让「当前激活」的面板变成 grid ——
+     各工具的 .mode-panel { display: none } 是靠 .mode-panel--active
+     显示当前页的，若这里对所有 .shell-io 生效，
+     未激活的面板会全部显示出来（切换 tab 的功能就废了）。 */
+  body .mode-panel.shell-io.mode-panel--active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'in  out'
+      'act act';
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  body .shell-io > .shell-io__in {
+    grid-area: in;
+  }
+
+  body .shell-io > .shell-io__out {
+    grid-area: out;
+  }
+
+  body .shell-io > .shell-io__act {
+    grid-area: act;
+    /* 操作按钮横跨底部后，居左更符合桌面端的阅读起点 */
+    justify-content: flex-start;
+  }
+
+  /* 分栏后纵向空间翻倍，文本框可以吃满 */
+  body .shell-io .codec-input,
+  body .shell-io .codec-output {
+    min-height: 300px;
+  }
+}
+
+/* 平板竖屏（641~1024px）：仍是单列，但内容区放宽一点，
+   免得平板上左右空得像手机版 */
+@media (min-width: 641px) and (max-width: 1024px) {
+  body .tool-container {
+    max-width: 100%;
+  }
+}
+
+/* ========== 窄内容例外 ==========
+   有些工具的内容本身就窄 —— 转换器（单位/颜色）只有两个输入框，
+   计时器只有一个数字。硬拉到 1200px 只会让中间空出大片。
+   这些页面给 body 加 .shell-narrow，内容区与 header 一起保持紧凑。
+
+   用自定义容器类的页面（dw-app / doc-container / ffmpeg-container 等）
+   在自己的 style.css 里设置 --shell-max-width 与容器宽度一致，
+   header 会自动跟随（.tool-header__inner 读同一个变量）。
+   注意：body 上的 .shell-narrow 规则会覆盖页面自己设的变量，
+   所以宽度不是 880px 的页面不要加这个类，直接在自己的 style.css 里设变量。 */
+@media (min-width: 1025px) {
+  body.shell-narrow .tool-container {
+    max-width: 880px;
+  }
+
+  body.shell-narrow .tool-header__inner {
+    max-width: 880px;
+  }
+}
+
 /* ========== 窄屏适配（手机）==========
    此前 global.css 没有任何媒体查询，共享外壳（头部/导航/容器）完全没适配，
    31 处断点全散在各工具里，改一处漏一片。这里补上外壳的基础适配。 */
 @media (max-width: 640px) {
   .tool-header {
     padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .tool-header__inner {
     gap: var(--space-sm);
   }
 

@@ -216,6 +216,44 @@
   padding: var(--space-xs) var(--space-sm);
 }
 
+/* ========== 桌面端双栏 ==========
+   左：SQL 输入；右：格式化结果；按钮横跨底部。
+   窄屏（≤1024px）回到单列竖排。 */
+@media (min-width: 1025px) {
+  body .mode-panel.sql-io.mode-panel--active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'in   out'
+      'act  act'
+      'meta meta';
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  body .mode-panel.sql-io > .shell-io__in {
+    grid-area: in;
+  }
+
+  body .mode-panel.sql-io > .shell-io__out {
+    grid-area: out;
+  }
+
+  body .mode-panel.sql-io > .shell-io__act {
+    grid-area: act;
+    justify-content: flex-start;
+  }
+
+  body .mode-panel.sql-io > .sql-io__meta {
+    grid-area: meta;
+  }
+
+  /* 分栏后纵向空间翻倍，文本框可以吃满 */
+  body .mode-panel.sql-io .codec-input {
+    min-height: 300px;
+  }
+}
+
 /* ========== CRON ========== */
 .cron-input-row {
   display: flex;

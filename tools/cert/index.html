@@ -13,8 +13,10 @@
 </head>
 <body>
   <main class="tool-container">
+    <!-- 桌面端：左侧证书输入，右侧解析结果（见 style.css 的 .cert-layout） -->
+    <div class="cert-layout">
     <!-- 输入区 -->
-    <section class="input-section glass">
+    <section class="input-section glass cert-layout__in">
       <h2 class="section-title">证书输入</h2>
       <div class="input-row">
         <textarea class="cert-input" id="cert-input" placeholder="粘贴 PEM 格式证书：&#10;-----BEGIN CERTIFICATE-----&#10;MIIFazCCBFOgAwIBAgISA2Q3...&#10;-----END CERTIFICATE-----" rows="8"></textarea>
@@ -30,6 +32,8 @@
       </div>
     </section>
 
+    <!-- 右侧结果区：错误提示 / 解析结果 / 空状态 -->
+    <div class="cert-layout__out">
     <!-- 错误提示 -->
     <section class="error-section" id="error-section" hidden></section>
 
@@ -79,6 +83,8 @@
     <section class="empty-state" id="empty-state">
       粘贴 PEM / DER Hex / DER Base64 证书后点击"解析证书"
     </section>
+    </div>
+    </div>
   </main>
 
   <script type="module" src="/assets/js/common.js"></script>

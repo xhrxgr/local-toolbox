@@ -18,6 +18,33 @@
   gap: var(--space-md);
 }
 
+/* ========== 桌面端分栏 ==========
+   左：输入与优化选项；右：优化前后预览对比。
+   窄屏（≤1024px）回到上下堆叠。 */
+.svg-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+@media (min-width: 1025px) {
+  .svg-layout {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  /* 右栏变窄后，预览对比的两个框改为上下排（横向放不下） */
+  .svg-layout__out .svg-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 分栏后纵向空间翻倍，源码框可以吃满 */
+  .svg-layout__in .codec-input {
+    min-height: 300px;
+  }
+}
+
 .panel-desc {
   font-size: var(--text-sm);
   color: var(--text-secondary);

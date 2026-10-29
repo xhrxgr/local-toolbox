@@ -75,6 +75,59 @@
   gap: var(--space-md);
 }
 
+/* ========== 桌面端分栏 ==========
+   上：正则表达式输入（全宽，横向内容多）
+   下：测试文本在左，结果预览在右
+   窄屏（≤1024px）全部回到竖排。 */
+.regex-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.regex-layout__out {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+/* 测试文本面板：从正则输入面板里拆出来单独占一栏 */
+.regex-test-panel {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+@media (min-width: 1025px) {
+  .regex-layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'full full'
+      'in   out';
+    align-items: start;
+  }
+
+  .regex-layout__full {
+    grid-area: full;
+  }
+
+  .regex-layout__in {
+    grid-area: in;
+  }
+
+  .regex-layout__out {
+    grid-area: out;
+  }
+
+  /* 分栏后纵向空间翻倍，文本框可以吃满 */
+  .regex-layout__in .codec-input {
+    min-height: 300px;
+  }
+}
+
 /* 正则输入行：/ pattern / flags */
 .regex-input-row {
   display: flex;

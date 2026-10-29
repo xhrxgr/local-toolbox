@@ -166,6 +166,21 @@
   border-radius: var(--radius-md);
 }
 
+/* ========== 桌面端：结果多列排布 ==========
+   进制转换要同时显示 4~6 种目标格式，竖排时每项只占一条窄带，
+   右侧大片空白。宽屏下改为两列网格。 */
+@media (min-width: 1025px) {
+  .radix-results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  .radix-results > .codec-row {
+    min-width: 0;
+  }
+}
+
 .text-meta {
   font-size: var(--text-xs);
   color: var(--text-secondary);

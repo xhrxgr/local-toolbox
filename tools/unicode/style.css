@@ -216,6 +216,36 @@
   flex-wrap: wrap;
 }
 
+/* ========== 桌面端：输入与统计并排，表格仍占满全宽 ==========
+   逐字符分析表有 6 列（字符/码点/UTF-8/UTF-16/分类/块），
+   分栏会导致表格横向滚动条常驻，所以表格保持全宽，
+   只把「输入框」与「统计」并排放 —— 两者都是窄内容，
+   并排后右侧空出来的空间正好给统计卡片。 */
+@media (min-width: 1025px) {
+  body .mode-panel.uni-io.mode-panel--active {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'in    stats'
+      'table table';
+    gap: var(--space-md);
+    align-items: start;
+  }
+
+  body .mode-panel.uni-io > .uni-io__in {
+    grid-area: in;
+  }
+
+  body .mode-panel.uni-io > .uni-io__stats {
+    grid-area: stats;
+    align-self: start;
+  }
+
+  body .mode-panel.uni-io > .uni-io__table {
+    grid-area: table;
+  }
+}
+
 .stat-item {
   display: flex;
   flex-direction: column;

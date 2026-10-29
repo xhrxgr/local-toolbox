@@ -45,16 +45,18 @@ function injectToolHeader(toolName) {
   const header = document.createElement('header');
   header.className = 'tool-header';
   header.innerHTML = `
-    <a href="${base}" class="back">
-      <svg class="back-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="10 3 5 8 10 13"></polyline>
-      </svg>
-      工具箱
-    </a>
-    <h1>${toolName}</h1>
-    <div class="tool-header__actions">
-      <a class="cache-manage-btn" href="${base}tools/resources/" aria-label="资源与缓存" title="资源与缓存管理">${ICON_DOWNLOAD}<span class="cache-manage-btn__text">下载</span></a>
-      <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()">${ICON_MOON}</button>
+    <div class="tool-header__inner">
+      <a href="${base}" class="back">
+        <svg class="back-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="10 3 5 8 10 13"></polyline>
+        </svg>
+        工具箱
+      </a>
+      <h1>${toolName}</h1>
+      <div class="tool-header__actions">
+        <a class="cache-manage-btn" href="${base}tools/resources/" aria-label="资源与缓存" title="资源与缓存管理">${ICON_DOWNLOAD}<span class="cache-manage-btn__text">下载</span></a>
+        <button class="theme-toggle" aria-label="切换主题" onclick="toggleTheme()">${ICON_MOON}</button>
+      </div>
     </div>
   `;
   document.body.prepend(header);

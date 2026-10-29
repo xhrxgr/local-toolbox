@@ -21,15 +21,15 @@
     </nav>
 
     <!-- ========== 字符分析 ========== -->
-    <section class="mode-panel mode-panel--active glass" id="panel-analyze">
+    <section class="mode-panel mode-panel--active glass uni-io" id="panel-analyze">
       <div class="panel-desc">逐字符分析文本，显示码点 / UTF-8 / UTF-16 / 分类 / 块归属，正确处理代理对（输入后防抖 120ms 自动分析）。</div>
 
-      <div class="codec-row">
+      <div class="codec-row uni-io__in">
         <label class="codec-label" for="analyze-input">输入文本</label>
         <textarea class="codec-input codec-input--tall" id="analyze-input" placeholder="输入要分析的文本（实时分析）" rows="6"></textarea>
       </div>
 
-      <div class="analyze-stats" id="analyze-stats" hidden>
+      <div class="analyze-stats uni-io__stats" id="analyze-stats" hidden>
         <div class="stat-item">
           <span class="stat-label">字符数</span>
           <span class="stat-value" id="stat-chars">0</span>
@@ -44,7 +44,7 @@
         </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap uni-io__table">
         <table class="char-table">
           <thead>
             <tr>

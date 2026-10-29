@@ -25,6 +25,35 @@
   gap: var(--space-md);
 }
 
+/* ========== 桌面端分栏 ==========
+   左：证书输入；右：解析结果（状态横幅 + 各信息块）。
+   窄屏（≤1024px）回到上下堆叠。 */
+.cert-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.cert-layout__out {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+@media (min-width: 1025px) {
+  .cert-layout {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  /* 分栏后纵向空间翻倍，证书输入框可以吃满 */
+  .cert-layout__in .cert-input {
+    min-height: 380px;
+  }
+}
+
 .input-row {
   display: flex;
   flex-direction: column;

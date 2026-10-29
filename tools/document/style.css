@@ -1,3 +1,8 @@
+/* header 与内容区同宽（见 assets/css/global.css 的 .tool-header__inner） */
+:root {
+  --shell-max-width: 880px;
+}
+
 /* ========== 通用小按钮（修复 .btn-sm 未定义） ========== */
 .btn-sm {
   padding: var(--space-xs) var(--space-sm);
