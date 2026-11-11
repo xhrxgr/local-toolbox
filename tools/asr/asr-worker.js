@@ -38,23 +38,44 @@ async function ensureModel() {
   env.allowLocalModels = false;
   env.remoteHost = host;
   env.useBrowserCache = true;   // 模型走 Cache API（库自己管）
-  // WASM 已放站点同源，由 SW 的 SWR 策略缓存。
+  // WASM 由 SW 的 SWR 策略缓存（同源无 hash 资源），
   // 关掉库自带的 WASM 缓存，避免同一份 26MB 存两遍撑爆配额。
   env.useWasmCache = false;
-  env.backends.onnx.wasm.proxy = true; // 让 ONNX 在 worker 内跑，不阻塞
-
   // WASM 运行时走站点同源（构建时从 Transformers.js 自带的 ORT 同步到
   // public/asr-runtime/，Vite 原样拷进 dist），避免依赖 jsdelivr CDN。
   // 用 BASE_URL 适配 GitHub Pages 的 /local-toolbox/ 子路径。
   const base = (import.meta.env?.BASE_URL || '/').replace(/\/$/, '');
   const wasmBase = `${self.location.origin}${base}/asr-runtime/`;
-  env.backends.onnx.wasm.wasmPaths = {
-    wasm: wasmBase + 'ort-wasm-simd-threaded.asyncify.wasm',
-    mjs: wasmBase + 'ort-wasm-simd-threaded.asyncify.mjs',
-  };
 
-  const useWebGpu = typeof navigator !== 'undefined' && !!navigator.gpu;
-  log(useWebGpu ? '检测到 WebGPU，优先使用 GPU 加速' : '使用 WASM 推理（无需跨源隔离）');
+  // 跨源隔离（public/sw.js 的 COI_PATHS 给 ASR 页注入 COOP/COEP）→ threaded
+  // 多线程 WASM，用 SharedArrayBuffer 并行推理；否则 → asyncify 单线程回退。
+  //
+  // 关键前提（2026-11-12 实测踩坑，详见 .workbuddy/memory/2026-11-12.md）：
+  // ORT 的 threaded wasm 会创建 em-pthread 子 Worker，其脚本用
+  // `new Worker(new URL(import.meta.url), { type: 'module' })` 自引用加载。
+  // 必须让这个子 Worker 的响应也带 COEP 头，否则 ERR_BLOCKED_BY_RESPONSE。
+  // 所以 SW 给白名单页的「所有响应」注入 COEP（含 Worker 脚本）——
+  // 早期只给导航注入、漏掉子 Worker，才误判为「SW+COEP 不兼容」。
+  const isolated = self.crossOriginIsolated === true;
+  const wasmFile = isolated ? 'ort-wasm-simd-threaded' : 'ort-wasm-simd-threaded.asyncify';
+  env.backends.onnx.wasm.wasmPaths = {
+    wasm: wasmBase + wasmFile + '.wasm',
+    mjs: wasmBase + wasmFile + '.mjs',
+  };
+  // ORT 默认 min(4, ceil(hardwareConcurrency / 2))，隔离时才允许多线程
+  const threads = isolated
+    ? Math.min(4, Math.max(1, Math.ceil((self.navigator?.hardwareConcurrency || 2) / 2)))
+    : 1;
+  env.backends.onnx.wasm.numThreads = threads;
+
+  // 设备选择：跨源隔离时用 WASM 多线程（ORT 的 WebGPU 后端与 threaded
+  // WASM runtime 不能同时用 —— 实测 device:'webgpu' + threaded wasmPaths
+  // 会报 "webgpuInit is not a function"），否则用 WebGPU（如果可用），
+  // 都没有就用 asyncify 单线程 WASM。
+  const useWebGpu = !isolated && typeof navigator !== 'undefined' && !!navigator.gpu;
+  log(isolated
+    ? `跨源隔离已生效，WASM ${threads} 线程并行推理`
+    : useWebGpu ? '检测到 WebGPU，使用 GPU 加速' : 'WASM 单线程推理');
 
   loadPromise = pipeline(
     'automatic-speech-recognition',

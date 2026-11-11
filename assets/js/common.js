@@ -97,9 +97,53 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
  * 策略详见 public/sw.js——页面导航走网络优先保证内容最新，
  * hash 静态资源与跨域 CDN 资源走缓存优先，二次访问直接读本地。
  */
+// 需要跨源隔离的页面（与 public/sw.js 的 COI_PATHS 保持一致）。
+// ASR 页启用：为将来接入 sherpa-onnx 流式识别铺路（SharedArrayBuffer）。
+// SW 会给这些页面的所有响应（含 Worker 脚本）注入 COOP/COEP；
+// 首次访问需 reload 一次让隔离生效，见下方 setupCrossOriginIsolation()。
+const COI_PAGES = ['/tools/asr/'];
+
+function inCoiPage() {
+  const base = ((typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL) || '/').replace(/\/$/, '');
+  let path = location.pathname;
+  if (base && path.startsWith(base + '/')) path = path.slice(base.length);
+  else if (base && path === base) path = '/';
+  return COI_PAGES.some((p) => path === p || path.startsWith(p));
+}
+
+/**
+ * 确保跨源隔离生效。隔离由 SW 在导航响应上注入 COOP/COEP 头实现，
+ * 而 SW 首次安装时还没接管当前页面，所以要自动刷新一次。
+ *
+ * 关键：register() resolve 只代表「注册成功」，此时 controller 仍是 null；
+ * 必须等 controllerchange 事件（SW 通过 skipWaiting + clients.claim 接管）
+ * 才能 reload。用 sessionStorage 保证只刷一次，避免 SW 异常时死循环。
+ */
+function setupCrossOriginIsolation() {
+  if (!inCoiPage() || self.crossOriginIsolated) return;
+  const flag = 'coi-reloaded';
+  if (sessionStorage.getItem(flag) === '1') return; // 已试过一次，放弃
+
+  const reloadWhenControlled = () => {
+    if (!navigator.serviceWorker.controller) return;
+    if (sessionStorage.getItem(flag) === '1') return;
+    navigator.serviceWorker.removeEventListener('controllerchange', reloadWhenControlled);
+    sessionStorage.setItem(flag, '1');
+    location.reload();
+  };
+
+  // SW 已接管（例如从首页点进 ASR 页）：直接刷新
+  if (navigator.serviceWorker.controller) { reloadWhenControlled(); return; }
+  // 首次安装：等 SW 接管后再刷新
+  navigator.serviceWorker.addEventListener('controllerchange', reloadWhenControlled);
+  // 兜底：8 秒后放弃监听，避免 SW 更新失败时永久挂着
+  setTimeout(() => navigator.serviceWorker.removeEventListener('controllerchange', reloadWhenControlled), 8000);
+}
+
 if (import.meta.env && import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     const base = (typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL) || '/';
+    setupCrossOriginIsolation();
     navigator.serviceWorker.register(`${base}sw.js`, { scope: base }).catch(() => {
       // 注册失败（协议不支持等）时静默降级，不影响站点功能
     });

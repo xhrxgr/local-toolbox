@@ -2,6 +2,14 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { copyFileSync, mkdirSync, existsSync } from 'fs';
 
+// 需要跨源隔离的页面路径前缀。必须与 public/sw.js 的 COI_PATHS
+// 和 assets/js/common.js 的 COI_PAGES 保持一致（三处无共享模块，
+// 因为分别运行在 Node / SW / 页面三种环境）。
+// ASR 页启用：为将来接入 sherpa-onnx 流式识别铺路。
+// 关键：必须给白名单页的所有响应（含 Worker 脚本）注入 COEP，
+// 只给导航注入会导致隔离页无法创建 Worker。详见 public/sw.js 注释。
+const COI_PATHS = ['/tools/asr/'];
+
 // ONNX Runtime Web 的 wasm 运行时体积较大且由 npm 管理，
 // 构建时同步到工具目录并交给 Vite 作为静态资源处理（不入 git）
 const ORT_DIST = resolve(__dirname, 'node_modules/onnxruntime-web/dist');
@@ -9,11 +17,16 @@ const ORT_RUNTIME = resolve(__dirname, 'tools/scandoc/handwriting/runtime');
 const ORT_FILES = ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs'];
 
 // 语音转文字用的 Transformers.js 自带另一份 ORT（版本不同，不能混用）。
-// 同步它的 asyncify 单线程运行时到站点同源，避免依赖 jsdelivr CDN。
-// asyncify 版不需要 SharedArrayBuffer，GitHub Pages 无需 COOP/COEP。
+// 同步它的 WASM 运行时到站点同源，避免依赖 jsdelivr CDN。
+// 两套都带：
+// - threaded：跨源隔离页用 SharedArrayBuffer 多线程（ASR 页已启用隔离）
+// - asyncify：隔离不可用时的单线程回退（老浏览器 / Nginx 未配头等）
 const ASR_ORT_DIST = resolve(__dirname, 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist');
 const ASR_ORT_RUNTIME = resolve(__dirname, 'public/asr-runtime');
-const ASR_ORT_FILES = ['ort-wasm-simd-threaded.asyncify.wasm', 'ort-wasm-simd-threaded.asyncify.mjs'];
+const ASR_ORT_FILES = [
+  'ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs',
+  'ort-wasm-simd-threaded.asyncify.wasm', 'ort-wasm-simd-threaded.asyncify.mjs',
+];
 
 function syncOrtRuntime() {
   if (existsSync(ORT_DIST)) {
@@ -86,13 +99,17 @@ export default defineConfig(({ mode }) => ({
     {
       name: 'conditional-coep',
       configureServer(server) {
-        // 只对 FFmpeg 工具页设置 COOP/COEP（SharedArrayBuffer 多线程必需）
-        // 其他页面（如网络工具）需要跨域 fetch，不能设置 COEP
+        // 开发环境模拟生产 SW 的跨源隔离行为（见 public/sw.js 的 COI_PATHS）。
+        // dev 模式不注册 SW，只能由服务器直接给头；生产环境则由 SW 注入。
+        // 只对白名单页生效：COEP 会拦掉无 CORP/CORS 声明的跨域子资源，
+        // ffmpeg core / tesseract 语言包等页面绝不能开。
+        // credentialless：HF 模型的 ACAO 是 https://huggingface.co 而非 *，
+        // require-corp 下会被拦（实测，见 .workbuddy/memory/2026-11-12.md）。
         server.middlewares.use((req, res, next) => {
           const path = (req.url || '').split('?')[0];
-          if (path.startsWith('/tools/ffmpeg')) {
+          if (COI_PATHS.some((p) => path === p || path.startsWith(p))) {
             res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+            res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
           }
           next();
         });
