@@ -19,8 +19,10 @@ sw.png
 stopwatch-final.png
 pages-deployed.png
 
-# ONNX Runtime Web 运行时（构建时从 node_modules 同步）
+# ONNX Runtime Web 运行时（构建时从 node_modules 同步，均不入 git）
 tools/scandoc/handwriting/runtime/
+tools/asr/runtime/
+public/asr-runtime/
 .tmp-*
 
 # 真实照片回归样本（第三方商业内容，不公开）

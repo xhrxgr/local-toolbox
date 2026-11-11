@@ -8,11 +8,25 @@ const ORT_DIST = resolve(__dirname, 'node_modules/onnxruntime-web/dist');
 const ORT_RUNTIME = resolve(__dirname, 'tools/scandoc/handwriting/runtime');
 const ORT_FILES = ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs'];
 
+// 语音转文字用的 Transformers.js 自带另一份 ORT（版本不同，不能混用）。
+// 同步它的 asyncify 单线程运行时到站点同源，避免依赖 jsdelivr CDN。
+// asyncify 版不需要 SharedArrayBuffer，GitHub Pages 无需 COOP/COEP。
+const ASR_ORT_DIST = resolve(__dirname, 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist');
+const ASR_ORT_RUNTIME = resolve(__dirname, 'public/asr-runtime');
+const ASR_ORT_FILES = ['ort-wasm-simd-threaded.asyncify.wasm', 'ort-wasm-simd-threaded.asyncify.mjs'];
+
 function syncOrtRuntime() {
-  if (!existsSync(ORT_DIST)) return;
-  mkdirSync(ORT_RUNTIME, { recursive: true });
-  for (const f of ORT_FILES) {
-    copyFileSync(resolve(ORT_DIST, f), resolve(ORT_RUNTIME, f));
+  if (existsSync(ORT_DIST)) {
+    mkdirSync(ORT_RUNTIME, { recursive: true });
+    for (const f of ORT_FILES) {
+      copyFileSync(resolve(ORT_DIST, f), resolve(ORT_RUNTIME, f));
+    }
+  }
+  if (existsSync(ASR_ORT_DIST)) {
+    mkdirSync(ASR_ORT_RUNTIME, { recursive: true });
+    for (const f of ASR_ORT_FILES) {
+      copyFileSync(resolve(ASR_ORT_DIST, f), resolve(ASR_ORT_RUNTIME, f));
+    }
   }
 }
 
@@ -59,6 +73,7 @@ export default defineConfig(({ mode }) => ({
         crypto: resolve(__dirname, 'tools/crypto/index.html'),
         svg: resolve(__dirname, 'tools/svg/index.html'),
         ocr: resolve(__dirname, 'tools/ocr/index.html'),
+        asr: resolve(__dirname, 'tools/asr/index.html'),
         scripts: resolve(__dirname, 'tools/scripts/index.html'),
         resources: resolve(__dirname, 'tools/resources/index.html'),
       },

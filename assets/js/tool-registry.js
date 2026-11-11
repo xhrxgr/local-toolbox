@@ -347,6 +347,17 @@ export const TOOLS = [
     available: true,
   },
   {
+    id: 'asr',
+    name: '语音转文字',
+    icon: 'mic',
+    desc: '浏览器本地 Whisper 识别，麦克风录音或音频文件转文本',
+    category: 'media',
+    tags: ['本地推理', '中英文'],
+    aliases: ['语音', '语音转文字', '语音识别', '音频转文字', '录音转文字', 'asr', 'whisper', 'speech to text', '转录', '听写', '字幕', '麦克风', '录音'],
+    path: '/tools/asr/',
+    available: true,
+  },
+  {
     id: 'scripts',
     name: '实用脚本',
     icon: 'download',

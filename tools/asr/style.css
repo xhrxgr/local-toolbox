@@ -1,0 +1,424 @@
+/* ========== 语音转文字工具样式 ========== */
+
+/* 桌面端双栏：左输入与选项，右进度与结果；窄屏回到单列 */
+.asr-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.asr-layout__in,
+.asr-layout__out {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+  /* 窄屏下重置 grid-area（宽屏的 grid-template-areas 在窄屏不存在，
+     若不重置会生成隐式网格导致两栏错位） */
+  grid-area: auto;
+}
+
+@media (min-width: 1025px) {
+  /* 用 body 前缀压过 global.css 的 .mode-panel { display: flex }，
+     否则 grid 不生效、两栏仍是竖排 */
+  body .asr-layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'desc  desc'
+      'in    out';
+    align-items: start;
+  }
+
+  /* .panel-desc 也是 grid 的直接子元素，不声明跨列会把后面两栏挤错位。
+     它原本靠父面板的 padding 留白，成为 grid item 后要自己留。 */
+  body .asr-layout > .panel-desc {
+    grid-area: desc;
+    margin: 0;
+  }
+
+  body .asr-layout__in {
+    grid-area: in;
+  }
+
+  body .asr-layout__out {
+    grid-area: out;
+  }
+
+  .asr-layout__out .codec-input {
+    min-height: 320px;
+  }
+}
+
+/* 描述条：本页自己定义，不依赖其他工具页的同名类 */
+.asr-layout > .panel-desc {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent);
+}
+
+.asr-layout > .panel-desc strong {
+  color: var(--text);
+}
+
+/* ========== 输入方式 Tab ========== */
+.asr-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.asr-tab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.asr-tab:hover {
+  color: var(--text);
+  background: var(--bg-secondary);
+}
+
+.asr-tab--active {
+  color: #fff;
+  background: var(--accent);
+}
+
+[data-theme="dark"] .asr-tab--active {
+  color: #0f172a;
+}
+
+.asr-source {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.asr-source--active {
+  display: flex;
+}
+
+/* ========== 录音区 ========== */
+.asr-record-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.asr-record-box--recording {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.asr-record-box__icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--tag-bg);
+  color: var(--accent);
+}
+
+.asr-record-box--recording .asr-record-box__icon {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+  animation: asr-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes asr-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.asr-record-box__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.asr-record-box__title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.asr-record-box__meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.asr-record-box__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 波形画布 */
+.asr-wave {
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.asr-wave canvas {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+
+/* ========== 文件区 ========== */
+/* 复用 .hash-dropzone 的视觉，但图标尺寸要在本页独立定义
+   （OCR 页的 .hash-dropzone__icon 尺寸样式不会带到这里） */
+.asr-source .hash-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-lg);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.asr-source .hash-dropzone:hover,
+.asr-source .hash-dropzone.is-dragover {
+  border-color: var(--accent);
+  background: var(--tag-bg);
+}
+
+.asr-source .hash-dropzone__icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.asr-source .hash-dropzone__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.asr-source .hash-dropzone__primary {
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.asr-source .hash-dropzone__secondary {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.asr-file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* ========== 选项 ========== */
+.asr-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.asr-options .codec-select {
+  width: 100%;
+}
+
+/* ========== 进度 ========== */
+.asr-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.asr-progress__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.asr-progress__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.asr-progress__pct {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.asr-progress__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.asr-progress__fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width var(--transition-fast);
+}
+
+.asr-progress__status {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.asr-progress__files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 110px;
+  overflow-y: auto;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* ========== 错误 ========== */
+.asr-error {
+  padding: var(--space-md);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+[data-theme="dark"] .asr-error {
+  color: #fca5a5;
+}
+
+/* ========== 结果 ========== */
+.asr-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.asr-result__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.asr-result__head h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.asr-result__meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.asr-result__text {
+  min-height: 280px;
+}
+
+/* ========== 空状态 ========== */
+.asr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 220px;
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.asr-empty p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.asr-empty__hint {
+  font-size: var(--text-xs) !important;
+  opacity: 0.75;
+}
+
+/* ========== 说明 ========== */
+.asr-notes {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.asr-notes .panel-title {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .asr-record-box {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .asr-record-box__actions .btn,
+  .asr-result .codec-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

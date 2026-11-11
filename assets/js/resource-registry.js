@@ -261,6 +261,57 @@ export const RESOURCE_GROUPS = [
     ],
   },
   {
+    id: 'asr',
+    title: '语音转文字',
+    toolPath: '/tools/asr/',
+    resources: [
+      {
+        id: 'asr-model',
+        name: 'Whisper 语音识别模型',
+        desc: 'Whisper-tiny 的 INT8 量化模型（编码器 + 解码器 + 分词器），首次转写时由浏览器下载并缓存；预下载后离线也能转写。',
+        size: 43_000_000,
+        files: [],
+        async isCached() {
+          const mod = await import('/tools/asr/model-registry.js');
+          // 只认官方源：那是默认下载源，也是预下载写入的键。
+          // 镜像源是用户手动切换后的临时选择，不作为「已缓存」判定。
+          for (const f of mod.ASR_MODEL_FILES) {
+            if (!(await urlCachedAnywhere(mod.asrModelUrl(mod.ASR_HOST_OFFICIAL, f.name)))) return false;
+          }
+          return true;
+        },
+        async download(onProgress) {
+          const mod = await import('/tools/asr/model-registry.js');
+          const total = mod.ASR_MODEL_TOTAL;
+          let loaded = 0;
+          // Transformers.js 默认用 Cache API 的 "transformers-cache" 缓存，
+          // 键就是文件的完整 URL。这里按同样的键写入，预下载才能真正生效。
+          const cache = ('caches' in window) ? await caches.open('transformers-cache') : null;
+          for (const f of mod.ASR_MODEL_FILES) {
+            const url = mod.asrModelUrl(mod.ASR_HOST_OFFICIAL, f.name);
+            const buf = await fetchWithProgress(url, (l) => onProgress?.(loaded + l, total));
+            loaded += buf.byteLength || f.size;
+            if (cache) {
+              try {
+                await cache.put(url, new Response(buf, {
+                  headers: { 'Content-Type': f.name.endsWith('.onnx') ? 'application/octet-stream' : 'application/json' },
+                }));
+              } catch { /* 配额不足时本次仍可用 */ }
+            }
+          }
+        },
+        async remove() {
+          const mod = await import('/tools/asr/model-registry.js');
+          for (const name of mod.ASR_MODEL_FILES) {
+            for (const host of [mod.ASR_HOST_OFFICIAL, mod.ASR_HOST_MIRROR]) {
+              await removeUrlEverywhere(mod.asrModelUrl(host, name));
+            }
+          }
+        },
+      },
+    ],
+  },
+  {
     id: 'scandoc',
     title: '扫描文档',
     toolPath: '/tools/scandoc/',
