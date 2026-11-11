@@ -50,6 +50,29 @@ function parsePageList(input) {
   return Array.from(pages).sort((a, b) => a - b);
 }
 
+/**
+ * 释放单页资源。
+ *
+ * pdfjs-dist 6.x 把公开的 PDFPageProxy.destroy() 改成了内部 _destroy()，
+ * 对外只留 cleanup()（返回 boolean，渲染未结束时会返回 false）。
+ * 直接调用 page.destroy() 会抛 "t.destroy is not a function"（压缩后变量名）。
+ *
+ * 这里做版本兼容：优先用 6.x 的 cleanup()，老版本仍走 destroy()。
+ * 注意 cleanup() 必须在 render().promise 完成之后调用，否则会清理失败。
+ */
+function releasePage(page) {
+  if (!page) return;
+  if (typeof page.cleanup === 'function') {
+    // cleanup() 在页面仍有渲染任务时返回 false，此时资源未释放。
+    // 我们是在 render().promise 之后调用的，正常情况下应为 true；
+    // 万一失败也不该让清理逻辑盖过已完成的转换结果。
+    try { page.cleanup(); } catch { /* 清理失败不影响结果 */ }
+  } else if (typeof page.destroy === 'function') {
+    // pdfjs-dist ≤5.x 的公开 API
+    try { page.destroy(); } catch { /* 同上 */ }
+  }
+}
+
 /* ========== PDF → 图片 ========== */
 export async function pdfToImage(ctx) {
   const { files, options, setProgress, getBaseName } = ctx;
@@ -57,31 +80,41 @@ export async function pdfToImage(ctx) {
   const imgFormat = options['pdf-image-format'] || 'png';
   setProgress('加载 PDF...', '', 5);
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  // 保留 loadingTask：6.x 里释放 worker / 文档级缓存要靠它，
+  // 单页 cleanup() 只清页面自身的字体和位图缓存。
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
   const results = [];
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    setProgress(`渲染第 ${i}/${pdf.numPages} 页`, '', 5 + (i / pdf.numPages) * 90);
-    const page = await pdf.getPage(i);
-    try {
-      const viewport = page.getViewport({ scale: 2 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx2d = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx2d, viewport }).promise;
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      setProgress(`渲染第 ${i}/${pdf.numPages} 页`, '', 5 + (i / pdf.numPages) * 90);
+      const page = await pdf.getPage(i);
+      try {
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx2d = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx2d, viewport }).promise;
 
-      const mime = imgFormat === 'jpg' ? 'image/jpeg' : 'image/png';
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, 0.92));
-      const filename = `${getBaseName(file.name)}_page_${String(i).padStart(3, '0')}.${imgFormat}`;
-      results.push({ blob, filename });
-      // 画布尺寸置 0 立刻归还显存，否则累积到全部渲染完
-      canvas.width = 0;
-      canvas.height = 0;
-    } finally {
-      // 每页都要 destroy()：pdf.js 会缓存页面资源（字体、位图、注解），
-      // 不释放的话 200 页的文档能把内存吃到几百 MB
-      page.destroy();
+        const mime = imgFormat === 'jpg' ? 'image/jpeg' : 'image/png';
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, mime, 0.92));
+        const filename = `${getBaseName(file.name)}_page_${String(i).padStart(3, '0')}.${imgFormat}`;
+        results.push({ blob, filename });
+        // 画布尺寸置 0 立刻归还显存，否则累积到全部渲染完
+        canvas.width = 0;
+        canvas.height = 0;
+      } finally {
+        // 每页都释放：pdf.js 会缓存页面资源（字体、位图、注解），
+        // 不释放的话 200 页的文档能把内存吃到几百 MB
+        releasePage(page);
+      }
+    }
+  } finally {
+    // 释放文档与 worker，避免多次转换后残留多个 pdf.js worker
+    if (typeof loadingTask.destroy === 'function') {
+      try { await loadingTask.destroy(); } catch { /* 销毁失败不应盖过转换结果 */ }
     }
   }
 
@@ -129,19 +162,26 @@ export async function pdfToText(ctx) {
   const file = files[0];
   setProgress('加载 PDF...', '', 5);
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
   let text = '';
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    setProgress(`提取文本第 ${i}/${pdf.numPages} 页`, '', 5 + (i / pdf.numPages) * 90);
-    const page = await pdf.getPage(i);
-    try {
-      const content = await page.getTextContent();
-      const pageText = content.items.map(item => item.str).join(' ');
-      text += `--- 第 ${i} 页 ---\n${pageText}\n\n`;
-    } finally {
-      // 逐页释放，避免长文档累积内存
-      page.destroy();
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      setProgress(`提取文本第 ${i}/${pdf.numPages} 页`, '', 5 + (i / pdf.numPages) * 90);
+      const page = await pdf.getPage(i);
+      try {
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        text += `--- 第 ${i} 页 ---\n${pageText}\n\n`;
+      } finally {
+        // 逐页释放，避免长文档累积内存（同 pdfToImage 的版本兼容处理）
+        releasePage(page);
+      }
+    }
+  } finally {
+    if (typeof loadingTask.destroy === 'function') {
+      try { await loadingTask.destroy(); } catch { /* 同上 */ }
     }
   }
 
