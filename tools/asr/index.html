@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="语音转文字 —— 浏览器本地运行 Whisper 模型，支持麦克风录音与音频文件转写，音频不上传服务器" />
+  <title>语音转文字 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
+  <script type="module" crossorigin src="/local-toolbox/assets/asr-DQ5sRwjw.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-D0N0xrTc.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/toast-C63kdhUO.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/preload-helper-CHq0b4Vy.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/resource-registry-eBkNIO5d.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/resource-hub-DQ74augv.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-CylBT3IK.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-C24IsV_E.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/rolldown-runtime-DAXXjFlN.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/model-registry-DjIWU1al.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/asr-BvaCaWu6.css">
+</head>
+<body>
+  <main class="tool-container">
+    <div id="resource-panel"></div>
+
+    <section class="mode-panel glass mode-panel--active asr-layout">
+      <div class="panel-desc">
+        浏览器本地运行 <strong>Whisper</strong> 语音识别模型，支持麦克风录音与音频文件转写。
+        音频数据全程留在本机，不上传服务器。首次使用需下载约 40 MB 模型（之后浏览器缓存，离线可用）。
+      </div>
+
+      <!-- ============ 左：输入与选项 ============ -->
+      <div class="asr-layout__in">
+        <!-- 输入方式 Tab -->
+        <div class="asr-tabs" role="tablist" aria-label="音频输入方式">
+          <button class="asr-tab asr-tab--active" type="button" data-source="record" role="tab" aria-selected="true">麦克风录音</button>
+          <button class="asr-tab" type="button" data-source="file" role="tab" aria-selected="false">音频文件</button>
+        </div>
+
+        <!-- 录音面板 -->
+        <div class="asr-source asr-source--active" data-source="record">
+          <div class="asr-record-box" id="record-box">
+            <div class="asr-record-box__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="2" width="6" height="12" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="17" x2="12" y2="22"/>
+                <line x1="8" y1="22" x2="16" y2="22"/>
+              </svg>
+            </div>
+            <div class="asr-record-box__title" id="record-hint">点击开始录音</div>
+            <div class="asr-record-box__meta" id="record-time">建议单次不超过 30 秒，长音频请用「音频文件」</div>
+            <div class="asr-record-box__actions">
+              <button class="btn btn-primary" id="btn-record" type="button">开始录音</button>
+              <button class="btn btn-secondary" id="btn-stop" type="button" disabled>停止并转写</button>
+            </div>
+          </div>
+          <div class="asr-wave" id="wave-box" hidden>
+            <canvas id="wave-canvas" height="64"></canvas>
+          </div>
+        </div>
+
+        <!-- 文件面板 -->
+        <div class="asr-source" data-source="file">
+          <div class="hash-dropzone" id="asr-dropzone" tabindex="0">
+            <svg class="hash-dropzone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <div class="hash-dropzone__text">
+              <span class="hash-dropzone__primary">拖入音频 / 点击选择 / Ctrl+V 粘贴</span>
+              <span class="hash-dropzone__secondary" id="asr-file-name">支持 MP3 / WAV / M4A / OGG / WebM / FLAC</span>
+            </div>
+            <input type="file" id="asr-file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.flac" hidden />
+          </div>
+          <div class="asr-file-info" id="asr-file-info" hidden>
+            <span id="asr-file-detail"></span>
+            <button class="meta-btn" id="btn-asr-remove" type="button">移除</button>
+          </div>
+        </div>
+
+        <!-- 选项 -->
+        <div class="asr-options">
+          <div class="codec-row">
+            <label class="codec-label" for="asr-language">识别语言</label>
+            <select class="codec-select" id="asr-language">
+              <option value="">自动检测</option>
+              <option value="chinese" selected>中文</option>
+              <option value="english">英语</option>
+              <option value="japanese">日语</option>
+              <option value="korean">韩语</option>
+              <option value="french">法语</option>
+              <option value="german">德语</option>
+              <option value="spanish">西班牙语</option>
+            </select>
+          </div>
+          <div class="codec-row">
+            <label class="codec-label" for="asr-host">模型下载源</label>
+            <select class="codec-select" id="asr-host">
+              <option value="official">官方（huggingface.co）</option>
+              <option value="mirror">镜像（hf-mirror.net）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="codec-actions">
+          <button class="btn btn-primary" id="btn-transcribe" type="button" disabled>开始转写</button>
+          <button class="btn btn-secondary" id="btn-cancel" type="button" disabled>取消</button>
+        </div>
+      </div>
+
+      <!-- ============ 右：进度与结果 ============ -->
+      <div class="asr-layout__out">
+        <!-- 进度区 -->
+        <div class="asr-progress" id="asr-progress" hidden>
+          <div class="asr-progress__head">
+            <span class="asr-progress__title" id="asr-progress-title">准备中…</span>
+            <span class="asr-progress__pct" id="asr-progress-pct"></span>
+          </div>
+          <div class="asr-progress__track"><div class="asr-progress__fill" id="asr-progress-fill"></div></div>
+          <div class="asr-progress__status" id="asr-progress-status"></div>
+          <div class="asr-progress__files" id="asr-progress-files"></div>
+        </div>
+
+        <!-- 错误 -->
+        <div class="asr-error" id="asr-error" hidden></div>
+
+        <!-- 结果 -->
+        <div class="asr-result" id="asr-result" hidden>
+          <div class="asr-result__head">
+            <h3>转写结果</h3>
+            <span class="asr-result__meta" id="asr-result-meta"></span>
+          </div>
+          <textarea class="codec-input asr-result__text" id="asr-output" placeholder="识别结果将显示在此处，可直接编辑" spellcheck="false"></textarea>
+          <div class="codec-actions">
+            <button class="btn btn-secondary" id="btn-asr-copy" type="button">复制文本</button>
+            <button class="btn btn-secondary" id="btn-asr-download" type="button">下载 TXT</button>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div class="asr-empty" id="asr-empty">
+          <p>选择录音或音频文件，点击「开始转写」</p>
+          <p class="asr-empty__hint">识别在浏览器本地完成 · 音频不会上传</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass panel-section asr-notes">
+      <h3 class="panel-title">关于首次使用</h3>
+      <ul class="script-notes">
+        <li>模型体积约 40 MB（INT8 量化版），下载后由浏览器缓存，后续使用无需重复下载。</li>
+        <li>下载速度取决于网络。若官方源较慢，可在「模型下载源」切换到镜像重试；两个源的文件完全一致。</li>
+        <li>支持 WebGPU 的浏览器会自动启用 GPU 加速，其余情况回退 WASM，均不需要 COOP/COEP 响应头。</li>
+        <li>音频仅在本地解码与推理，不经过任何服务器。清理站点缓存会同时清除已下载模型。</li>
+      </ul>
+    </section>
+  </main>
+
+</body>
+</html>

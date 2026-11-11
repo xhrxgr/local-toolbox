@@ -35,6 +35,11 @@ const HASHED_ASSET_RE = /[.-][A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2?|png|jpe?g|g
 /* 跨域可缓存资源类型（ffmpeg core 的 .wasm/.js、tesseract 的 .traineddata.gz 等） */
 const CROSS_ORIGIN_ASSET_RE = /\.(?:js|mjs|wasm|data|onnx|traineddata|traineddata\.gz|gz|json|zip)(?:[?#]|$)/i;
 
+/* Transformers.js 自己用 Cache API 缓存 Whisper 模型（键就是文件 URL），
+   SW 若再缓存一份会重复占 40MB，容易撑爆配额。
+   这些请求交给库自己管理，SW 不拦截。 */
+const TRANSFORMERS_MODEL_RE = /(?:huggingface\.co|hf-mirror\.(?:com|net))\/(?:onnx-community|Xenova)\//i;
+
 /* 离线且无对应缓存时的兜底页 */
 const OFFLINE_HTML = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -104,6 +109,8 @@ self.addEventListener('fetch', (event) => {
   }
 
   // 4. 跨域 CDN 资源：缓存优先；其余跨域请求不拦截
+  //    Transformers.js 模型除外 —— 库自己用 Cache API 管理，SW 不重复缓存
+  if (TRANSFORMERS_MODEL_RE.test(url.href)) return;
   if (CROSS_ORIGIN_ASSET_RE.test(url.pathname)) {
     event.respondWith(cacheFirst(req));
   }
