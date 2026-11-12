@@ -13,6 +13,21 @@
  * 4. 跨域 CDN 资源（ffmpeg core / tesseract worker·core·语言数据）：
  *    缓存优先。代码里按版本号锁定 URL，内容不可变，与同源 hash 资源同理
  *
+ * 跨源隔离（COOP/COEP）：
+ * - 只对 COI_PATHS 白名单里的页面注入响应头（当前：ASR 页），
+ *   其他页面完全不走注入分支。原因：COEP 会拦掉 no-cors 的跨域子资源，
+ *   白名单之外的工具不该承担这个风险。
+ * - 必须给白名单页的「所有响应」注入，包括 Worker 脚本本身 ——
+ *   只给导航注入会让隔离页创建 Worker 时全部被拦（实测，见下方注释）。
+ * - 用 credentialless 而非 require-corp：huggingface.co 的模型响应
+ *   Access-Control-Allow-Origin 是 https://huggingface.co（非 *），
+ *   require-corp 下会被拦；credentialless 实测可正常加载模型与
+ *   ffmpeg core / tesseract 语言包。
+ * - 首次访问时 SW 还没接管页面，需要 reload 一次才能让隔离生效；
+ *   reload 逻辑在 assets/js/common.js 的 setupCrossOriginIsolation()。
+ * - 这是从独立 coi-serviceworker 合并进来的能力：一个 SW 同时管缓存与隔离，
+ *   避免两个 SW 抢同一 scope（历史上因此踩过坑，见提交 da338c2）。
+ *
  * 缓存管理：
  * - 缓存名带 SW_VERSION，activate 时删除旧版本缓存（改策略时升版本号即可全量刷新）
  * - 条目数超 MAX_ENTRIES 时按插入序淘汰最旧的，防止反复部署后旧 hash 无限堆积
@@ -24,6 +39,20 @@
 const SW_VERSION = 'v2';
 const CACHE_NAME = `toolbox-${SW_VERSION}`;
 const MAX_ENTRIES = 250;
+
+/* 需要跨源隔离的页面路径前缀（相对站点根，不含 base 前缀）。
+   默认空数组 = 全站不启用。
+
+   当前 ASR 页启用，为将来接入 sherpa-onnx 流式识别铺路（SharedArrayBuffer）。
+   关键实现约束（2026-11-12 实测，详见 .workbuddy/memory/2026-11-12.md）：
+   必须给「白名单页的所有响应」注入 COOP/COEP —— 包括 Worker 脚本本身。
+   早期只给页面导航注入、漏掉 Worker 脚本，导致隔离页创建 Worker 时
+   全部 ERR_BLOCKED_BY_RESPONSE，一度误判为「SW + COEP 不兼容」。
+   改成全响应注入后，同源 Worker、HF 模型、ffmpeg core、tesseract 语言包
+   实测均正常；只有 no-cors 的跨域 script 会被拦（项目里没有这种用法）。
+   其他页面完全不走注入分支，行为与合并前一致。 */
+const COI_PATHS = ['/tools/asr/'];
+const COI_MODE = 'credentialless';
 
 /* 带内容 hash 的静态资源：路径中含 8 位以上 hash 串 + 已知静态扩展名。
    bat/cmd/ps1 是实用脚本页的分发文件（tools/scripts/），
@@ -77,6 +106,36 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
+/** 这个请求是否属于需要跨源隔离的页面。
+ *
+ *  难点：Worker 里创建的子 Worker，其 clientId 指向「父 Worker」而不是页面。
+ *  ORT 的 threaded wasm 会在 Worker 内用
+ *  `new Worker(new URL(import.meta.url))` 创建 em-pthread 子 Worker，
+ *  这个子 Worker 的脚本请求（asr-runtime/*.mjs）若不带 COEP 就会被拦。
+ *
+ *  所以除了「发起者页面在白名单」，还要认两类 ASR 专属资源：
+ *  1. 请求 URL 本身在 asr-runtime/ 下（wasm / mjs）
+ *  2. 发起者本身是 asr-worker（Worker 内发起的子请求）
+ *  这些资源只有 ASR 页会用，给它们注入 COEP 不会影响其他工具。
+ */
+const ASR_RUNTIME_RE = /\/asr-runtime\//;
+const ASR_WORKER_RE = /\/asr-worker-[\w-]+\.js$/;
+
+async function isCoiRequest(event, url) {
+  if (!COI_PATHS.length) return false;
+  if (event.request.mode === 'navigate') return needsCoi(url);
+  if (ASR_RUNTIME_RE.test(url.pathname)) return true;
+  if (event.clientId) {
+    const client = await self.clients.get(event.clientId);
+    if (client) {
+      const clientUrl = new URL(client.url);
+      if (needsCoi(clientUrl)) return true;
+      if (ASR_RUNTIME_RE.test(clientUrl.pathname) || ASR_WORKER_RE.test(clientUrl.pathname)) return true;
+    }
+  }
+  return false;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -88,47 +147,85 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. 页面导航：网络优先，失败回退缓存
-  if (req.mode === 'navigate') {
-    event.respondWith(networkFirstNavigation(req));
-    return;
-  }
+  // 决策：先算缓存策略（同步返回 Promise），再按来源决定是否注入 COEP。
+  // 必须在这次 tick 内调用 respondWith，所以把两步包在同一个 Promise 里。
+  // 跨域模型文件交给 Transformers.js 自己缓存，SW 不碰（避免 40MB 存两遍）。
+  const skipCaching = TRANSFORMERS_MODEL_RE.test(url.href);
 
-  if (url.origin === self.origin) {
-    // SW 脚本自身不缓存：浏览器对 SW 脚本有独立更新机制，
-    // 混进业务缓存只会在管理列表里造成困惑
-    if (url.pathname.endsWith('/sw.js')) return;
+  event.respondWith((async () => {
+    let response;
 
-    // 2/3. 同源静态资源：hash 文件缓存优先，其余 SWR
-    if (HASHED_ASSET_RE.test(url.pathname)) {
-      event.respondWith(cacheFirst(req));
+    if (req.mode === 'navigate') {
+      response = await networkFirstNavigation(req);
+    } else if (url.origin === self.origin) {
+      if (url.pathname.endsWith('/sw.js')) {
+        // SW 脚本自身走浏览器原生更新机制，不缓存也不注入
+        return fetch(req);
+      }
+      response = HASHED_ASSET_RE.test(url.pathname)
+        ? await cacheFirst(req)
+        : await staleWhileRevalidate(req);
+    } else if (!skipCaching && CROSS_ORIGIN_ASSET_RE.test(url.pathname)) {
+      response = await cacheFirst(req);
     } else {
-      event.respondWith(staleWhileRevalidate(req));
+      response = await fetch(req);
     }
-    return;
-  }
 
-  // 4. 跨域 CDN 资源：缓存优先；其余跨域请求不拦截
-  //    Transformers.js 模型除外 —— 库自己用 Cache API 管理，SW 不重复缓存
-  if (TRANSFORMERS_MODEL_RE.test(url.href)) return;
-  if (CROSS_ORIGIN_ASSET_RE.test(url.pathname)) {
-    event.respondWith(cacheFirst(req));
-  }
+    // 白名单页的所有响应都要带 COOP/COEP，包括 Worker 脚本 ——
+    // 只给导航注入而漏掉 Worker 脚本，会导致隔离页无法创建 Worker
+    // （实测 ERR_BLOCKED_BY_RESPONSE，详见 .workbuddy/memory/2026-11-12.md）。
+    if (await isCoiRequest(event, url)) return withCoiHeaders(response);
+    return response;
+  })());
 });
+
+/** 站点根路径（GitHub Pages 上是 /local-toolbox/，本地是 /）。
+    SW 脚本固定在站点根，用它的 scope 推断即可，不依赖构建时变量。
+    注意 registration.scope 是完整 URL，必须取 .pathname 才能和
+   request 的 pathname 比较 —— 直接拿 URL 字符串比较永远不匹配。 */
+function siteBase() {
+  const pathname = new URL(self.registration.scope).pathname;
+  return pathname.replace(/\/$/, ''); // 例如 '' 或 '/local-toolbox'
+}
+
+/** 这个导航请求是否需要跨源隔离 */
+function needsCoi(url) {
+  if (!COI_PATHS.length) return false;
+  const base = siteBase();
+  let path = url.pathname;
+  if (base && path.startsWith(base + '/')) path = path.slice(base.length);
+  else if (base && path === base) path = '/';
+  return COI_PATHS.some((p) => path === p || path.startsWith(p));
+}
+
+/** 给响应加上 COOP/COEP 头（返回新 Response，原响应的 body 可继续流式的读） */
+function withCoiHeaders(resp) {
+  if (!resp) return resp;
+  const headers = new Headers(resp.headers);
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Embedder-Policy', COI_MODE);
+  return new Response(resp.body, {
+    status: resp.status,
+    statusText: resp.statusText,
+    headers,
+  });
+}
 
 async function networkFirstNavigation(req) {
   const cache = await caches.open(CACHE_NAME);
+  const coi = needsCoi(new URL(req.url));
   try {
     const fresh = await fetch(req);
     // 只缓存成功响应，避免把 404 页写进缓存
     if (fresh && fresh.ok) cache.put(req, fresh.clone());
-    return fresh;
+    return coi ? withCoiHeaders(fresh) : fresh;
   } catch (err) {
     const cached = await cache.match(req);
-    if (cached) return cached;
+    // 缓存页也要带头，否则离线打开白名单页时隔离会失效
+    if (cached) return coi ? withCoiHeaders(cached) : cached;
     // 深层页面未缓存过：回退到缓存的首页，用户可从首页进入已缓存的工具
     const home = await cache.match(new URL('./', self.registration.scope), { ignoreSearch: true });
-    if (home) return home;
+    if (home) return coi ? withCoiHeaders(home) : home;
     return new Response(OFFLINE_HTML, {
       status: 503,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },

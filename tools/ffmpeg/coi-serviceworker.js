@@ -1,9 +1,14 @@
-/* 兼容性清理脚本
- * 旧版本页面通过 coi-serviceworker 在 GitHub Pages 上补发 COOP/COEP 头以实现跨源隔离。
- * 现改用单线程 FFmpeg 内核（不依赖 SharedArrayBuffer），已不再需要跨源隔离，
- * 且旧 SW 固定给响应加的 COEP 头反而会导致 Chrome 拦截内核资源。
- * 此文件放在与旧 SW 相同的路径，浏览器下次更新时会用本脚本替换旧 SW，
- * 随即清理缓存并自我注销，使历史访问过的浏览器脱离 SW 控制。
+/* 历史 coi-serviceworker 的清理脚本
+ *
+ * 早期版本（提交 fa81e00）曾用 coi-serviceworker 在 GitHub Pages 上补发
+ * COOP/COEP 头。那个 SW 注册在 /tools/ffmpeg/ 下，与站点全局缓存 SW
+ * （public/sw.js，scope 为站点根）形成嵌套 scope —— 两个 SW 抢同一批请求，
+ * 且旧 SW 强制给所有响应加 COEP: require-corp，反而拦掉了 module worker
+ * （提交 da338c2 记录了这次事故）。
+ *
+ * 现在跨源隔离能力已合并进全局 SW（见 public/sw.js 的 COI_PATHS），
+ * 本文件只负责：历史浏览器下次更新到这里时，注销旧的嵌套 SW、清掉它的缓存，
+ * 然后重新加载页面，让全局 SW 接管。新访客不会注册本脚本。
  */
 self.addEventListener('install', () => self.skipWaiting());
 
