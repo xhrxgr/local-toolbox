@@ -91,9 +91,20 @@ function formatCodepoint(cp) {
   return 'U+' + (hex.length <= 4 ? hex.padStart(4, '0') : hex);
 }
 
+// UTF-8 编码按码点分级，直接算长度比编码成字节数组快一个量级
+function utf8Length(cp) {
+  if (cp < 0x80) return 1;
+  if (cp < 0x800) return 2;
+  if (cp < 0x10000) return 3;
+  return 4;
+}
+
+// TextEncoder 复用一份：每次 new 会重新初始化编码器状态
+const utf8Encoder = new TextEncoder();
+
 // 字符 → UTF-8 字节数组
 function getUtf8Bytes(ch) {
-  return Array.from(new TextEncoder().encode(ch));
+  return Array.from(utf8Encoder.encode(ch));
 }
 
 // 字符 → UTF-16 代码单元数组（码元）
@@ -206,26 +217,26 @@ function analyze() {
     return;
   }
 
-  // for...of 按码点迭代，正确拆分代理对
-  const chars = [...input];
+  // 只有前 MAX_ROWS 行会被渲染，所以逐字对象只建这么多；
+  // 总字数/字节数仍要覆盖全文，但用计数而不是数组 —— 百万字输入下
+  // spread 出百万个元素的数组本身就要几百毫秒。
+  const MAX_ROWS = 2000;
+  const rows = [];
   let utf8Count = 0;
   let utf16Count = 0;
-  const rows = [];
+  let charCount = 0;
 
-  for (const ch of chars) {
+  // for...of 按码点迭代，正确拆分代理对
+  for (const ch of input) {
+    charCount++;
     const cp = ch.codePointAt(0);
-    const utf8 = getUtf8Bytes(ch);
-    const utf16 = getUtf16Units(ch);
-    utf8Count += utf8.length;
-    utf16Count += utf16.length;
-    rows.push({ ch, cp, utf8, utf16 });
+    utf8Count += utf8Length(cp);
+    utf16Count += ch.length;
+    if (rows.length < MAX_ROWS) rows.push({ ch, cp });
   }
 
-  // 限制最多 2000 行避免渲染卡顿
-  const maxRows = 2000;
-  const displayRows = rows.slice(0, maxRows);
-
-  tbody.innerHTML = displayRows
+  // 字节数组只给要渲染的行算，避免为整篇输入分配逐字数组
+  tbody.innerHTML = rows
     .map((r) => {
       const cls = classifyChar(r.ch);
       const block = findBlock(r.cp);
@@ -234,8 +245,8 @@ function analyze() {
         <tr>
           <td class="char-cell">${escapeHtml(visibleChar(r.ch))}</td>
           <td><code>${formatCodepoint(r.cp)}</code></td>
-          <td><code>${bytesToHex(r.utf8)}</code></td>
-          <td><code>${unitsToHex(r.utf16)}</code></td>
+          <td><code>${bytesToHex(getUtf8Bytes(r.ch))}</code></td>
+          <td><code>${unitsToHex(getUtf16Units(r.ch))}</code></td>
           <td>${cls}</td>
           <td>${escapeHtml(blockName)}</td>
         </tr>
@@ -244,14 +255,14 @@ function analyze() {
     .join('');
 
   statsEl.hidden = false;
-  document.getElementById('stat-chars').textContent = chars.length;
+  document.getElementById('stat-chars').textContent = charCount;
   document.getElementById('stat-utf8').textContent = utf8Count;
   document.getElementById('stat-utf16').textContent = utf16Count;
 
   emptyEl.hidden = true;
-  if (rows.length > maxRows) {
+  if (charCount > MAX_ROWS) {
     emptyEl.hidden = false;
-    emptyEl.textContent = `仅显示前 ${maxRows} 个字符（共 ${rows.length} 个）`;
+    emptyEl.textContent = `仅显示前 ${MAX_ROWS} 个字符（共 ${charCount} 个）`;
   }
 }
 

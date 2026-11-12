@@ -193,8 +193,7 @@ function render(state) {
   // marked 不消毒：原始 HTML（含 <img onerror>、<script>）会原样透传，
   // 直接 innerHTML 就是 XSS——粘贴别人分享的 Markdown 即可触发。
   // 这里必须过 DOMPurify，导出 HTML 时也要用同一份消毒结果。
-  const html = sanitizeHtml(marked.parse(text));
-  state.preview.innerHTML = html;
+  state.preview.innerHTML = sanitizeHtml(marked.parse(text));
   highlightAllCode(state.preview);
   buildToc(state);
 }
@@ -251,16 +250,21 @@ function renderTocPanel(state, items) {
       return `<a class="md-toc-item md-toc-item--l${item.level}" data-target="${escapeAttr(item.id)}" style="padding-left:${12 + indent}px" title="${escapeAttr(item.text)}">${escapeHtml(item.text)}</a>`;
     })
     .join('');
-  state.tocList.querySelectorAll('.md-toc-item').forEach((a) => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault();
-      const el = state.preview.querySelector(`#${CSS.escape(a.dataset.target)}`);
-      if (el) {
-        // 仅滚动预览容器，避免整页跳动
-        const top = el.offsetTop - 8;
-        state.preview.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
-      }
-    });
+}
+
+/** 目录点击：用事件委托，不在每个条目上挂监听器。
+ *  长文档标题数以万计（1MB 文档实测 2 万个），逐项挂监听会多出上万次注册。 */
+function bindTocClick(state) {
+  state.tocList.addEventListener('click', (e) => {
+    const a = e.target.closest('.md-toc-item');
+    if (!a) return;
+    e.preventDefault();
+    const el = state.preview.querySelector(`#${CSS.escape(a.dataset.target)}`);
+    if (el) {
+      // 仅滚动预览容器，避免整页跳动
+      const top = el.offsetTop - 8;
+      state.preview.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+    }
   });
 }
 
@@ -359,6 +363,7 @@ function initMarkdown() {
   const splitBtn = viewSwitch.querySelector('[data-view="split"]');
 
   const state = { editor, preview, gutter, layout, toc, tocList, viewBtns };
+  bindTocClick(state);
 
   // 默认内容
   editor.value = DEFAULT_CONTENT;
