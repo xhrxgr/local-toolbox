@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>FFmpeg 内核性能基准</title>
+<!--
+  FFmpeg 单/多线程内核性能基准（开发期资产，不在 rollupOptions.input 里，不进产物）
+
+  为什么放在 tools/asr/ 下：dev 的 conditional-coep 插件只对 COI_PATHS
+  白名单页（当前 /tools/asr/）注入 COOP/COEP，而多线程内核需要跨源隔离。
+  放这里才能拿到隔离环境。若将来 ffmpeg 页也进白名单，可移回 tools/ffmpeg/。
+
+  运行前提（仅 dev server）：
+  1. npm run dev -- --port 5199 --host 127.0.0.1
+  2. 两套内核放到仓库根 .probe-ffmpeg/{st,mt}/（已 gitignore，不进产物）：
+     st = @ffmpeg/core@0.12.6/dist/esm 的 ffmpeg-core.js + .wasm
+     mt = @ffmpeg/core-mt@0.12.10/dist/esm 的 3 个文件（多一个 .worker.js）
+     vite.config.js 的 serve-local-probe-assets 中间件会提供 /.probe-ffmpeg/
+  3. 打开本页，参数：
+     core=st|mt        内核
+     threads=N          0=不传 -threads；-1=显式传 -threads 0（现有线上写法）；>0=传该值
+     blob=1             core/wasm 走 Blob URL（生产形态）
+     cdn=1              core/wasm 从 unpkg 跨域加载（workerURL 仍同源）
+     dur / size         测试画面时长与分辨率，默认 12s / 1280x720
+  4. 每个配置必须独立页面 + 独立 context（FFmpeg 实例与 WASM 堆不能复用）。
+
+  已知陷阱（都实测踩过）：
+  - 多线程内核不传 -threads 或用 -threads 0 → ff.exec 静默卡死 >120s
+  - -threads 8 同样卡死；4 是本机最优点
+  - pthread 子 Worker 的 ffmpeg-core.worker.js 必须同源且响应带 COEP 头，
+    否则反复 ERR_BLOCKED_BY_RESPONSE，ff.load() 静默卡住
+  - workerURL 不能用 Blob URL（pthread 靠它推导相对路径定位自身脚本）
+  - 单线程内核不需要隔离，但本页在隔离环境下也能正常跑
+
+  2026-11-13 基线（NVIDIA Ampere / 12 核 / Chrome headless / mpeg4）：
+    12s 720p：
+      单线程 + -threads 0   5209 / 5282 / 5303 / 5458ms   输出 1006706 B
+      多线程 + -threads 4   2378 / 2464 / 2552ms          输出 999552 B
+      多线程 + -threads 0   卡死
+      多线程 + 8 线程        卡死
+      单线程 + -threads 4   5194 / 5303ms（无变化）
+    2s 320x240（轻任务）：
+      单线程 144-152ms / 多线程 132-156ms（基本持平，线程开销抵掉收益）
+    注意：多线程与单线程编码输出字节数不同（帧级并行导致码率分配差异），
+    属正常 ffmpeg 行为，但切换内核前要确认质量可接受。
+-->
+</head>
+<body>
+<div id="out" style="font-family:monospace;white-space:pre-wrap">运行中…</div>
+<script type="module">
+const out = document.getElementById('out');
+window.__benchResult = null;
+const params = new URLSearchParams(location.search);
+const core = params.get('core') || 'st';       // st | mt
+const threads = Number(params.get('threads') || 0); // 0 = 不传 -threads
+const codec = params.get('codec') || 'mpeg4';
+const log = (s) => { out.textContent += '\n' + s; };
+
+try {
+  const coi = self.crossOriginIsolated;
+  const sab = typeof SharedArrayBuffer !== 'undefined';
+  log(`core=${core} threads=${threads} codec=${codec} coi=${coi} SAB=${sab} hc=${navigator.hardwareConcurrency}`);
+
+  const { FFmpeg } = await import('/node_modules/@ffmpeg/ffmpeg/dist/esm/classes.js');
+  const base = location.origin + '/.probe-ffmpeg/' + (core === 'mt' ? 'mt' : 'st') + '/';
+  // blob=1 模拟生产：内核文件 fetch 后转成 Blob URL（项目现有 fetchCoreFile 的做法）
+  const useBlob = params.get('blob') === '1';
+  async function coreUrl(name, mime) {
+    const url = name.startsWith('http') ? name : base + name;
+    if (!useBlob) return url;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${name} HTTP ${r.status}`);
+    return URL.createObjectURL(new Blob([await r.arrayBuffer()], { type: mime }));
+  }
+  const loadCfg = {
+    coreURL: await coreUrl('ffmpeg-core.js', 'text/javascript'),
+    wasmURL: await coreUrl('ffmpeg-core.wasm', 'application/wasm'),
+  };
+  // workerURL 不能用 blob：pthread 子 Worker 要靠它推导相对路径定位自身脚本。
+  // cdn=1 模拟线上：内核从 unpkg 跨域加载，workerURL 用跨域绝对 URL。
+  const useCdn = params.get('cdn') === '1';
+  const cdnBase = 'https://unpkg.com/@ffmpeg/core-mt@0.12.10/dist/esm';
+  if (core === 'mt') {
+    if (useCdn) {
+      loadCfg.coreURL = await coreUrl(`${cdnBase}/ffmpeg-core.js`, 'text/javascript');
+      loadCfg.wasmURL = await coreUrl(`${cdnBase}/ffmpeg-core.wasm`, 'application/wasm');
+    }
+    // pthread 子 Worker 的脚本必须同源（浏览器不允许跨域 Worker 脚本）。
+    // 所以这个文件要自托管到站点内，不能跟 core/wasm 一样走 CDN。
+    loadCfg.workerURL = base + 'ffmpeg-core.worker.js';
+  }
+
+  const ff = new FFmpeg();
+  const msgs = [];
+  ff.on('log', ({ message }) => { if (msgs.length < 8) msgs.push(message); });
+
+  const t0 = performance.now();
+  await ff.load(loadCfg);
+  const loadMs = Math.round(performance.now() - t0);
+  log(`load=${loadMs}ms`);
+
+  // 用 lavfi 生成测试画面再编码，纯 CPU 密集、无外部输入依赖。
+  // 时长/分辨率可用 ?dur= ?size= 调整：太轻的任务（4s/640x480）噪声会盖过线程收益。
+  const dur = Number(params.get('dur') || 12);
+  const frameSize = params.get('size') || '1280x720';
+  const args = ['-f', 'lavfi', '-i', `testsrc=duration=${dur}:size=${frameSize}:rate=25`];
+  // threads=0 表示不传该参数；threads=-1 表示显式传 -threads 0（现有代码的写法）
+  if (threads > 0) args.push('-threads', String(threads));
+  else if (threads < 0) args.push('-threads', '0');
+  args.push('-c:v', codec, '-q:v', '5', '-y', 'out.mp4');
+
+  const t1 = performance.now();
+  const ret = await ff.exec(args);
+  const execMs = Math.round(performance.now() - t1);
+  let size = -1;
+  try { size = (await ff.readFile('out.mp4')).length; } catch (e) { log('readFile 失败 ' + e.message); }
+  log(`exec=${execMs}ms ret=${ret} outBytes=${size}`);
+  log('logs: ' + msgs.slice(0, 3).join(' | ').slice(0, 200));
+
+  await ff.terminate();
+  window.__benchResult = { core, threads, codec, coi, sab, loadMs, execMs, outBytes: size, exitCode: ret, error: null };
+  log('DONE');
+} catch (e) {
+  const msg = (e && e.message) || String(e);
+  log('ERROR ' + msg);
+  window.__benchResult = { core, threads, codec, error: msg, stack: String(e?.stack || '').slice(0, 300) };
+}
+</script>
+</body>
+</html>

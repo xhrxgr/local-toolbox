@@ -9,10 +9,13 @@ import { copyFileSync, mkdirSync, existsSync, createReadStream } from 'fs';
 // 关键：必须给白名单页的所有响应（含 Worker 脚本）注入 COEP，
 // 只给导航注入会导致隔离页无法创建 Worker。详见 public/sw.js 注释。
 const COI_PATHS = ['/tools/asr/'];
-// 生产 SW 除白名单页外，还要给 ASR 的运行时资源注入 COEP
-// （ORT 的 em-pthread 子 Worker 会自引用加载 asr-runtime/*.mjs）。
+// 生产 SW 除白名单页外，还要给隔离页用到的运行时资源注入 COEP：
+// - ORT 的 em-pthread 子 Worker 会自引用加载 asr-runtime/*.mjs
+// - @ffmpeg/ffmpeg 的 classWorkerURL 走 Vite 的 ?worker_file 转换，
+//   请求落在 /node_modules/@ffmpeg/ffmpeg/dist/esm/worker.js
 // dev 没有 SW，必须由服务器直接给这些路径加头，才能与生产行为一致。
-const COI_ASSET_RE = /\/(?:asr-runtime\/|asr-worker-[\w-]+\.js$)/;
+// 漏掉任意一个，隔离页里的 Worker 就会被 ERR_BLOCKED_BY_RESPONSE 拦掉。
+const COI_ASSET_RE = /\/(?:asr-runtime\/|asr-worker-[\w-]+\.js$|node_modules\/@ffmpeg\/|ffmpeg-core\.worker\.js$)/;
 
 // ONNX Runtime Web 的 wasm 运行时体积较大且由 npm 管理，
 // 构建时同步到工具目录并交给 Vite 作为静态资源处理（不入 git）
@@ -100,28 +103,10 @@ export default defineConfig(({ mode }) => ({
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util', 'zxing-wasm'],
   },
   plugins: [
-    {
-      // 性能基准用的本地模型放在仓库根的 .probe-model/（不入 git、不进产物）。
-      // 不能放 public/：Vite 会把 public 里的文件原样拷进 dist，
-      // 42MB 测试模型会跟着部署上线。dev 时才由这个中间件按 HF 的 URL 结构提供。
-      name: 'serve-local-asr-model',
-      configureServer(server) {
-        const root = resolve(__dirname, '.probe-model');
-        server.middlewares.use((req, res, next) => {
-          const path = (req.url || '').split('?')[0];
-          const prefix = '/.probe-model/';
-          if (!path.startsWith(prefix)) return next();
-          const file = resolve(root, path.slice(prefix.length));
-          if (!file.startsWith(root) || !existsSync(file)) {
-            res.statusCode = 404;
-            return res.end('not found');
-          }
-          res.setHeader('Content-Type', extname(file) === '.onnx'
-            ? 'application/octet-stream' : 'application/json');
-          createReadStream(file).pipe(res);
-        });
-      },
-    },
+    // 顺序要紧：COEP 头必须在「素材中间件结束响应之前」设置。
+    // 早先素材中间件排在前面，直接 pipe(res) 就结束了响应，
+    // pthread 子 Worker 的 ffmpeg-core.worker.js 因而拿不到 COEP 头，
+    // 被反复 ERR_BLOCKED_BY_RESPONSE 拦下、ff.load() 静默卡死。
     {
       name: 'conditional-coep',
       configureServer(server) {
@@ -138,6 +123,35 @@ export default defineConfig(({ mode }) => ({
             res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
           }
           next();
+        });
+      },
+    },
+    {
+      // 性能基准用的本地素材放在仓库根的 .probe-*/（不入 git、不进产物）。
+      // 不能放 public/：Vite 会把 public 里的文件原样拷进 dist，
+      // 几十 MB 测试素材会跟着部署上线。仅 dev 时由这个中间件提供。
+      name: 'serve-local-probe-assets',
+      configureServer(server) {
+        const roots = {
+          '/.probe-model/': resolve(__dirname, '.probe-model'),
+          '/.probe-ffmpeg/': resolve(__dirname, '.probe-ffmpeg'),
+        };
+        server.middlewares.use((req, res, next) => {
+          const path = (req.url || '').split('?')[0];
+          const prefix = Object.keys(roots).find((p) => path.startsWith(p));
+          if (!prefix) return next();
+          const file = resolve(roots[prefix], path.slice(prefix.length));
+          if (!file.startsWith(roots[prefix]) || !existsSync(file)) {
+            res.statusCode = 404;
+            return res.end('not found');
+          }
+          const ext = extname(file);
+          const type = ext === '.wasm' ? 'application/wasm'
+            : ext === '.js' ? 'text/javascript'
+            : ext === '.onnx' ? 'application/octet-stream'
+            : 'application/json';
+          res.setHeader('Content-Type', type);
+          createReadStream(file).pipe(res);
         });
       },
     },
