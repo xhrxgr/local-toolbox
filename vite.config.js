@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { resolve, extname } from 'path';
+import { copyFileSync, mkdirSync, existsSync, createReadStream } from 'fs';
 
 // 需要跨源隔离的页面路径前缀。必须与 public/sw.js 的 COI_PATHS
 // 和 assets/js/common.js 的 COI_PAGES 保持一致（三处无共享模块，
@@ -9,6 +9,10 @@ import { copyFileSync, mkdirSync, existsSync } from 'fs';
 // 关键：必须给白名单页的所有响应（含 Worker 脚本）注入 COEP，
 // 只给导航注入会导致隔离页无法创建 Worker。详见 public/sw.js 注释。
 const COI_PATHS = ['/tools/asr/'];
+// 生产 SW 除白名单页外，还要给 ASR 的运行时资源注入 COEP
+// （ORT 的 em-pthread 子 Worker 会自引用加载 asr-runtime/*.mjs）。
+// dev 没有 SW，必须由服务器直接给这些路径加头，才能与生产行为一致。
+const COI_ASSET_RE = /\/(?:asr-runtime\/|asr-worker-[\w-]+\.js$)/;
 
 // ONNX Runtime Web 的 wasm 运行时体积较大且由 npm 管理，
 // 构建时同步到工具目录并交给 Vite 作为静态资源处理（不入 git）
@@ -97,6 +101,28 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     {
+      // 性能基准用的本地模型放在仓库根的 .probe-model/（不入 git、不进产物）。
+      // 不能放 public/：Vite 会把 public 里的文件原样拷进 dist，
+      // 42MB 测试模型会跟着部署上线。dev 时才由这个中间件按 HF 的 URL 结构提供。
+      name: 'serve-local-asr-model',
+      configureServer(server) {
+        const root = resolve(__dirname, '.probe-model');
+        server.middlewares.use((req, res, next) => {
+          const path = (req.url || '').split('?')[0];
+          const prefix = '/.probe-model/';
+          if (!path.startsWith(prefix)) return next();
+          const file = resolve(root, path.slice(prefix.length));
+          if (!file.startsWith(root) || !existsSync(file)) {
+            res.statusCode = 404;
+            return res.end('not found');
+          }
+          res.setHeader('Content-Type', extname(file) === '.onnx'
+            ? 'application/octet-stream' : 'application/json');
+          createReadStream(file).pipe(res);
+        });
+      },
+    },
+    {
       name: 'conditional-coep',
       configureServer(server) {
         // 开发环境模拟生产 SW 的跨源隔离行为（见 public/sw.js 的 COI_PATHS）。
@@ -107,7 +133,7 @@ export default defineConfig(({ mode }) => ({
         // require-corp 下会被拦（实测，见 .workbuddy/memory/2026-11-12.md）。
         server.middlewares.use((req, res, next) => {
           const path = (req.url || '').split('?')[0];
-          if (COI_PATHS.some((p) => path === p || path.startsWith(p))) {
+          if (COI_PATHS.some((p) => path === p || path.startsWith(p)) || COI_ASSET_RE.test(path)) {
             res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
             res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
           }

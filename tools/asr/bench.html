@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>ASR 推理性能基准</title>
+<!--
+  ASR 推理性能基准（开发期资产，不在 Vite 的 rollupOptions.input 里，不会进产物）
+
+  用途：比较 WebGPU / WASM 多线程 / WASM 单线程的加载与推理耗时，
+  为 asr-worker.js 的设备选择和线程数上限提供可复现的数据依据。
+  改动推理配置前先跑一遍，别凭直觉「优化」。
+
+  运行前提（仅 dev server，生产构建不含本页）：
+  1. npm run dev -- --port 5199
+  2. 本地模型放到仓库根的 .probe-model/onnx-community/whisper-tiny/resolve/main/
+     （按 HF 的 URL 结构摆文件；从 huggingface.co 下载 7 个文件，约 42MB。
+      vite.config.js 的 serve-local-asr-model 插件会在 dev 时提供 /.probe-model/；
+      该目录已 gitignore，且不在 public/ 下，不会被拷进产物）
+  3. 访问 /tools/asr/bench.html?cfg=配置名（可加 &threads=N 覆盖线程数）
+     配置名见下方 CONFIGS；用 Playwright 等驱动脚本依次打开，
+     每个配置必须独立页面/独立 context，避免 env 单例与 WASM 实例复用。
+
+  已知陷阱：纯正弦长音频会让 Whisper 无限重复解码（8 秒音频单次 >15s），
+  所以用 2 秒短音频 + max_new_tokens: 32 测模型推理本身的速度。
+
+  2026-11-12 基线（NVIDIA Ampere / 12 核 / Chrome headless）：
+    WebGPU 默认 wasm      推理 1037-1158ms，加载 5056-6771ms
+    WebGPU + asyncify     推理 1501ms
+    WASM 1 线程           推理 1295ms
+    WASM 2 线程           推理 926ms
+    WASM 4 线程           推理 720-782ms   ← 最优
+    WASM 8 线程           推理 777ms       ← 无收益
+    WASM 单线程 asyncify  推理 1229ms
+    WebGPU + threaded     报错 webgpuInit is not a function
+-->
+</head>
+<body>
+<div id="out" style="font-family:monospace;white-space:pre-wrap">运行中…</div>
+<script type="module">
+const out = document.getElementById('out');
+window.__benchResult = null;
+const params = new URLSearchParams(location.search);
+const cfg = params.get('cfg') || 'wasm-threaded';
+
+const CONFIGS = {
+  'webgpu-threaded': { device: 'webgpu', wasm: 'ort-wasm-simd-threaded', threads: 4 },
+  'webgpu-asyncify': { device: 'webgpu', wasm: 'ort-wasm-simd-threaded.asyncify', threads: 1 },
+  'webgpu-default':  { device: 'webgpu', wasm: null, threads: 1 },
+  'wasm-threaded':   { device: 'wasm',   wasm: 'ort-wasm-simd-threaded', threads: 4 },
+  'wasm-asyncify':   { device: 'wasm',   wasm: 'ort-wasm-simd-threaded.asyncify', threads: 1 },
+};
+
+// 2 秒短音频：纯正弦会让 Whisper 无限重复解码（实测 8 秒音频单次推理 15s+），
+// 短音频能快速收敛到 EOS，测出的才是模型推理本身的速度。
+function makeAudio(seconds = 2) {
+  const rate = 16000, n = rate * seconds;
+  const a = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    a[i] = 0.25 * Math.sin(2 * Math.PI * 220 * t) * (0.3 + 0.25 * Math.sin(2 * Math.PI * 3 * t));
+  }
+  return a;
+}
+
+const log = (s) => { out.textContent += '\n' + s; };
+
+try {
+  const C = CONFIGS[cfg];
+  const coi = self.crossOriginIsolated;
+  let adapterInfo = 'n/a';
+  try {
+    const ad = await navigator.gpu?.requestAdapter();
+    adapterInfo = ad?.info ? `${ad.info.vendor || '?'}/${ad.info.architecture || '?'}` : 'none';
+  } catch (e) { adapterInfo = 'err ' + e.message.slice(0, 40); }
+  log(`cfg=${cfg} coi=${coi} gpu=${!!navigator.gpu} adapter=${adapterInfo} hc=${navigator.hardwareConcurrency}`);
+
+  const { pipeline, env } = await import('/node_modules/@huggingface/transformers/dist/transformers.web.js');
+  env.allowLocalModels = false;
+  env.remoteHost = location.origin + '/.probe-model';
+  env.useBrowserCache = false;
+  env.useWasmCache = false;
+
+  if (C.wasm) {
+    const wasmBase = location.origin + '/asr-runtime/';
+    env.backends.onnx.wasm.wasmPaths = {
+      wasm: wasmBase + C.wasm + '.wasm',
+      mjs: wasmBase + C.wasm + '.mjs',
+    };
+  }
+  const threadsOverride = Number(params.get('threads'));
+  const threads = Number.isInteger(threadsOverride) && threadsOverride > 0 ? threadsOverride : C.threads;
+  env.backends.onnx.wasm.numThreads = threads;
+  log(`threads=${threads} wasm=${C.wasm || 'default'}`);
+
+  const t0 = performance.now();
+  const pipe = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-tiny', {
+    dtype: 'q8', device: C.device,
+  });
+  const loadMs = Math.round(performance.now() - t0);
+  log(`load=${loadMs}ms`);
+
+  const audio = makeAudio();
+  const opts = { language: 'chinese', max_new_tokens: 32 };
+  const tWarm = performance.now();
+  const warm = await pipe(audio, opts);
+  const warmMs = Math.round(performance.now() - tWarm);
+  log(`warmup=${warmMs}ms text="${warm.text.slice(0, 30)}"`);
+
+  const times = [];
+  for (let i = 0; i < 2; i++) {
+    const t = performance.now();
+    const r = await pipe(audio, opts);
+    times.push(Math.round(performance.now() - t));
+    log(`run${i + 1}=${times[i]}ms text="${r.text.slice(0, 30)}"`);
+  }
+  window.__benchResult = {
+    cfg, coi, gpu: !!navigator.gpu, adapter: adapterInfo,
+    loadMs, warmMs, runs: times, minMs: Math.min(...times), error: null,
+  };
+  log('DONE');
+} catch (e) {
+  log('ERROR ' + e.message);
+  window.__benchResult = { cfg, error: e.message, stack: String(e.stack || '').slice(0, 300) };
+}
+</script>
+</body>
+</html>

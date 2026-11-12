@@ -62,16 +62,20 @@ async function ensureModel() {
     wasm: wasmBase + wasmFile + '.wasm',
     mjs: wasmBase + wasmFile + '.mjs',
   };
-  // ORT 默认 min(4, ceil(hardwareConcurrency / 2))，隔离时才允许多线程
+  // 线程数上限 4 是实测最优点，不要「优化」成更高：
+  //   1 线程 1295ms / 2 线程 926ms / 4 线程 720-782ms / 8 线程 777ms
+  // （8 线程反而略慢，见 tools/asr/bench.html 的基准方法）
   const threads = isolated
     ? Math.min(4, Math.max(1, Math.ceil((self.navigator?.hardwareConcurrency || 2) / 2)))
     : 1;
   env.backends.onnx.wasm.numThreads = threads;
 
-  // 设备选择：跨源隔离时用 WASM 多线程（ORT 的 WebGPU 后端与 threaded
-  // WASM runtime 不能同时用 —— 实测 device:'webgpu' + threaded wasmPaths
-  // 会报 "webgpuInit is not a function"），否则用 WebGPU（如果可用），
-  // 都没有就用 asyncify 单线程 WASM。
+  // 设备选择按实测数据定，不要改成「隔离时优先 WebGPU」：
+  //   WASM 4 线程 720-782ms < WebGPU 1037-1158ms < WASM 单线程 1229-1295ms
+  //   （Whisper-tiny q8、2 秒音频、NVIDIA Ampere + 12 核，独立页面重复测量）
+  // 隔离时 GPU 反而更慢，且加载慢 3-5 倍；ORT 的 WebGPU 后端也需要
+  // asyncify wasmPaths，与 threaded wasmPaths 冲突（webgpuInit is not a function）。
+  // 非隔离时拿不到 SharedArrayBuffer，只能用 WebGPU 或单线程 WASM。
   const useWebGpu = !isolated && typeof navigator !== 'undefined' && !!navigator.gpu;
   log(isolated
     ? `跨源隔离已生效，WASM ${threads} 线程并行推理`
