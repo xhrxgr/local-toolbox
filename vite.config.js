@@ -8,14 +8,14 @@ import { copyFileSync, mkdirSync, existsSync, createReadStream } from 'fs';
 // ASR 页启用：为将来接入 sherpa-onnx 流式识别铺路。
 // 关键：必须给白名单页的所有响应（含 Worker 脚本）注入 COEP，
 // 只给导航注入会导致隔离页无法创建 Worker。详见 public/sw.js 注释。
-const COI_PATHS = ['/tools/asr/'];
+const COI_PATHS = ['/tools/asr/', '/tools/ffmpeg/'];
 // 生产 SW 除白名单页外，还要给隔离页用到的运行时资源注入 COEP：
 // - ORT 的 em-pthread 子 Worker 会自引用加载 asr-runtime/*.mjs
 // - @ffmpeg/ffmpeg 的 classWorkerURL 走 Vite 的 ?worker_file 转换，
 //   请求落在 /node_modules/@ffmpeg/ffmpeg/dist/esm/worker.js
 // dev 没有 SW，必须由服务器直接给这些路径加头，才能与生产行为一致。
 // 漏掉任意一个，隔离页里的 Worker 就会被 ERR_BLOCKED_BY_RESPONSE 拦掉。
-const COI_ASSET_RE = /\/(?:asr-runtime\/|asr-worker-[\w-]+\.js$|node_modules\/@ffmpeg\/|ffmpeg-core\.worker\.js$)/;
+const COI_ASSET_RE = /\/(?:asr-runtime\/|asr-worker-[\w-]+\.js$|node_modules\/@ffmpeg\/|ffmpeg-runtime\/|ffmpeg-core\.worker\.js$)/;
 
 // ONNX Runtime Web 的 wasm 运行时体积较大且由 npm 管理，
 // 构建时同步到工具目录并交给 Vite 作为静态资源处理（不入 git）

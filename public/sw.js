@@ -51,7 +51,7 @@ const MAX_ENTRIES = 250;
    改成全响应注入后，同源 Worker、HF 模型、ffmpeg core、tesseract 语言包
    实测均正常；只有 no-cors 的跨域 script 会被拦（项目里没有这种用法）。
    其他页面完全不走注入分支，行为与合并前一致。 */
-const COI_PATHS = ['/tools/asr/'];
+const COI_PATHS = ['/tools/asr/', '/tools/ffmpeg/'];
 const COI_MODE = 'credentialless';
 
 /* 带内容 hash 的静态资源：路径中含 8 位以上 hash 串 + 已知静态扩展名。
@@ -120,17 +120,23 @@ self.addEventListener('activate', (event) => {
  */
 const ASR_RUNTIME_RE = /\/asr-runtime\//;
 const ASR_WORKER_RE = /\/asr-worker-[\w-]+\.js$/;
+// ffmpeg 多线程内核的 pthread 子 Worker 与 @ffmpeg/ffmpeg 的 classWorkerURL
+// 都不在页面路径下，clientId 指向父 Worker，必须按资源路径单独认。
+const FFMPEG_RUNTIME_RE = /\/ffmpeg-runtime\//;
+const FFMPEG_WORKER_RE = /ffmpeg-core\.worker\.js$|@ffmpeg\/|ffmpeg-core\.js$/;
 
 async function isCoiRequest(event, url) {
   if (!COI_PATHS.length) return false;
   if (event.request.mode === 'navigate') return needsCoi(url);
-  if (ASR_RUNTIME_RE.test(url.pathname)) return true;
+  if (ASR_RUNTIME_RE.test(url.pathname) || FFMPEG_RUNTIME_RE.test(url.pathname)) return true;
   if (event.clientId) {
     const client = await self.clients.get(event.clientId);
     if (client) {
       const clientUrl = new URL(client.url);
       if (needsCoi(clientUrl)) return true;
-      if (ASR_RUNTIME_RE.test(clientUrl.pathname) || ASR_WORKER_RE.test(clientUrl.pathname)) return true;
+      const p = clientUrl.pathname;
+      if (ASR_RUNTIME_RE.test(p) || ASR_WORKER_RE.test(p)
+          || FFMPEG_RUNTIME_RE.test(p) || FFMPEG_WORKER_RE.test(p)) return true;
     }
   }
   return false;

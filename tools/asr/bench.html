@@ -12,7 +12,7 @@
   1. npm run dev -- --port 5199
   2. 本地模型放到仓库根的 .probe-model/onnx-community/whisper-tiny/resolve/main/
      （按 HF 的 URL 结构摆文件；从 huggingface.co 下载 7 个文件，约 42MB。
-      vite.config.js 的 serve-local-asr-model 插件会在 dev 时提供 /.probe-model/；
+      vite.config.js 的 serve-local-probe-assets 插件会在 dev 时提供 /.probe-model/；
       该目录已 gitignore，且不在 public/ 下，不会被拷进产物）
   3. 访问 /tools/asr/bench.html?cfg=配置名（可加 &threads=N 覆盖线程数）
      配置名见下方 CONFIGS；用 Playwright 等驱动脚本依次打开，

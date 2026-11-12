@@ -98,10 +98,11 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
  * hash 静态资源与跨域 CDN 资源走缓存优先，二次访问直接读本地。
  */
 // 需要跨源隔离的页面（与 public/sw.js 的 COI_PATHS 保持一致）。
-// ASR 页启用：为将来接入 sherpa-onnx 流式识别铺路（SharedArrayBuffer）。
-// SW 会给这些页面的所有响应（含 Worker 脚本）注入 COOP/COEP；
+// - ASR：WASM 多线程推理
+// - ffmpeg：@ffmpeg/core-mt 多线程转码（长视频实测约 2.2 倍）
+// SW 会给这些页面的所有响应（含各级 Worker 脚本）注入 COOP/COEP；
 // 首次访问需 reload 一次让隔离生效，见下方 setupCrossOriginIsolation()。
-const COI_PAGES = ['/tools/asr/'];
+const COI_PAGES = ['/tools/asr/', '/tools/ffmpeg/'];
 
 function inCoiPage() {
   const base = ((typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL) || '/').replace(/\/$/, '');

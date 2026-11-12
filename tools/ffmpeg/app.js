@@ -7,7 +7,20 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { showToast } from '/assets/js/toast.js';
 import { mountResourcePanel } from '/assets/js/resource-hub.js';
-import { FFMPEG_CORE_SOURCES, FFMPEG_CACHE_NAME, FFMPEG_CORE_FILES } from '/assets/js/resource-registry.js';
+import { pickFFmpegCore, siteBase, FFMPEG_CORE_ST } from '/assets/js/resource-registry.js';
+
+/* 内核选择：跨源隔离可用时走多线程 core-mt，否则回退单线程 core。
+   决策必须在模块加载时定一次，让「加载哪个内核」和「命令传多少线程」
+   永远一致 —— 两处各自判断会在 SW 接管时机上出现错配。 */
+const FFMPEG_ISOLATED = typeof self !== 'undefined' && self.crossOriginIsolated === true;
+let activeCore = pickFFmpegCore(FFMPEG_ISOLATED);
+/** 命令里的线程参数。多线程内核必须显式传 -threads N，
+    -threads 0（ffmpeg 语义「自动」）会让 ff.exec 静默卡死 >120s。 */
+function threadArgs() {
+  return activeCore.multiThread
+    ? ['-threads', String(activeCore.threads)]
+    : ['-threads', '0'];
+}
 
 /** HTML 转义：文件名、错误信息会进 innerHTML，必须转义 */
 function escapeHtml(s) {
@@ -135,12 +148,13 @@ function updateAmvOptionState() {
 }
 
 // 拉取单个 core 文件：先查所有源的缓存 → 命中直接返回；否则多源回退 fetch → 成功后写回缓存
-async function fetchCoreFile(file) {
-  const cache = ('caches' in window) ? await caches.open(FFMPEG_CACHE_NAME).catch(() => null) : null;
+// core 参数由调用方传入，单/多线程内核的 URL 与缓存名不同，不能混用
+async function fetchCoreFile(file, core) {
+  const cache = ('caches' in window) ? await caches.open(core.cacheName).catch(() => null) : null;
 
   // 1) 遍历源查缓存（任一源命中即可）
   if (cache) {
-    for (const base of FFMPEG_CORE_SOURCES) {
+    for (const base of core.sources) {
       const fullUrl = `${base}/${file.name}`;
       try {
         const cached = await cache.match(fullUrl);
@@ -154,7 +168,7 @@ async function fetchCoreFile(file) {
 
   // 2) 多源回退 fetch
   let lastErr = null;
-  for (const base of FFMPEG_CORE_SOURCES) {
+  for (const base of core.sources) {
     const fullUrl = `${base}/${file.name}`;
     try {
       const resp = await fetch(fullUrl);
@@ -199,24 +213,52 @@ async function loadFFmpeg() {
 let ffmpegLoadPromise = null;
 
 async function doLoadFFmpeg() {
-  // @ffmpeg/core 0.12.x 为单线程构建，不使用 SharedArrayBuffer，因此无需跨源隔离（COOP/COEP）。
-  // 依赖 GitHub Pages 等静态托管本就不配置 COOP/COEP 响应头，单线程内核在普通页面即可运行。
-
+  // 双内核：跨源隔离可用 → @ffmpeg/core-mt 多线程（长视频转码实测约 2.2 倍）；
+  // 不可用或多线程加载失败 → 回退 @ffmpeg/core 单线程，功能完全不受影响。
+  // 隔离由全局 SW 给白名单页注入 COOP/COEP 实现（见 public/sw.js）。
   const loadingSection = document.getElementById('loading-section');
   loadingSection.hidden = false;
   const loadingText = document.getElementById('loading-text');
   const originalText = loadingText?.textContent;
-  if (loadingText) loadingText.textContent = '正在加载 FFmpeg 内核（首次约 31MB，缓存后秒载）...';
 
-  ffmpeg = new FFmpeg();
-  ffmpeg.on('log', ({ message }) => { console.log('[FFmpeg]', message); });
+  /** 真正加载指定内核；失败时抛错，由外层决定要不要回退 */
+  async function loadCore(core) {
+    if (loadingText) {
+      loadingText.textContent = core.multiThread
+        ? '正在加载 FFmpeg 多线程内核（首次约 33MB，缓存后秒载）...'
+        : '正在加载 FFmpeg 内核（首次约 31MB，缓存后秒载）...';
+    }
+    const instance = new FFmpeg();
+    instance.on('log', ({ message }) => { console.log('[FFmpeg]', message); });
 
-  try {
-    // 并行拉取两个文件（每个内部自己处理缓存 + 多源回退）
-    const results = await Promise.all(FFMPEG_CORE_FILES.map(fetchCoreFile));
+    // 并行拉取 core.js 与 wasm（各自处理缓存 + 多源回退）
+    const results = await Promise.all(core.files.map((f) => fetchCoreFile(f, core)));
     const cacheHit = results.every(r => r.cacheHit);
     if (loadingText && cacheHit) loadingText.textContent = '正在从本地缓存加载 FFmpeg 内核...';
-    await ffmpeg.load({ coreURL: results[0].blobUrl, wasmURL: results[1].blobUrl });
+
+    const loadCfg = { coreURL: results[0].blobUrl, wasmURL: results[1].blobUrl };
+    if (core.multiThread) {
+      // pthread 子 Worker 的脚本必须同源，且不能用 Blob URL：
+      // Emscripten 靠 workerURL 推导相对路径来定位自身脚本。
+      // 站点内自托管一份，由 SW 给它注入 COEP 头。
+      loadCfg.workerURL = siteBase() + core.workerFile;
+    }
+    await instance.load(loadCfg);
+    return instance;
+  }
+
+  try {
+    if (!FFMPEG_ISOLATED) activeCore = FFMPEG_CORE_ST;
+    try {
+      ffmpeg = await loadCore(activeCore);
+    } catch (err) {
+      if (!activeCore.multiThread) throw err;
+      // 多线程内核不可用（CDN 故障 / 浏览器不支持）：降级重来，不让工具报废
+      console.warn('[FFmpeg] 多线程内核加载失败，回退单线程:', err.message);
+      activeCore = FFMPEG_CORE_ST;
+      if (loadingText) loadingText.textContent = '多线程内核不可用，正在回退单线程内核...';
+      ffmpeg = await loadCore(activeCore);
+    }
     // 检测内核支持的编码器/复用器（await 确保后续 pre-check 能用）
     await detectFFmpegCapabilities().catch(e => console.warn('[FFmpeg] 能力检测失败:', e.message));
   } catch (err) {
@@ -591,7 +633,7 @@ async function executeConvert(file, onStage) {
     const acodec = document.getElementById('audio-codec').value;
     const abitrate = document.getElementById('audio-bitrate').value;
     const customAbitrate = document.getElementById('custom-abitrate').value;
-    args.push('-vn', '-threads', '0');
+    args.push('-vn', ...threadArgs());
     // 格式→编码器自动映射：某些音频容器要求特定编码器
     const audioFormatCodecMap = {
       wma: 'wmav2',
@@ -622,7 +664,7 @@ async function executeConvert(file, onStage) {
     const deinterlace = document.querySelector('input[name="deinterlace"]:checked')?.value || 'auto';
     const needDeinterlace = deinterlace === 'on' || (deinterlace === 'auto' && ['mts', 'm2ts', 'ts', 'mod'].includes(inputExt));
 
-    args.push('-threads', '0');
+    args.push(...threadArgs());
     let actualVcodec = vcodec;
     if (needDeinterlace && vcodec === 'copy') actualVcodec = 'libx264';
 
@@ -701,7 +743,7 @@ async function executeConvert(file, onStage) {
     newArgs.push('-vf', `scale=${amvW}:${amvH}`, '-pix_fmt', 'yuvj420p', '-r', String(amvFps),
       '-c:v', 'amv', '-c:a', 'adpcm_ima_amv', '-ac', '1', '-ar', '22050',
       '-block_size', String(blockSize),
-      '-threads', '0', '-f', 'amv', '-y', outputName);
+      ...threadArgs(), '-f', 'amv', '-y', outputName);
     args.length = 0;
     args.push(...newArgs);
   }
@@ -781,7 +823,7 @@ async function executeImageConvert(file, onStage) {
   onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
-  const args = ['-i', inputName, '-threads', '0'];
+  const args = ['-i', inputName, ...threadArgs()];
   if (outputFormat === 'jpg') args.push('-q:v', q.jpg_q);
   else if (outputFormat === 'png') args.push('-compression_level', '6');
   else if (outputFormat === 'webp') args.push('-quality', q.webp_q);
@@ -861,7 +903,7 @@ async function executeVideoFormatConvert(file, onStage) {
   onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
-  const args = ['-i', inputName, '-threads', '0'];
+  const args = ['-i', inputName, ...threadArgs()];
   if (outputFormat === 'gif') {
     // GIF 特殊处理：不输出音频，强制 gif 编码器
     args.push('-an', '-c:v', 'gif');
@@ -943,7 +985,7 @@ async function executeVideoFrameExtract(file, onStage) {
     '-ss', String(seekTime),
     '-i', inputName,
     '-frames:v', '1',
-    '-threads', '0',
+    ...threadArgs(),
     '-q:v', '2',  // 默认高质量
     outputName,
   ];
@@ -1015,11 +1057,14 @@ async function executeAudioConvert(file, onStage) {
   onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
-  const args = ['-i', inputName, '-vn', '-threads', '0', '-c:a', codec];
+  const args = ['-i', inputName, '-vn', ...threadArgs(), '-c:a', codec];
   // 码率仅对有损格式生效；选择"无损"时对有损格式忽略
   if (!isLossless && bitrate !== 'lossless') {
     args.push('-b:a', bitrate);
   }
+  // 输出文件名必须在最后。原先漏了这一行，ffmpeg 报
+  // "At least one output file must be specified"，音频转换模式一直不可用。
+  args.push(outputName);
 
   const progressHandler = ({ progress }) => {
     if (!isFinite(progress)) return;
@@ -1083,7 +1128,7 @@ async function executeExtract(file, onStage) {
   onStage(Stage.READ_FILE, `正在读取 ${file.name}...`, 10);
   await ffmpeg.writeFile(inputName, await fetchFile(file));
 
-  const args = ['-i', inputName, '-vn', '-threads', '0'];
+  const args = ['-i', inputName, '-vn', ...threadArgs()];
   if (format === 'copy') {
     args.push('-c:a', 'copy');
   } else {
@@ -1171,7 +1216,7 @@ async function executeTrim(file, onStage) {
     args.push('-c', 'copy');
   } else {
     args.push('-i', inputName);
-    args.push('-threads', '0');
+    args.push(...threadArgs());
     if (startTime > 0) args.push('-ss', startTime.toString());
     if (endTime !== null && !isNaN(endTime)) {
       const dur = endTime - startTime;
@@ -1204,7 +1249,7 @@ async function executeTrim(file, onStage) {
     newArgs.push('-vf', 'scale=160:128', '-pix_fmt', 'yuvj420p', '-r', String(amvFps),
       '-c:v', 'amv', '-c:a', 'adpcm_ima_amv', '-ac', '1', '-ar', '22050',
       '-block_size', String(blockSize),
-      '-threads', '0', '-f', 'amv', '-y', outputName);
+      ...threadArgs(), '-f', 'amv', '-y', outputName);
     args.length = 0;
     args.push(...newArgs);
   } else {
@@ -1418,7 +1463,7 @@ async function forcePlayVideo(file) {
       '-vf', vfStr,
       '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode', '-crf', '23',
       '-an',
-      '-threads', '0',
+      ...threadArgs(),
       '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
       '-y', outputName,
     ];
@@ -1450,7 +1495,7 @@ async function forcePlayVideo(file) {
               '-i', inputName,
               '-vf', fallbackVf,
               '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode', '-crf', '23',
-              '-an', '-threads', '0',
+              '-an', ...threadArgs(),
               '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
               '-y', outputName,
             ]);
@@ -1460,7 +1505,7 @@ async function forcePlayVideo(file) {
             await ffmpeg.exec([
               '-i', inputName,
               '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode', '-crf', '23',
-              '-an', '-threads', '0',
+              '-an', ...threadArgs(),
               '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
               '-y', outputName,
             ]);

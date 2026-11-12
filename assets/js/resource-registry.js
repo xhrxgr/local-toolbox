@@ -66,23 +66,118 @@ async function allCached(urls) {
   return true;
 }
 
-/* ========== ffmpeg 转换内核 ========== */
-export const FFMPEG_CORE_VERSION = '0.12.6';
-export const FFMPEG_CORE_SOURCES = [
-  `https://unpkg.com/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
-  `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
-  `https://fastly.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
-  `https://esm.sh/@ffmpeg/core@${FFMPEG_CORE_VERSION}/dist/esm`,
-];
-export const FFMPEG_CACHE_NAME = `ffmpeg-core-v${FFMPEG_CORE_VERSION}`;
-export const FFMPEG_CORE_FILES = [
-  { name: 'ffmpeg-core.js', mime: 'text/javascript', size: 114494 },
-  { name: 'ffmpeg-core.wasm', mime: 'application/wasm', size: 32129114 },
-];
+/* ========== ffmpeg 转换内核（双内核） ==========
+ * 跨源隔离可用时用 @ffmpeg/core-mt 多线程内核（实测 12s 720p 转码快约 2.2 倍），
+ * 不可用（老浏览器 / SW 未接管 / 隔离失败）时回退到 @ffmpeg/core 单线程内核。
+ *
+ * 实测约束（见 tools/asr/ffmpeg-bench.html 的基准数据）：
+ * - 多线程内核必须显式传 -threads N，现有代码的 -threads 0 会静默卡死
+ * - pthread 子 Worker 的 ffmpeg-core.worker.js 必须同源（不能用 Blob URL，
+ *   也不能走跨域 CDN），所以站点内自托管一份，由 SW 注入 COEP 头。
+ * - 两个内核版本不同，缓存名必须分开，否则会互相覆盖。
+ */
+export const FFMPEG_CORE_ST_VERSION = '0.12.6';
+export const FFMPEG_CORE_MT_VERSION = '0.12.10';
+
+function coreSources(pkg, version) {
+  return [
+    `https://unpkg.com/${pkg}@${version}/dist/esm`,
+    `https://cdn.jsdelivr.net/npm/${pkg}@${version}/dist/esm`,
+    `https://fastly.jsdelivr.net/npm/${pkg}@${version}/dist/esm`,
+    `https://esm.sh/${pkg}@${version}/dist/esm`,
+  ];
+}
+
+/** 单线程内核（回退用）：2 个文件 */
+export const FFMPEG_CORE_ST = {
+  version: FFMPEG_CORE_ST_VERSION,
+  sources: coreSources('@ffmpeg/core', FFMPEG_CORE_ST_VERSION),
+  cacheName: `ffmpeg-core-v${FFMPEG_CORE_ST_VERSION}`,
+  files: [
+    { name: 'ffmpeg-core.js', mime: 'text/javascript', size: 114494 },
+    { name: 'ffmpeg-core.wasm', mime: 'application/wasm', size: 32129114 },
+  ],
+  multiThread: false,
+};
+
+/** 多线程内核：3 个文件。worker.js 由站点同源提供，不走这里的多源回退 */
+export const FFMPEG_CORE_MT = {
+  version: FFMPEG_CORE_MT_VERSION,
+  sources: coreSources('@ffmpeg/core-mt', FFMPEG_CORE_MT_VERSION),
+  cacheName: `ffmpeg-core-mt-v${FFMPEG_CORE_MT_VERSION}`,
+  files: [
+    { name: 'ffmpeg-core.js', mime: 'text/javascript', size: 128947 },
+    { name: 'ffmpeg-core.wasm', mime: 'application/wasm', size: 32718323 },
+  ],
+  workerFile: 'ffmpeg-runtime/ffmpeg-core.worker.js',
+  multiThread: true,
+  threads: 4,
+};
+
+/** 站点 base 前缀（GitHub Pages 是 /local-toolbox/） */
+export function siteBase() {
+  return (typeof import.meta.env !== 'undefined' && import.meta.env.BASE_URL) || '/';
+}
+
+/** 按当前隔离状态选内核。isolated 由调用方传入，本模块不碰 window */
+export function pickFFmpegCore(isolated) {
+  return isolated ? FFMPEG_CORE_MT : FFMPEG_CORE_ST;
+}
 
 /** 某个源下的完整文件 URL 列表 */
-function ffmpegUrls(base) {
-  return FFMPEG_CORE_FILES.map((f) => `${base}/${f.name}`);
+function ffmpegUrls(core, base) {
+  return core.files.map((f) => `${base}/${f.name}`);
+}
+
+/** 生成一个 ffmpeg 内核资源条目（单/多线程各一份，共用下载与清理逻辑） */
+function makeFFmpegCoreResource(core, { id, name, desc }) {
+  const totalSize = core.files.reduce((sum, f) => sum + f.size, 0);
+  return {
+    id,
+    name,
+    desc,
+    size: totalSize,
+    files: ffmpegUrls(core, core.sources[0]),
+    async isCached() {
+      for (const base of core.sources) {
+        if (await allCached(ffmpegUrls(core, base))) return true;
+      }
+      return false;
+    },
+    async download(onProgress) {
+      const cache = ('caches' in window) ? await caches.open(core.cacheName).catch(() => null) : null;
+      let lastErr = null;
+      for (const base of core.sources) {
+        try {
+          let loaded = 0;
+          for (const file of core.files) {
+            const buf = await fetchWithProgress(`${base}/${file.name}`, (l) => {
+              loaded = l;
+              onProgress?.(l, file.size);
+            });
+            if (cache) {
+              try { await cache.put(`${base}/${file.name}`, new Response(buf)); } catch { /* 配额不足时本次仍可用 */ }
+            }
+          }
+          onProgress?.(totalSize, totalSize);
+          return;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw new Error(`所有 CDN 源均不可用：${lastErr?.message || '未知错误'}`);
+    },
+    async remove() {
+      for (const name of await caches.keys()) {
+        const cache = await caches.open(name);
+        for (const base of core.sources) {
+          for (const url of ffmpegUrls(core, base)) {
+            try { await cache.delete(url); } catch { /* 忽略 */ }
+          }
+        }
+      }
+    },
+  };
 }
 
 /* ========== OCR 运行时与语言包 ========== */
@@ -162,60 +257,16 @@ export const RESOURCE_GROUPS = [
     title: '多媒体转换',
     toolPath: '/tools/ffmpeg/',
     resources: [
-      {
+      makeFFmpegCoreResource(FFMPEG_CORE_MT, {
+        id: 'ffmpeg-core-mt',
+        name: 'FFmpeg 多线程内核',
+        desc: '跨源隔离环境下使用的 @ffmpeg/core-mt（含 pthread 子 Worker）。实测长视频转码比单线程快约 2 倍。现代浏览器走这一套。',
+      }),
+      makeFFmpegCoreResource(FFMPEG_CORE_ST, {
         id: 'ffmpeg-core',
-        name: 'FFmpeg 转换内核',
-        desc: '音视频转码用的 wasm 内核（ffmpeg-core.js + ffmpeg-core.wasm），多源回退下载，命中缓存后转码不再等待联网。',
-        size: 114494 + 32129114,
-        files: ffmpegUrls(FFMPEG_CORE_SOURCES[0]),
-        async isCached() {
-          for (const base of FFMPEG_CORE_SOURCES) {
-            if (await allCached(ffmpegUrls(base))) return true;
-          }
-          return false;
-        },
-        async download(onProgress) {
-          const cache = ('caches' in window) ? await caches.open(FFMPEG_CACHE_NAME).catch(() => null) : null;
-          let lastErr = null;
-          for (const base of FFMPEG_CORE_SOURCES) {
-            try {
-              let loaded = 0;
-              for (const file of FFMPEG_CORE_FILES) {
-                const buf = await fetchWithProgress(`${base}/${file.name}`, (l) => {
-                  loaded = l;
-                  onProgress?.(l, file.size);
-                });
-                if (cache) {
-                  try {
-                    await cache.put(`${base}/${file.name}`, new Response(buf));
-                  } catch {
-                    /* 配额不足时本次仍可用 */
-                  }
-                }
-              }
-              onProgress?.(loaded + FFMPEG_CORE_FILES[0].size, FFMPEG_CORE_FILES[0].size + FFMPEG_CORE_FILES[1].size);
-              return;
-            } catch (e) {
-              lastErr = e;
-            }
-          }
-          throw new Error(`所有 CDN 源均不可用：${lastErr?.message || '未知错误'}`);
-        },
-        async remove() {
-          for (const name of await caches.keys()) {
-            const cache = await caches.open(name);
-            for (const base of FFMPEG_CORE_SOURCES) {
-              for (const url of ffmpegUrls(base)) {
-                try {
-                  await cache.delete(url);
-                } catch {
-                  /* 忽略 */
-                }
-              }
-            }
-          }
-        },
-      },
+        name: 'FFmpeg 单线程内核',
+        desc: '不支持跨源隔离时的回退内核（@ffmpeg/core）。功能完整但长视频转码较慢；保留预下载可让老浏览器也离线可用。',
+      }),
     ],
   },
   {

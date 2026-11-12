@@ -298,7 +298,8 @@ const LIBRARY_FILES = new Set([
 /* 缓存组名 → 可读名称（toolbox-v1 是站点自身缓存，其余是工具专用缓存） */
 function describeGroup(name) {
   if (name.startsWith('toolbox')) return '站点页面与静态资源';
-  if (name.startsWith('ffmpeg-core')) return 'FFmpeg 转换内核';
+  if (name.startsWith('ffmpeg-core-mt')) return 'FFmpeg 多线程内核';
+  if (name.startsWith('ffmpeg-core')) return 'FFmpeg 单线程内核';
   if (name.startsWith('inkerase-models')) return '扫描文档去手写模型';
   return name;
 }
