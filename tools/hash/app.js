@@ -5,6 +5,67 @@
  */
 
 import { copyText, flashHint } from '/assets/js/clipboard.js';
+import { md5 } from './md5.js';
+
+/* ========== MD5 走 Worker ========== */
+// 纯 JS 的 MD5 是同步的：20MB 文件会在主线程阻塞 329ms、100MB 约 1.6 秒，
+// 期间界面完全无响应。交给 Worker 后主线程只等一个 Promise。
+let md5Worker = null;
+let md5Broken = false;   // Worker 建不起来或中途挂了，之后一律走同步实现
+let md5Seq = 0;
+const md5Pending = new Map();
+
+function getMd5Worker() {
+  if (md5Worker) return md5Worker;
+  const w = new Worker(new URL('./md5-worker.js', import.meta.url), { type: 'module' });
+  w.onmessage = (e) => {
+    const { id, out, error } = e.data;
+    const p = md5Pending.get(id);
+    if (!p) return;
+    md5Pending.delete(id);
+    if (error) p.reject(new Error(error));
+    else p.resolve(new Uint8Array(out));
+  };
+  w.onerror = () => {
+    // 缓冲区已经转移给 Worker，拿不回来，只能让排队的请求明确失败 ——
+    // 用空的 buffer 重算会得到一个正确格式但内容错误的哈希，那更糟。
+    for (const [, p] of md5Pending) p.reject(new Error('MD5 计算线程异常退出'));
+    md5Pending.clear();
+    md5Broken = true;
+    md5Worker = null;
+  };
+  md5Worker = w;
+  return w;
+}
+
+/** 计算 MD5：优先交给 Worker，建不起 Worker 时同步算 */
+function md5Async(bytes) {
+  let w = null;
+  if (!md5Broken) {
+    try {
+      w = getMd5Worker();
+    } catch {
+      md5Broken = true;
+    }
+  }
+  if (!w) return Promise.resolve(md5(bytes));
+
+  const id = ++md5Seq;
+  return new Promise((resolve, reject) => {
+    md5Pending.set(id, { resolve, reject });
+    // 只在「整个 buffer 就是这个视图」时转移，否则会连带丢掉视图外的数据
+    const whole = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength;
+    try {
+      if (whole) w.postMessage({ id, buf: bytes.buffer }, [bytes.buffer]);
+      else w.postMessage({ id, buf: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
+    } catch {
+      // postMessage 失败时缓冲区还没转移，同步算一份是安全的
+      md5Pending.delete(id);
+      md5Broken = true;
+      resolve(md5(bytes));
+    }
+  });
+}
 
 /* ========== Tab 切换 ========== */
 function switchTab(mode) {
@@ -200,104 +261,12 @@ async function copyAllUuids() {
   }
 }
 
-/* ========== MD5（纯 JS，RFC 1321） ========== */
-// crypto.subtle 不支持 MD5，需自行实现
-const MD5_S = [
-  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
-];
-const MD5_K = (() => {
-  const k = new Array(64);
-  for (let i = 0; i < 64; i++) {
-    // T[i] = floor(2^32 * abs(sin(i+1)))
-    k[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 0x100000000);
-  }
-  return k;
-})();
-
-function md5(input) {
-  // input: Uint8Array → Uint8Array(16)
-  const origLen = input.length;
-  const bitLen = origLen * 8; // JS Number 精度足够（文件大小远小于 2^50 字节）
-
-  // 填充：0x80 + 0x00 至长度 ≡ 56 (mod 64)，再加 8 字节小端长度
-  const padLen = (56 - ((origLen + 1) % 64) + 64) % 64;
-  const totalLen = origLen + 1 + padLen + 8;
-  const msg = new Uint8Array(totalLen);
-  msg.set(input);
-  msg[origLen] = 0x80;
-  // 64 位小端 bit 长度
-  const low = bitLen >>> 0;
-  const high = Math.floor(bitLen / 0x100000000) >>> 0;
-  msg[totalLen - 8] = low & 0xff;
-  msg[totalLen - 7] = (low >>> 8) & 0xff;
-  msg[totalLen - 6] = (low >>> 16) & 0xff;
-  msg[totalLen - 5] = (low >>> 24) & 0xff;
-  msg[totalLen - 4] = high & 0xff;
-  msg[totalLen - 3] = (high >>> 8) & 0xff;
-  msg[totalLen - 2] = (high >>> 16) & 0xff;
-  msg[totalLen - 1] = (high >>> 24) & 0xff;
-
-  let a0 = 0x67452301;
-  let b0 = 0xefcdab89;
-  let c0 = 0x98badcfe;
-  let d0 = 0x10325476;
-
-  for (let chunk = 0; chunk < totalLen; chunk += 64) {
-    const M = new Array(16);
-    for (let i = 0; i < 16; i++) {
-      const off = chunk + i * 4;
-      M[i] = (msg[off] | (msg[off + 1] << 8) | (msg[off + 2] << 16) | (msg[off + 3] << 24)) >>> 0;
-    }
-    let A = a0, B = b0, C = c0, D = d0;
-    for (let i = 0; i < 64; i++) {
-      let F, g;
-      if (i < 16) {
-        F = (B & C) | (~B & D);
-        g = i;
-      } else if (i < 32) {
-        F = (D & B) | (~D & C);
-        g = (5 * i + 1) % 16;
-      } else if (i < 48) {
-        F = B ^ C ^ D;
-        g = (3 * i + 5) % 16;
-      } else {
-        F = C ^ (B | ~D);
-        g = (7 * i) % 16;
-      }
-      F = (F + A + MD5_K[i] + M[g]) >>> 0;
-      A = D;
-      D = C;
-      C = B;
-      const shift = MD5_S[i];
-      // 32 位循环左移
-      B = (B + (((F << shift) | (F >>> (32 - shift))) >>> 0)) >>> 0;
-    }
-    a0 = (a0 + A) >>> 0;
-    b0 = (b0 + B) >>> 0;
-    c0 = (c0 + C) >>> 0;
-    d0 = (d0 + D) >>> 0;
-  }
-
-  const out = new Uint8Array(16);
-  const words = [a0, b0, c0, d0];
-  for (let i = 0; i < 4; i++) {
-    const w = words[i];
-    out[i * 4] = w & 0xff;
-    out[i * 4 + 1] = (w >>> 8) & 0xff;
-    out[i * 4 + 2] = (w >>> 16) & 0xff;
-    out[i * 4 + 3] = (w >>> 24) & 0xff;
-  }
-  return out;
-}
 
 /* ========== 哈希计算 ========== */
 // 返回 { fn, block }：fn(Uint8Array) => Promise<Uint8Array>，block 为 HMAC 块大小
 function getHashFn(algo) {
   if (algo === 'MD5') {
-    return { fn: (b) => Promise.resolve(md5(b)), block: 64 };
+    return { fn: md5Async, block: 64 };
   }
   const block = algo === 'SHA-512' ? 128 : 64;
   return {

@@ -178,8 +178,25 @@ function initRadix() {
   const treatAsNum = $('radix-treat-as-num');
   const metaEl = $('radix-meta');
 
+  // 输入长度上限：转换是平方复杂度，4000 字符约 300ms，再长就会明显卡顿
+  const RADIX_MAX_INPUT = 4000;
+
   function convert() {
-    const input = inputEl.value.trim();
+    // 守卫必须在这里，不能只挂在输入防抖上：
+    // 「转换」按钮、源类型下拉、数值模式开关都是直接调 convert()，
+    // 绕过了外面那层检查。实测 4000 字符约 300ms、8000 字符 1190ms，
+    // 10 万字符要两分钟以上（base58/62 的 BigInt 逐位除法是平方复杂度）。
+    const raw = inputEl.value;
+    if (raw.length > RADIX_MAX_INPUT) {
+      // 先清空输出再写提示：clearOutputs 会把 meta 一起清掉
+      clearOutputs();
+      metaEl.textContent = `输入过长（${raw.length.toLocaleString()} 字符），超出 ${RADIX_MAX_INPUT.toLocaleString()} 上限。` +
+        '转换耗时随长度平方增长，请分段处理';
+      metaEl.classList.add('field-error');
+      return;
+    }
+
+    const input = raw.trim();
     if (!input) {
       clearOutputs();
       return;
@@ -289,6 +306,7 @@ function initRadix() {
   function clearOutputs() {
     document.querySelectorAll('.radix-output').forEach(el => el.value = '');
     metaEl.textContent = '';
+    metaEl.classList.remove('field-error');
   }
 
   $('btn-convert').addEventListener('click', convert);
@@ -298,25 +316,11 @@ function initRadix() {
   });
 
   // 实时转换（输入或源类型变化时）
-  // 防抖 + 长度上限：原来每敲一个键就全量重算（BigInt 逐位乘除），
-  // 而且没有任何长度限制，粘进去一深度二进制就会卡死
+  // 防抖：原来每敲一个键就全量重算（BigInt 逐位乘除）
   let radixTimer = null;
-  const RADIX_MAX_INPUT = 100000; // 10 万字符
   inputEl.addEventListener('input', () => {
     clearTimeout(radixTimer);
-    radixTimer = setTimeout(() => {
-      if (inputEl.value.length > RADIX_MAX_INPUT) {
-        const meta = document.getElementById('radix-meta');
-        if (meta) {
-          meta.textContent = '输入过长（' + inputEl.value.length.toLocaleString() +
-            ' 字符），超出 ' + RADIX_MAX_INPUT.toLocaleString() +
-            ' 上限。转换耗时随长度指数上升，请分段处理';
-          meta.classList.add('field-error');
-        }
-        return;
-      }
-      convert();
-    }, 200);
+    radixTimer = setTimeout(convert, 200);
   });
   sourceSel.addEventListener('change', convert);
   treatAsNum.addEventListener('change', convert);

@@ -86,6 +86,22 @@ async function generate() {
   const fg = document.getElementById('qr-fg').value;
   const bg = document.getElementById('qr-bg').value;
 
+  // 二维码的理论上限是 version 40-L 的纯数字模式 7089 字符。超过这个数
+  // 无论什么编码模式都放不下，先拦掉 —— 否则要等库把数据编码一遍才失败。
+  // 用字符数而不是字节数判断：5000 个数字看似 5000 字节，但数字模式下能装下。
+  const QR_ABS_MAX_CHARS = 7089;
+  if (text.length > QR_ABS_MAX_CHARS) {
+    img.hidden = true;
+    img.removeAttribute('src');
+    empty.hidden = false;
+    btnPng.disabled = true;
+    btnSvg.disabled = true;
+    lastDataUrl = '';
+    lastSvg = '';
+    showMetaError(`内容过长（${text.length.toLocaleString()} 字符），二维码最多容纳 ${QR_ABS_MAX_CHARS.toLocaleString()} 个字符。请缩短内容或改用短链接`);
+    return;
+  }
+
   try {
     const dataUrl = await QRCode.toDataURL(text, {
       errorCorrectionLevel: level,
