@@ -17,6 +17,8 @@ export function initLlm() {
   const hintEl = $('llm-hint');
   const sendBtn = $('btn-send');
   const loadBtn = $('btn-load');
+  const importBtn = $('btn-import');
+  const fileInput = $('llm-files');
 
   let worker = null;
   let ready = false;
@@ -73,10 +75,15 @@ export function initLlm() {
           busy = false;
           sendBtn.disabled = false;
           loadBtn.disabled = false;
+          importBtn.disabled = false;
           if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
           progressBox.hidden = true;
           setStatus(`已就绪 · ${m.label} · 本地推理`, 'ready');
           hintEl.textContent = '对话内容只在本机处理。模型能力有限，回答仅供参考。';
+          break;
+        case 'local-ready':
+          setStatus(`已导入 ${m.count} 个本地模型文件，点击「加载模型」开始`, 'ready');
+          loadBtn.disabled = false;
           break;
         case 'token':
           if (currentAI) {
@@ -98,6 +105,7 @@ export function initLlm() {
           busy = false;
           sendBtn.disabled = !ready;
           loadBtn.disabled = false;
+          importBtn.disabled = false;
           if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
           break;
       }
@@ -107,6 +115,7 @@ export function initLlm() {
       busy = false;
       sendBtn.disabled = !ready;
       loadBtn.disabled = false;
+      importBtn.disabled = false;
     };
     return worker;
   }
@@ -129,6 +138,41 @@ export function initLlm() {
   }
 
   loadBtn.addEventListener('click', startLoad);
+
+  importBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const files = [...fileInput.files];
+    if (!files.length) return;
+    ready = false;
+    sendBtn.disabled = true;
+    importBtn.disabled = true;
+    setStatus(`正在读取 ${files.length} 个本地文件…`);
+    try {
+      const payload = files.map((f) => ({
+        // webkitRelativePath 形如 "模型文件夹/onnx/model_q4f16.onnx"
+        name: (f.webkitRelativePath || f.name).split('/').slice(1).join('/') || f.name,
+        file: f,
+      }));
+      getWorker().postMessage({ type: 'local-files', files: payload });
+      // 本地文件夹自带 config.json，模型 ID 不再由下拉决定。
+      // 用一个不可见的哨兵值标记，避免用户误以为在用下拉里那个模型。
+      let sentinel = modelSel.querySelector('option[value="local"]');
+      if (!sentinel) {
+        sentinel = document.createElement('option');
+        sentinel.value = 'local';
+        sentinel.textContent = '本地导入的模型';
+        modelSel.insertBefore(sentinel, modelSel.firstChild);
+      }
+      modelSel.value = 'local';
+      setStatus(`已导入 ${files.length} 个文件，点击「加载模型」开始`, 'ready');
+    } catch (e) {
+      setStatus('读取本地文件失败：' + e.message, 'error');
+    } finally {
+      importBtn.disabled = false;
+      fileInput.value = '';
+    }
+  });
 
   modelSel.addEventListener('change', () => {
     ready = false;

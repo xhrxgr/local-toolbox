@@ -5,12 +5,21 @@
  * Cache Storage，之后可离线使用。
  *
  * 协议：
- *   入 { type: 'load'|'generate'|'reset', model?, prompt?, maxTokens?, host? }
- *   出 { type: 'log'|'progress'|'model-ready'|'token'|'done'|'error', ... }
+ *   入 { type: 'load'|'generate'|'reset'|'local-files',
+ *        model?, prompt?, maxTokens?, host?, files? }
+ *   出 { type: 'log'|'progress'|'model-ready'|'token'|'done'|'error'|'local-ready', ... }
+ *
+ * 本地模型文件：主线程把用户选中的文件夹（File 列表）传进来，
+ * 这里覆盖 env.fetch 优先从这些文件返回 Response，没有的再走网络。
  */
 import { pipeline, env, TextStreamer } from '@huggingface/transformers';
 
 const MODELS = {
+  local: {
+    id: 'local/imported-model',   // 仅作占位；文件由 env.fetch 从本地 Map 提供
+    label: '本地导入模型',
+    dtype: 'q4f16',
+  },
   qwen: {
     id: 'onnx-community/Qwen2.5-0.5B-Instruct',
     label: 'Qwen2.5-0.5B',
@@ -31,6 +40,44 @@ let messages = [];          // 对话上下文 [{role, content}]
 let currentStreamText = '';
 let host = HOST_OFFICIAL;
 
+// 用户导入的本地模型文件：Map<文件名或相对路径, File>
+let localFiles = new Map();
+const originalFetch = env.fetch;
+
+/** 覆盖 env.fetch：本地文件优先，未命中的交给原始 fetch */
+function installLocalFetch() {
+  env.fetch = async (urlOrPath, opts) => {
+    const raw = typeof urlOrPath === 'string' ? urlOrPath : urlOrPath.toString();
+    // 取路径里最后两段做键，兼容 "onnx/model_q4f16.onnx" 这种子目录
+    let pathname = raw;
+    try { pathname = new URL(raw).pathname; } catch { /* 相对路径直接用 */ }
+    const clean = decodeURIComponent(pathname).replace(/^\/+/, '');
+    const parts = clean.split('/');
+    const basename = parts[parts.length - 1];
+    const rel = parts.slice(-2).join('/');
+
+    const file = localFiles.get(clean) || localFiles.get(rel) || localFiles.get(basename)
+      || [...localFiles].find(([k]) => k.endsWith('/' + basename))?.[1];
+    if (file) {
+      post('log', { message: `使用本地文件：${basename}` });
+      return new Response(file, {
+        status: 200,
+        headers: { 'Content-Type': 'application/octet-stream' },
+      });
+    }
+    // 本地文件没覆盖到，且是模型文件 → 明确失败，避免误从网络下载同名文件
+    if (/\.(json|onnx|model|safetensors|txt)$/i.test(basename)) {
+      throw new Error(`本地模型缺少文件：${basename}（已导入 ${localFiles.size} 个文件）`);
+    }
+    // WASM 运行时等非模型资源仍走原始 fetch
+    return originalFetch(urlOrPath, opts);
+  };
+}
+
+function restoreFetch() {
+  env.fetch = originalFetch;
+}
+
 function post(type, data = {}) {
   self.postMessage({ type, ...data });
 }
@@ -38,7 +85,7 @@ function post(type, data = {}) {
 function setupEnv() {
   env.allowLocalModels = false;
   env.remoteHost = host;
-  env.useBrowserCache = true;
+  env.useBrowserCache = localFiles.size === 0;  // 本地文件模式不能读缓存里的旧模型
   env.useWasmCache = false; // WASM 由 SW 缓存，不重复存
   const base = (import.meta.env?.BASE_URL || '/').replace(/\/$/, '');
   const wasmBase = `${self.location.origin}${base}/asr-runtime/`;
@@ -51,7 +98,6 @@ function setupEnv() {
     mjs: wasmBase + wasmFile + '.mjs',
   };
   env.backends.onnx.wasm.numThreads = 1;
-  return { isolated, threads: env.backends.onnx.wasm.numThreads };
 }
 
 async function ensureModel(key, requestedHost) {
@@ -65,13 +111,18 @@ async function ensureModel(key, requestedHost) {
   if (loadPromise) return loadPromise;
 
   const cfg = MODELS[key] || MODELS.qwen;
-  const envInfo = setupEnv();
+  setupEnv();
+  const usingLocal = localFiles.size > 0;
+  if (usingLocal) installLocalFetch();
   post('log', {
-    message: `正在加载 ${cfg.label}（单线程 WASM，约 ${(cfg.dtype === 'q4f16' ? '112~460' : '300')}MB）…`,
+    message: usingLocal
+      ? `正在从本地文件加载 ${cfg.label}…`
+      : `正在加载 ${cfg.label}（单线程 WASM，约 112~460MB）…`,
   });
 
+  const dtype = key === 'local' ? detectLocalDtype() : cfg.dtype;
   loadPromise = pipeline('text-generation', cfg.id, {
-    dtype: cfg.dtype,
+    dtype,
     device: 'wasm',
     progress_callback: (e) => {
       if (e.status === 'progress' && typeof e.progress === 'number') {
@@ -94,7 +145,19 @@ async function ensureModel(key, requestedHost) {
   return loadPromise;
 }
 
-/** 用 tokenizer 内置的 chat 模板拼提示词，避免手写标记与模型模板不一致 */
+/** 从导入的文件名推断 dtype：model_q4f16.onnx -> q4f16 */
+function detectLocalDtype() {
+  for (const name of localFiles.keys()) {
+    const m = /(?:^|\/)model_([a-z0-9]+)\.onnx$/i.exec(name);
+    if (m) {
+      const d = m[1].toLowerCase();
+      // Transformers.js 认识的 dtype 名
+      if (['q4', 'q4f16', 'int8', 'uint8', 'fp16', 'bnb4', 'q4f16'].includes(d)) return d;
+      if (d === 'quantized') return 'q8';
+    }
+  }
+  return 'q4f16'; // 兜底
+}
 
 async function generate(prompt, maxTokens) {
   const tokenizer = generator.tokenizer;
@@ -125,6 +188,16 @@ async function generate(prompt, maxTokens) {
 self.onmessage = async (e) => {
   const msg = e.data || {};
   try {
+    if (msg.type === 'local-files') {
+      // files: [{ name, file }]，name 是相对文件夹的路径（如 onnx/model_q4f16.onnx）
+      localFiles = new Map((msg.files || []).map((f) => [f.name, f.file]));
+      generator = null;
+      currentKey = null;
+      loadPromise = null;
+      restoreFetch();
+      post('local-ready', { count: localFiles.size });
+      return;
+    }
     if (msg.type === 'load') {
       await ensureModel(msg.model, msg.host);
       return;

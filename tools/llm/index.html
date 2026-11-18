@@ -24,8 +24,10 @@
         </select>
         <span class="llm-status" id="llm-status" role="status">模型未加载</span>
         <button class="btn btn-secondary" id="btn-load" type="button">加载模型</button>
+        <button class="btn btn-secondary" id="btn-import" type="button">导入本地模型文件</button>
         <button class="btn btn-secondary" id="btn-reset" type="button">新建对话</button>
       </div>
+      <input type="file" id="llm-files" webkitdirectory directory multiple hidden />
 
       <div class="llm-progress" id="llm-progress" hidden>
         <div class="llm-progress__bar"><span id="llm-progress-fill"></span></div>
@@ -43,7 +45,7 @@
           <button class="btn btn-primary" id="btn-send" type="button" disabled>发送</button>
         </div>
       </div>
-      <p class="llm-hint" id="llm-hint">提示：模型越大回答越好但越慢。首次下载受网络影响可能需要几分钟，下载完成后会自动缓存。</p>
+      <p class="llm-hint" id="llm-hint">提示：模型越大回答越好但越慢。首次下载受网络影响可能需要几分钟，下载完成后会自动缓存。也可以「导入本地模型文件」直接用一个已下载好的模型文件夹，无需联网。</p>
     </section>
   </main>
   <script type="module" src="/tools/llm/main.js"></script>
