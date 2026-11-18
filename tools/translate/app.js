@@ -16,6 +16,9 @@ export function initTranslate() {
   const hintEl = $('tr-hint');
   const runBtn = $('btn-run');
   const preloadBtn = $('btn-preload');
+  const swapBtn = $('btn-swap');
+  const langFrom = $('tr-lang-from');
+  const langTo = $('tr-lang-to');
 
   let worker = null;
   let busy = false;
@@ -55,6 +58,7 @@ export function initTranslate() {
         // 用户输入可能在推理期间变化，只接受最后一次请求的结果
         if (m.seq === reqSeq) {
           output.value = m.text || '';
+          if (m.direction) updateLangLabels(m.direction);
           setStatus('翻译完成', 'ready');
         }
         releaseBusy();
@@ -75,11 +79,34 @@ export function initTranslate() {
     return worker;
   }
 
+  const LANG = { 'zh-en': ['中文', '英文'], 'en-zh': ['英文', '中文'] };
+
+  function updateLangLabels(dir) {
+    const pair = LANG[dir];
+    langFrom.textContent = pair ? pair[0] : '自动检测';
+    langTo.textContent = pair ? pair[1] : '待检测';
+  }
+
   function updateCount() {
     $('tr-count').textContent = input.value.length.toLocaleString() + ' 字符';
   }
 
   input.addEventListener('input', updateCount);
+  directionSel.addEventListener('change', () => updateLangLabels(directionSel.value));
+
+  swapBtn.addEventListener('click', () => {
+    if (busy) return;
+    const cur = directionSel.value;
+    const next = cur === 'zh-en' ? 'en-zh' : cur === 'en-zh' ? 'zh-en' : 'zh-en';
+    directionSel.value = next;
+    updateLangLabels(next);
+    // 把当前译文放到原文，方便反向翻译
+    if (output.value.trim()) {
+      input.value = output.value;
+      output.value = '';
+      updateCount();
+    }
+  });
 
   runBtn.addEventListener('click', () => {
     const text = input.value.trim();
@@ -137,5 +164,6 @@ export function initTranslate() {
     flashHint(e.currentTarget, ok ? '已复制' : '复制失败');
   });
 
+  updateLangLabels(directionSel.value);
   updateCount();
 }
