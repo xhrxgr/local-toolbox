@@ -54,6 +54,16 @@ export function initTranslate() {
         setStatus(`正在下载模型文件：${name || '…'}`);
       } else if (m.type === 'model-ready') {
         setStatus('模型就绪（可离线使用）', 'ready');
+      } else if (m.type === 'token') {
+        // 流式译文：只接受当前请求的片段
+        if (m.seq === reqSeq) {
+          output.value += m.text || '';
+          scrollOutput();
+        }
+      } else if (m.type === 'seg') {
+        if (m.seq === reqSeq && m.total > 1) {
+          setStatus(`正在翻译第 ${m.index}/${m.total} 段…`);
+        }
       } else if (m.type === 'result') {
         // 用户输入可能在推理期间变化，只接受最后一次请求的结果
         if (m.seq === reqSeq) {
@@ -87,12 +97,34 @@ export function initTranslate() {
     langTo.textContent = pair ? pair[1] : '待检测';
   }
 
+  function scrollOutput() {
+    output.scrollTop = output.scrollHeight;
+  }
+
   function updateCount() {
     $('tr-count').textContent = input.value.length.toLocaleString() + ' 字符';
   }
 
   input.addEventListener('input', updateCount);
-  directionSel.addEventListener('change', () => updateLangLabels(directionSel.value));
+
+  // Ctrl/Cmd+Enter 直接翻译
+  input.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runBtn.click();
+    }
+  });
+
+  // 记住上次的方向选择
+  const DIR_KEY = 'translate-direction';
+  try {
+    const saved = localStorage.getItem(DIR_KEY);
+    if (saved && ['auto', 'zh-en', 'en-zh'].includes(saved)) directionSel.value = saved;
+  } catch { /* 隐私模式不可用 */ }
+  directionSel.addEventListener('change', () => {
+    try { localStorage.setItem(DIR_KEY, directionSel.value); } catch { /* 忽略 */ }
+    updateLangLabels(directionSel.value);
+  });
 
   swapBtn.addEventListener('click', () => {
     if (busy) return;
@@ -161,7 +193,7 @@ export function initTranslate() {
   $('btn-copy').addEventListener('click', async (e) => {
     if (!output.value) { flashHint(e.currentTarget, '暂无译文'); return; }
     const ok = await copyText(output.value);
-    flashHint(e.currentTarget, ok ? '已复制' : '复制失败');
+    flashHint(e.currentTarget, ok ? '已复制x' : '复制失败');
   });
 
   updateLangLabels(directionSel.value);

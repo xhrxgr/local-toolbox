@@ -55,6 +55,13 @@ syncOrtRuntime();
 
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/local-toolbox/' : '/',
+  // Worker 保持 ESM：默认 iife 格式在 Rolldown 下会把 worker 里的 npm 依赖
+  // （@huggingface/transformers）丢在外面，产物引用未定义的全局变量，
+  // 运行时即报错（实测踩过）。所有 worker 都用 { type: 'module' } 创建，
+  // ESM 合法；显式声明让依赖正常打进 worker 产物。
+  worker: {
+    format: 'es',
+  },
   build: {
     // 实用脚本以独立文件输出：小于内联阈值的脚本默认会被转成 data URL，
     // 下载行为与文件下载不一致（个别浏览器对 data URL 下载处理不同）
