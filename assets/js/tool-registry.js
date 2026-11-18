@@ -270,6 +270,17 @@ export const TOOLS = [
     available: true,
   },
   {
+    id: 'llm',
+    name: '本地大模型',
+    icon: 'text',
+    desc: '在浏览器里运行大语言模型，对话不上传',
+    category: 'dev',
+    tags: ['本地处理', '离线', 'AI 对话'],
+    aliases: ['大模型', '本地大模型', 'AI', 'AI 对话', '聊天', 'llm', 'qwen', '本地 AI', '离线 AI', '语言模型'],
+    path: '/tools/llm/',
+    available: true,
+  },
+  {
     id: 'translate',
     name: '离线翻译',
     icon: 'text',

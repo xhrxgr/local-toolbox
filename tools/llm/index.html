@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="本地大模型 —— 在浏览器里运行大语言模型，对话内容不上传服务器" />
+  <title>本地大模型 - 网页工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/assets/css/variables.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/global.css" />
+  <link rel="stylesheet" href="/tools/llm/style.css" />
+</head>
+<body>
+  <main class="tool-container">
+    <section class="mode-panel glass mode-panel--active llm-panel">
+      <div class="panel-desc">在浏览器里直接运行大语言模型，对话内容不会上传。首次使用需下载模型，之后可离线使用。</div>
+
+      <div class="llm-bar">
+        <label class="codec-label" for="llm-model">模型</label>
+        <select class="codec-select" id="llm-model" aria-label="选择模型">
+          <option value="qwen">Qwen2.5-0.5B（中英较好，约 460MB）</option>
+          <option value="smollm">SmolLM2-135M（下载快，偏英文，约 112MB）</option>
+        </select>
+        <span class="llm-status" id="llm-status" role="status">模型未加载</span>
+        <button class="btn btn-secondary" id="btn-load" type="button">加载模型</button>
+        <button class="btn btn-secondary" id="btn-reset" type="button">新建对话</button>
+      </div>
+
+      <div class="llm-progress" id="llm-progress" hidden>
+        <div class="llm-progress__bar"><span id="llm-progress-fill"></span></div>
+        <span class="llm-progress__text" id="llm-progress-text"></span>
+      </div>
+
+      <div class="llm-chat" id="llm-chat" aria-live="polite">
+        <div class="llm-empty" id="llm-empty">加载模型后开始对话。小模型能力有限，适合简单问答与文本改写。</div>
+      </div>
+
+      <div class="llm-compose">
+        <textarea class="codec-input" id="llm-input" placeholder="输入问题，Ctrl+Enter 发送…" rows="3" spellcheck="false"></textarea>
+        <div class="llm-compose__foot">
+          <span class="llm-count" id="llm-count">0 字符</span>
+          <button class="btn btn-primary" id="btn-send" type="button" disabled>发送</button>
+        </div>
+      </div>
+      <p class="llm-hint" id="llm-hint">提示：模型越大回答越好但越慢。首次下载受网络影响可能需要几分钟，下载完成后会自动缓存。</p>
+    </section>
+  </main>
+  <script type="module" src="/tools/llm/main.js"></script>
+</body>
+</html>

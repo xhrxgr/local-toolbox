@@ -64,10 +64,13 @@ const HASHED_ASSET_RE = /[.-][A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2?|png|jpe?g|g
 /* 跨域可缓存资源类型（ffmpeg core 的 .wasm/.js、tesseract 的 .traineddata.gz 等） */
 const CROSS_ORIGIN_ASSET_RE = /\.(?:js|mjs|wasm|data|onnx|traineddata|traineddata\.gz|gz|json|zip)(?:[?#]|$)/i;
 
-/* Transformers.js 自己用 Cache API 缓存 Whisper 模型（键就是文件 URL），
-   SW 若再缓存一份会重复占 40MB，容易撑爆配额。
-   这些请求交给库自己管理，SW 不拦截。 */
-const TRANSFORMERS_MODEL_RE = /(?:huggingface\.co|hf-mirror\.(?:com|net))\/(?:onnx-community|Xenova)\//i;
+/* Transformers.js 自己用 Cache API 缓存模型（键就是文件 URL），
+   SW 若再缓存一份会重复占几百 MB，容易撑爆配额。
+   这些请求交给库自己管理，SW 不拦截。
+   注意：不要只列 onnx-community/Xenova —— HuggingFaceTB 等组织同样
+   会被用作模型源，漏掉就会让 .json/.onnx 走进 cacheFirst，
+   拿到 opaque 响应后库解析失败（表现为 net::ERR_FAILED）。 */
+const TRANSFORMERS_MODEL_RE = /(?:huggingface\.co|hf-mirror\.(?:com|net))\/(?:[^/]+\/)?[^/]+\/resolve\//i;
 
 /* 离线且无对应缓存时的兜底页 */
 const OFFLINE_HTML = `<!DOCTYPE html>
@@ -127,6 +130,13 @@ const FFMPEG_WORKER_RE = /ffmpeg-core\.worker\.js$|@ffmpeg\/|ffmpeg-core\.js$/;
 
 async function isCoiRequest(event, url) {
   if (!COI_PATHS.length) return false;
+
+  // 跨域模型文件绝不能注入 COEP：huggingface.co 的响应 CORS 头是具体域名，
+  // credentialless 模式下注入 COEP 会让浏览器判定为跨源资源而拒绝加载
+  // （实测 tokenizer_config.json 直接 net::ERR_FAILED）。
+  // 模型请求不需要隔离上下文即可下载，ORT 的 WASM 才需要。
+  if (TRANSFORMERS_MODEL_RE.test(url.href)) return false;
+
   if (event.request.mode === 'navigate') return needsCoi(url);
   if (ASR_RUNTIME_RE.test(url.pathname) || FFMPEG_RUNTIME_RE.test(url.pathname)) return true;
   if (event.clientId) {

@@ -100,6 +100,9 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
 // 需要跨源隔离的页面（与 public/sw.js 的 COI_PATHS 保持一致）。
 // - ASR：WASM 多线程推理
 // - ffmpeg：@ffmpeg/core-mt 多线程转码（长视频实测约 2.2 倍）
+// LLM 虽然也跑 WASM 推理，但不在这份白名单里：隔离页的 credentialless COEP
+// 会拦掉 HuggingFace 的模型下载（见 public/sw.js 的 TRANSFORMERS_MODEL_RE），
+// 权衡后选择单线程 WASM 换取模型能正常加载。
 // SW 会给这些页面的所有响应（含各级 Worker 脚本）注入 COOP/COEP；
 // 首次访问需 reload 一次让隔离生效，见下方 setupCrossOriginIsolation()。
 const COI_PAGES = ['/tools/asr/', '/tools/ffmpeg/'];

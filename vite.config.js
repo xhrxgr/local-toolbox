@@ -92,6 +92,7 @@ export default defineConfig(({ mode }) => ({
         unicode: resolve(__dirname, 'tools/unicode/index.html'),
         crypto: resolve(__dirname, 'tools/crypto/index.html'),
         translate: resolve(__dirname, 'tools/translate/index.html'),
+        llm: resolve(__dirname, 'tools/llm/index.html'),
         svg: resolve(__dirname, 'tools/svg/index.html'),
         ocr: resolve(__dirname, 'tools/ocr/index.html'),
         asr: resolve(__dirname, 'tools/asr/index.html'),
