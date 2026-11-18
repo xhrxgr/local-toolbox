@@ -270,6 +270,17 @@ export const TOOLS = [
     available: true,
   },
   {
+    id: 'translate',
+    name: '离线翻译',
+    icon: 'text',
+    desc: '中英互译，模型本地运行，文本不上传',
+    category: 'dev',
+    tags: ['本地处理', '离线', '中英互译'],
+    aliases: ['翻译', '离线翻译', '中英翻译', '英汉翻译', '汉英翻译', 'translate', 'translation', 'offline translate'],
+    path: '/tools/translate/',
+    available: true,
+  },
+  {
     id: 'radix',
     name: '进制转换',
     icon: 'radix',

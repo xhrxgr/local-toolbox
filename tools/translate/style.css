@@ -1,0 +1,74 @@
+/* 离线翻译样式 */
+.translate-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm, 10px);
+  margin-bottom: var(--space-md, 14px);
+}
+
+.translate-bar .codec-select { flex: 0 0 auto; min-width: 150px; }
+
+.translate-status {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-muted, #94a3b8);
+  overflow-wrap: anywhere;
+}
+.translate-status.is-ready { color: var(--accent, #818cf8); }
+.translate-status.is-error { color: #f87171; }
+
+.translate-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+}
+.translate-progress__bar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+.translate-progress__bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent, #818cf8);
+  transition: width 0.15s ease;
+}
+.translate-progress__text { flex: 0 0 auto; min-width: 72px; text-align: right; }
+
+.translate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md, 14px);
+}
+
+.translate-pane { display: flex; flex-direction: column; min-width: 0; }
+.translate-pane .codec-input--tall { min-height: 260px; resize: vertical; }
+.translate-pane__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+}
+
+.translate-hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .translate-grid { grid-template-columns: 1fr; }
+  .translate-pane .codec-input--tall { min-height: 180px; }
+}
