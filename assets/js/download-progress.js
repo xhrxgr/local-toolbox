@@ -28,6 +28,9 @@ export class DownloadProgress {
     this.known = new Map(this.files.map((f) => [f.name, f]));
     this.activeName = '';
     this.finished = false;
+    // 速度计算：每个文件的字节数 + 最近 3 秒的采样点
+    this.bytes = new Map();   // name -> { loaded, total }
+    this.samples = [];        // [{ t, loaded }]
   }
 
   /** 整个下载/加载完成：此时才允许显示 100% */
@@ -50,6 +53,15 @@ export class DownloadProgress {
       // 只升不降：重试或乱序回包时不要让进度倒退
       this.progress.set(name, Math.max(this.progress.get(name) || 0, p));
       this.activeName = p < 1 ? name : this.activeName;
+      // 记录字节数用于速度计算
+      if (typeof e.loaded === 'number' && typeof e.total === 'number' && e.total > 0) {
+        this.bytes.set(name, { loaded: e.loaded, total: e.total });
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const sumLoaded = [...this.bytes.values()].reduce((s, b) => s + b.loaded, 0);
+        this.samples.push({ t: now, loaded: sumLoaded });
+        // 只保留最近 3 秒的采样，实时反映网速变化
+        while (this.samples.length > 2 && now - this.samples[0].t > 3000) this.samples.shift();
+      }
     }
   }
 
@@ -112,14 +124,56 @@ export class DownloadProgress {
       return `${label} · ${p >= 1 ? '完成' : p > 0 ? Math.round(p * 100) + '%' : '等待'}`;
     });
 
+    // 速度与剩余时间：用最近 3 秒的字节增量算滑动窗口，避免瞬时抖动
+    let speed = 0;   // 字节/秒
+    let eta = 0;     // 秒
+    if (this.samples.length >= 2) {
+      const first = this.samples[0];
+      const last = this.samples[this.samples.length - 1];
+      const dt = (last.t - first.t) / 1000;
+      const db = last.loaded - first.loaded;
+      if (dt > 0.15 && db > 0) speed = db / dt;
+    }
+    if (speed > 0) {
+      // 剩余字节：有 total 的按 total-loaded，没 total 的按预知 size 估
+      let remaining = 0;
+      for (const [n, b] of this.bytes) {
+        if (b.total > b.loaded) remaining += b.total - b.loaded;
+        else if (!this.known.get(n)?.size) continue;
+      }
+      // 预知清单里还没开始下载的文件（进度 0）也要计入剩余
+      for (const f of this.files) {
+        if (!this.bytes.has(f.name) && f.size) remaining += f.size;
+      }
+      eta = remaining > 0 ? remaining / speed : 0;
+    }
+
     return {
       percent: Math.max(0, Math.min(100, Math.round(ratio * 100))),
       active,
       doneCount: entries.filter(([, p]) => p >= 1).length,
       totalCount: names.length,
       lines,
+      speed: formatSpeed(speed),
+      eta: formatEta(eta),
     };
   }
+}
+
+/** 字节/秒 → 可读速度 */
+export function formatSpeed(bps) {
+  if (!bps || bps <= 0) return '';
+  if (bps >= 1024 * 1024) return (bps / (1024 * 1024)).toFixed(1) + ' MB/s';
+  return Math.round(bps / 1024) + ' KB/s';
+}
+
+/** 秒 → 可读剩余时间 */
+export function formatEta(sec) {
+  if (!sec || !isFinite(sec) || sec <= 0) return '';
+  if (sec < 60) return `剩余 ${Math.ceil(sec)} 秒`;
+  const m = Math.ceil(sec / 60);
+  if (m < 60) return `剩余 ${m} 分钟`;
+  return `剩余 ${Math.floor(m / 60)} 小时 ${m % 60} 分`;
 }
 
 /** 长文件名缩短显示：去掉目录，只留主名（保留扩展名） */
@@ -152,6 +206,13 @@ export function renderProgress(prefix, snap, { title, status } = {}) {
     : `下载中 · ${snap.doneCount}/${snap.totalCount} 个文件`);
   if ($('-status')) $('-status').textContent = st;
   if ($('-files')) $('-files').textContent = snap.lines.join('\n');
+  const meta = $('-meta');
+  if (meta) {
+    const parts = [];
+    if (snap.speed) parts.push(`<b>${snap.speed}</b>`);
+    if (snap.eta) parts.push(`<span class="eta">${snap.eta}</span>`);
+    meta.innerHTML = parts.join('');
+  }
 }
 
 /** 隐藏进度区 */

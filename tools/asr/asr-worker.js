@@ -90,7 +90,7 @@ async function ensureModel() {
       progress_callback: (p) => {
         if (cancelled) return;
         if (p.status === 'progress' && typeof p.progress === 'number') {
-          post('progress', { file: p.file || '', progress: p.progress });
+          post('progress', { file: p.file || '', progress: p.progress, loaded: p.loaded, total: p.total });
         } else if (p.status === 'done') {
           post('file-done', { file: p.file || '' });
         } else if (p.status === 'initiate') {

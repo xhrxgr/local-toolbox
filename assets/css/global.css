@@ -151,6 +151,18 @@ button {
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
+.dl-progress__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 16px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.dl-progress__meta:empty { display: none; }
+.dl-progress__meta .eta { color: var(--text-muted, #94a3b8); }
 .dl-progress__files {
   display: flex;
   flex-direction: column;

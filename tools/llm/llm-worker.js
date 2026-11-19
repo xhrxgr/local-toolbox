@@ -130,7 +130,7 @@ async function ensureModel(key, requestedHost) {
     device: 'wasm',
     progress_callback: (e) => {
       if (e.status === 'progress' && typeof e.progress === 'number') {
-        post('progress', { file: e.file || '', progress: e.progress });
+        post('progress', { file: e.file || '', progress: e.progress, loaded: e.loaded, total: e.total });
       } else if (e.status === 'done') {
         post('progress', { file: e.file || '', progress: 100, done: true });
       }

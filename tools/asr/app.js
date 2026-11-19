@@ -106,7 +106,7 @@ function getWorker() {
         renderProgress();
         break;
       case 'progress': {
-        dl.feed({ status: 'progress', file: friendlyFileName(data.file), progress: data.progress });
+        dl.feed({ status: 'progress', file: friendlyFileName(data.file), progress: data.progress, loaded: data.loaded, total: data.total });
         renderProgress();
         break;
       }

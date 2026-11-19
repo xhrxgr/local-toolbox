@@ -64,7 +64,7 @@ export function initLlm() {
           break;
         case 'progress': {
           // 模型文件清单随所选模型变化，这里用空清单让共享模块按实际文件聚合
-          dl.feed({ status: m.done ? 'done' : 'progress', file: m.file, progress: m.progress });
+          dl.feed({ status: m.done ? 'done' : 'progress', file: m.file, progress: m.progress, loaded: m.loaded, total: m.total });
           renderProgressUi('llm', dl.snapshot(), { title: '首次使用：下载语言模型' });
           break;
         }

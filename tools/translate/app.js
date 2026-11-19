@@ -141,6 +141,8 @@ export function initTranslate() {
             status: m.done ? 'done' : 'progress',
             file: dlKey(m.direction || dlDirection, m.file),
             progress: m.progress,
+            loaded: m.loaded,
+            total: m.total,
           });
           renderDlProgress(m.direction || dlDirection);
         }
