@@ -149,7 +149,14 @@ async function translate(text, direction, seq) {
           post('token', { seq, text: t });
         },
       });
-      const out = await pipe(chunk, { max_new_tokens: maxTokensFor(chunk), streamer });
+      const out = await pipe(chunk, {
+        max_new_tokens: maxTokensFor(chunk),
+        streamer,
+        // 抑制短输入下的解码循环："hello" 曾输出 63 个重复的「你好」直到
+        // token 上限（实测基线 188 字符；加 1.2 后输出「你好,你好」，
+        // 正常句子翻译不受影响）。Marian 贪心解码的已知缺陷。
+        repetition_penalty: 1.2,
+      });
       translated.push((acc || out?.[0]?.translation_text || '').trim());
       outIndex++;
     }
