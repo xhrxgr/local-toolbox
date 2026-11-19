@@ -100,6 +100,71 @@ button {
   border-radius: var(--radius-lg);
 }
 
+/* ========== 统一下载进度组件（模型/语言包下载）==========
+   由 assets/js/download-progress.js 的 renderProgress() 驱动。
+   统一显示：阶段标题 + 总体百分比 + 进度条 + 当前文件 + 文件清单。
+   此前各工具各写一套，ASR 还因进度单位搞错出现先 100% 再掉回 6% 的乱跳。 */
+.dl-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+.dl-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.dl-progress__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.dl-progress__pct {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.dl-progress__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.dl-progress__fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.15s ease;
+}
+.dl-progress__status {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.dl-progress__files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
 /* 通用按钮 */
 .btn {
   display: inline-flex;

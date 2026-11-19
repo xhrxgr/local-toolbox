@@ -104,32 +104,6 @@ body .tool-container.translate-page {
 .translate-status.is-error { color: #f87171; }
 
 /* ---------- 下载进度 ---------- */
-.translate-progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  font-size: 12px;
-  color: var(--text-muted, #94a3b8);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-}
-.translate-progress__bar {
-  flex: 1 1 auto;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(148, 163, 184, 0.2);
-  overflow: hidden;
-}
-.translate-progress__bar span {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: var(--accent, #818cf8);
-  transition: width 0.15s ease;
-}
-.translate-progress__text { flex: 0 0 auto; min-width: 72px; text-align: right; }
-
 /* ---------- 双栏面板 ---------- */
 .translate-grid {
   display: grid;

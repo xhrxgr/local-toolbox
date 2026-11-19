@@ -4,6 +4,7 @@
  */
 import { copyText, flashHint } from '/assets/js/clipboard.js';
 import { getModelHost, setModelHost, HOST_MODELSCOPE } from '/assets/js/model-host.js';
+import { DownloadProgress, renderProgress as renderProgressUi, hideProgress } from '/assets/js/download-progress.js';
 
 export function initTranslate() {
   const $ = (id) => document.getElementById(id);
@@ -11,9 +12,6 @@ export function initTranslate() {
   const output = $('tr-output');
   const directionSel = $('tr-direction');
   const statusEl = $('tr-status');
-  const progressBox = $('tr-progress');
-  const progressFill = $('tr-progress-fill');
-  const progressText = $('tr-progress-text');
   const hintEl = $('tr-hint');
   const runBtn = $('btn-run');
   const preloadBtn = $('btn-preload');
@@ -65,22 +63,28 @@ export function initTranslate() {
     if (busyTimer) { clearTimeout(busyTimer); busyTimer = null; }
   }
 
-  // ---------- 预下载进度聚合 ----------
-  // 两个方向共约 8 个文件，单个文件的 0~100% 会来回横跳；
-  // 以文件为单位聚合成总体进度：进度条 = 各文件均值的均值，文本显示已完成数。
-  const dlFiles = new Map();   // 'direction|file' -> { progress, done }
-  let dlDoneCount = 0;
+  // ---------- 下载进度聚合（共享模块）----------
+  // 两个方向会下载同名文件（如 config.json），用方向前缀区分；
+  // 共享模块统一处理 0~100 单位、体积加权、当前文件与百分比显示。
+  const dl = new DownloadProgress([]);
+  let dlDirection = '';   // 当前下载方向，用于标题
 
-  function renderDlProgress(currentFile, currentDir) {
-    progressBox.hidden = false;
-    let sum = 0;
-    for (const f of dlFiles.values()) sum += f.progress;
-    const total = Math.round(sum / dlFiles.size);
-    progressFill.style.width = total + '%';
-    progressText.textContent = `${dlDoneCount}/${dlFiles.size} 个文件`;
-    const dir = DIR_LABEL[currentDir] || '';
-    const name = (currentFile || '').split('/').pop();
-    setStatus(`正在下载${dir ? ` ${dir}` : ''}模型：${name || '…'}`);
+  function renderDlProgress(currentDir) {
+    const snap = dl.snapshot();
+    const dir = DIR_LABEL[currentDir || dlDirection] || '';
+    // 文件清单加方向前缀，区分两方向的同名文件
+    const lines = snap.lines.map((line) => (dir ? `${dir} · ${line}` : line));
+    renderProgressUi('tr', { ...snap, lines }, {
+      title: dir ? `正在下载${dir}模型` : '正在下载翻译模型',
+      status: snap.active
+        ? `正在下载 ${snap.active.label} · ${snap.active.pct}%（${snap.doneCount}/${snap.totalCount} 个文件）`
+        : `下载中 · ${snap.doneCount}/${snap.totalCount} 个文件`,
+    });
+    if (dir) setStatus(`正在下载 ${dir} 模型 · ${snap.percent}%`);
+  }
+
+  function dlKey(dir, file) {
+    return dir ? `${DIR_LABEL[dir] || dir}/${file || ''}` : (file || '');
   }
 
   function applyCachedUi() {
@@ -130,21 +134,15 @@ export function initTranslate() {
       if (m.type === 'log') {
         setStatus(m.message);
       } else if (m.type === 'progress') {
-        const key = (m.direction || '') + '|' + (m.file || '');
-        if (busyKind === 'preload' && m.file && m.direction) {
-          const rec = dlFiles.get(key) || { progress: 0 };
-          rec.progress = m.done ? 100 : Math.round(m.progress || 0);
-          dlFiles.set(key, rec);
-          if (m.done && rec.progress === 100 && !rec.counted) { rec.counted = true; dlDoneCount++; }
-          renderDlProgress(m.file, m.direction);
-        } else {
-          // 翻译时的单模型加载：保持原有单文件进度显示
-          progressBox.hidden = false;
-          const p = Math.round(m.progress || 0);
-          progressFill.style.width = p + '%';
-          const name = (m.file || '').split('/').pop();
-          progressText.textContent = m.done ? '完成' : name ? `${p}% · ${name.slice(0, 14)}` : `${p}%`;
-          setStatus(`正在下载模型文件：${name || '…'}`);
+        // 预下载与翻译时用同一套聚合显示，避免两条路径行为不一致
+        if (m.file) {
+          if (m.direction) dlDirection = m.direction;
+          dl.feed({
+            status: m.done ? 'done' : 'progress',
+            file: dlKey(m.direction || dlDirection, m.file),
+            progress: m.progress,
+          });
+          renderDlProgress(m.direction || dlDirection);
         }
       } else if (m.type === 'model-ready') {
         // 记入缓存集合即可。不要在翻译过程中调 applyCachedUi()：
@@ -174,7 +172,7 @@ export function initTranslate() {
         cachedDirs.add('zh-en');
         cachedDirs.add('en-zh');
         setStatus('模型已全部缓存，之后可离线翻译', 'ready');
-        progressBox.hidden = true;
+        hideProgress('tr');
         mirrorFallbackUsed = false;
         applyCachedUi();
         releaseBusy();
@@ -270,9 +268,14 @@ export function initTranslate() {
     const seq = ++reqSeq;
     lastAction = { kind: 'translate', text, seq };
     setStatus('正在初始化模型…');
-    progressBox.hidden = false;
-    progressFill.style.width = '0%';
-    progressText.textContent = '';
+    dl.reset();
+    dlDirection = directionSel.value === 'auto' ? '' : directionSel.value;
+    $('tr-progress').hidden = false;
+    $('tr-progress-title').textContent = '正在下载模型';
+    $('tr-progress-pct').textContent = '0%';
+    $('tr-progress-fill').style.width = '0%';
+    $('tr-progress-status').textContent = '等待开始';
+    $('tr-progress-files').textContent = '';
     // 首次下载约 60MB，国际链路慢时可能几分钟。给明确提示并在超时后
     // 解除按钮锁定，避免用户以为卡死又无法重试。
     busyTimer = setTimeout(() => {
@@ -302,14 +305,17 @@ export function initTranslate() {
     busy = true;
     busyKind = 'preload';
     preloadBtn.disabled = true;
-    // 计数器重置：上一次的进度不应混进本次统计
-    dlFiles.clear();
-    dlDoneCount = 0;
+    // 进度聚合器重置：上一次的进度不应混进本次统计
+    dl.reset();
+    dlDirection = '';
     lastAction = { kind: 'preload' };
     setStatus('正在预下载两个方向的模型…');
-    progressBox.hidden = false;
-    progressFill.style.width = '0%';
-    progressText.textContent = '';
+    $('tr-progress').hidden = false;
+    $('tr-progress-title').textContent = '正在下载翻译模型';
+    $('tr-progress-pct').textContent = '0%';
+    $('tr-progress-fill').style.width = '0%';
+    $('tr-progress-status').textContent = '等待开始';
+    $('tr-progress-files').textContent = '';
     busyTimer = setTimeout(() => {
       if (busy) {
         setStatus('模型下载较慢，请稍候或重试', '');

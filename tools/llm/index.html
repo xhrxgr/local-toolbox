@@ -33,9 +33,14 @@
       </div>
       <input type="file" id="llm-files" webkitdirectory directory multiple hidden />
 
-      <div class="llm-progress" id="llm-progress" hidden>
-        <div class="llm-progress__bar"><span id="llm-progress-fill"></span></div>
-        <span class="llm-progress__text" id="llm-progress-text"></span>
+      <div class="dl-progress" id="llm-progress" hidden>
+        <div class="dl-progress__head">
+          <span class="dl-progress__title" id="llm-progress-title">正在加载模型</span>
+          <span class="dl-progress__pct" id="llm-progress-pct">0%</span>
+        </div>
+        <div class="dl-progress__track"><div class="dl-progress__fill" id="llm-progress-fill"></div></div>
+        <div class="dl-progress__status" id="llm-progress-status">等待开始</div>
+        <div class="dl-progress__files" id="llm-progress-files"></div>
       </div>
 
       <div class="llm-chat" id="llm-chat" aria-live="polite">

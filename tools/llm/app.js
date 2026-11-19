@@ -4,6 +4,7 @@
  */
 import { copyText } from '/assets/js/clipboard.js';
 import { getModelHost, setModelHost, HOST_MODELSCOPE } from '/assets/js/model-host.js';
+import { DownloadProgress, renderProgress as renderProgressUi, hideProgress } from '/assets/js/download-progress.js';
 
 export function initLlm() {
   const $ = (id) => document.getElementById(id);
@@ -12,9 +13,6 @@ export function initLlm() {
   const input = $('llm-input');
   const modelSel = $('llm-model');
   const statusEl = $('llm-status');
-  const progressBox = $('llm-progress');
-  const progressFill = $('llm-progress-fill');
-  const progressText = $('llm-progress-text');
   const hintEl = $('llm-hint');
   const sendBtn = $('btn-send');
   const loadBtn = $('btn-load');
@@ -27,6 +25,8 @@ export function initLlm() {
   let currentAI = null;
   let currentText = '';
   let loadTimer = null;
+  // 模型文件清单随所选模型变化，用空清单让共享模块按实际出现的文件聚合
+  const dl = new DownloadProgress([]);
 
   function setStatus(text, kind = '') {
     statusEl.textContent = text;
@@ -63,12 +63,9 @@ export function initLlm() {
           setStatus(m.message);
           break;
         case 'progress': {
-          progressBox.hidden = false;
-          const p = Math.round(m.progress || 0);
-          progressFill.style.width = p + '%';
-          const name = (m.file || '').split('/').pop();
-          progressText.textContent = m.done ? '完成' : name ? `${p}% · ${name.slice(0, 12)}` : `${p}%`;
-          setStatus(`正在下载：${name || '…'}`);
+          // 模型文件清单随所选模型变化，这里用空清单让共享模块按实际文件聚合
+          dl.feed({ status: m.done ? 'done' : 'progress', file: m.file, progress: m.progress });
+          renderProgressUi('llm', dl.snapshot(), { title: '首次使用：下载语言模型' });
           break;
         }
         case 'model-ready':
@@ -78,7 +75,7 @@ export function initLlm() {
           loadBtn.disabled = false;
           importBtn.disabled = false;
           if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
-          progressBox.hidden = true;
+          hideProgress('llm');
           setStatus(`已就绪 · ${m.label} · 本地推理`, 'ready');
           hintEl.textContent = '对话内容只在本机处理。模型能力有限，回答仅供参考。';
           break;
@@ -170,8 +167,13 @@ export function initLlm() {
     lastAction = { kind: 'load', model: modelSel.value };
     loadBtn.disabled = true;
     sendBtn.disabled = true;
-    progressBox.hidden = false;
-    progressFill.style.width = '0%';
+    dl.reset();
+    $('llm-progress').hidden = false;
+    $('llm-progress-title').textContent = '正在加载模型';
+    $('llm-progress-pct').textContent = '0%';
+    $('llm-progress-fill').style.width = '0%';
+    $('llm-progress-status').textContent = '等待开始';
+    $('llm-progress-files').textContent = '';
     setStatus('正在加载模型…');
     loadTimer = setTimeout(() => {
       if (busy) {

@@ -9,10 +9,10 @@ import { copyWithFeedback, flashHint } from '/assets/js/clipboard.js';
 import { downloadBlob } from '/assets/js/download.js';
 import { showToast } from '/assets/js/toast.js';
 import { mountResourcePanel } from '/assets/js/resource-hub.js';
+import { DownloadProgress, renderProgress as renderProgressUi } from '/assets/js/download-progress.js';
 import {
   ASR_HOST_MIRROR,
   ASR_HOST_OFFICIAL,
-  ASR_MODEL_TOTAL,
   ASR_MODEL_FILES,
   getAsrHost,
   setAsrHost,
@@ -64,48 +64,31 @@ function hideError() {
 }
 
 /* ========== 进度 ========== */
-const fileProgress = new Map();
+// 用共享聚合器：库给的 progress 是 0~100，这里统一归一化，
+// 按文件体积加权算总体进度（此前把 0~100 当 0~1，出现先 100% 再掉回 6%）
+const dl = new DownloadProgress(ASR_MODEL_FILES);
 
 function resetProgress() {
-  fileProgress.clear();
+  dl.reset();
   $('asr-progress').hidden = false;
   $('asr-progress-title').textContent = '准备中…';
-  $('asr-progress-pct').textContent = '';
+  $('asr-progress-pct').textContent = '0%';
   $('asr-progress-fill').style.width = '0%';
-  $('asr-progress-status').textContent = '';
+  $('asr-progress-status').textContent = '等待开始';
   $('asr-progress-files').textContent = '';
   $('asr-empty').hidden = true;
   $('asr-result').hidden = true;
 }
 
 function renderProgress() {
-  // 用「已完成文件数 / 总文件数」+ 当前文件百分比给出整体进度。
-  // 模型各文件体积差异大，按件均分会有跳跃；这里按体积加权更接近真实。
-  let doneBytes = 0;
-  let active = null;
-  for (const f of ASR_MODEL_FILES) {
-    const p = fileProgress.get(f.name) || 0;
-    doneBytes += f.size * p;
-    if (p > 0 && p < 1 && (!active || p > active.p)) active = { name: f.name, p };
-  }
-  const overall = Math.min(100, Math.round((doneBytes / ASR_MODEL_TOTAL) * 100));
-  $('asr-progress-fill').style.width = overall + '%';
-  $('asr-progress-pct').textContent = overall + '%';
-  if (active) {
-    $('asr-progress-status').textContent = `正在下载 ${active.name} · ${Math.round(active.p * 100)}%`;
-  }
-  const lines = ASR_MODEL_FILES.map((f) => {
-    const p = fileProgress.get(f.name) || 0;
-    const mark = p >= 1 ? '完成' : p > 0 ? Math.round(p * 100) + '%' : '等待';
-    return `${f.name} · ${mark}`;
-  });
-  $('asr-progress-files').textContent = lines.join('\n');
+  renderProgressUi('asr', dl.snapshot(),
+    dl.finished ? {} : { title: '首次使用：下载语音识别模型' });
 }
 
 function friendlyFileName(raw) {
-  if (!raw) return '';
-  const name = String(raw).split('/').pop();
-  return name || String(raw).slice(0, 60);
+  // 保留完整相对路径（如 onnx/encoder_model_quantized.onnx），
+  // 才能和 ASR_MODEL_FILES 的 name 对上、按体积正确加权
+  return raw ? String(raw).replace(/^\//, '') : '';
 }
 
 /* ========== Worker 管理 ========== */
@@ -119,24 +102,24 @@ function getWorker() {
         $('asr-progress-status').textContent = data.message;
         break;
       case 'file-start':
-        fileProgress.set(friendlyFileName(data.file), 0);
+        dl.feed({ status: 'initiate', file: friendlyFileName(data.file) });
         renderProgress();
         break;
       case 'progress': {
-        const name = friendlyFileName(data.file);
-        fileProgress.set(name, Math.max(fileProgress.get(name) || 0, data.progress || 0));
-        $('asr-progress-title').textContent = '首次使用：下载语音识别模型';
+        dl.feed({ status: 'progress', file: friendlyFileName(data.file), progress: data.progress });
         renderProgress();
         break;
       }
       case 'file-done':
-        fileProgress.set(friendlyFileName(data.file), 1);
+        dl.done(friendlyFileName(data.file));
         renderProgress();
         break;
       case 'model-ready':
+        dl.finish();
         $('asr-progress-title').textContent = '模型已就绪';
+        $('asr-progress-pct').textContent = '100%';
+        $('asr-progress-fill').style.width = '100%';
         $('asr-progress-status').textContent = data.webgpu ? 'WebGPU 加速已启用' : 'WASM 推理已就绪';
-        renderProgress();
         break;
       case 'status':
         $('asr-progress-status').textContent = data.message;
