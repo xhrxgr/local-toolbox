@@ -3,6 +3,7 @@
  * 模型下载与推理都在 Worker 内，主线程只管界面与消息。
  */
 import { copyText, flashHint } from '/assets/js/clipboard.js';
+import { getModelHost, setModelHost, HOST_MODELSCOPE } from '/assets/js/model-host.js';
 
 export function initTranslate() {
   const $ = (id) => document.getElementById(id);
@@ -19,6 +20,25 @@ export function initTranslate() {
   const swapBtn = $('btn-swap');
   const langFrom = $('tr-lang-from');
   const langTo = $('tr-lang-to');
+  const hostSel = $('tr-host');
+
+  // 下载源：切换后消息里带新 host，worker 会重建模型管道；
+  // 缓存键是完整 URL，换源意味着重新下载，切换时给出提示
+  const HOST_KEY = 'translate-model-host';
+  hostSel.value = getModelHost(HOST_KEY) === HOST_MODELSCOPE ? 'modelscope' : 'official';
+  hostSel.addEventListener('change', () => {
+    if (busy) { flashHint(hostSel, '下载中，稍后再切换'); return; }
+    setModelHost(HOST_KEY, hostSel.value === 'modelscope' ? HOST_MODELSCOPE : 'https://huggingface.co');
+    // 用户主动重新选源，允许再次尝试回退
+    mirrorFallbackUsed = false;
+    const mirror = hostSel.value === 'modelscope';
+    setStatus(`已切换到${mirror ? '魔搭（国内）' : '官方源'}，下次下载模型时生效`);
+    if (cachedDirs.size > 0 && mirror) {
+      hintEl.textContent = '已缓存的模型不区分来源；切换源后如需重新下载，将使用新源。';
+    }
+    // host 变化后重置 worker，让后续请求走新源
+    resetWorker();
+  });
 
   let worker = null;
   let busy = false;
@@ -26,6 +46,8 @@ export function initTranslate() {
   let busyTimer = null;
   let busyKind = '';       // 'translate' | 'preload'
   let cachedDirs = new Set(); // 已缓存的模型方向
+  let lastAction = null;      // 最近一次下载动作，供魔搭失败回退重放
+  let mirrorFallbackUsed = false;
 
   const DIR_LABEL = { 'zh-en': '中→英', 'en-zh': '英→中' };
   // 两个方向各自的关键文件：decoder 是最大的模型文件，缓存里有它即算完整
@@ -91,10 +113,19 @@ export function initTranslate() {
     } catch { /* Cache API 不可用时静默跳过 */ }
   }
 
+  /** 切换下载源后重置 worker：worker 内的 env.remoteHost 在创建时确定，
+   *  保留旧实例会让后续下载仍走旧源。缓存按 URL 键存储，换源会重新下载。 */
+  function resetWorker() {
+    if (worker) { worker.terminate(); worker = null; }
+  }
+
+  function currentHost() {
+    return hostSel.value === 'modelscope' ? HOST_MODELSCOPE : 'https://huggingface.co';
+  }
+
   function getWorker() {
     if (worker) return worker;
-    worker = new Worker(new URL('./translate-worker.js', import.meta.url), { type: 'module' });
-    worker.onmessage = (e) => {
+    worker = new Worker(new URL('./translate-worker.js', import.meta.url), { type: 'module' });    worker.onmessage = (e) => {
       const m = e.data || {};
       if (m.type === 'log') {
         setStatus(m.message);
@@ -116,12 +147,9 @@ export function initTranslate() {
           setStatus(`正在下载模型文件：${name || '…'}`);
         }
       } else if (m.type === 'model-ready') {
-        // 某个方向刚下载完成，记入缓存集合（preload 进行中不覆盖下载文案）
+        // 记入缓存集合即可。不要在翻译过程中调 applyCachedUi()：
+        // 它会覆盖「正在翻译…」的进度文案（实测出现过中途闪出缓存提示）
         if (m.direction) cachedDirs.add(m.direction);
-        if (busyKind !== 'preload') {
-          setStatus('模型就绪，正在翻译…', 'ready');
-          applyCachedUi();
-        }
       } else if (m.type === 'token') {
         // 流式译文：只接受当前请求的片段
         if (m.seq === reqSeq) {
@@ -139,6 +167,7 @@ export function initTranslate() {
           if (m.direction) updateLangLabels(m.direction);
           setStatus('翻译完成', 'ready');
         }
+        mirrorFallbackUsed = false;
         releaseBusy();
       } else if (m.type === 'ready') {
         // preload 完成：两个方向都已进缓存
@@ -146,13 +175,31 @@ export function initTranslate() {
         cachedDirs.add('en-zh');
         setStatus('模型已全部缓存，之后可离线翻译', 'ready');
         progressBox.hidden = true;
+        mirrorFallbackUsed = false;
         applyCachedUi();
         releaseBusy();
       } else if (m.type === 'error') {
         const wasPreload = busyKind === 'preload';
-        setStatus('错误：' + m.message, 'error');
-        hintEl.textContent = '若首次下载失败，请检查网络；已下载过的模型可离线使用。';
+        const isMirror = hostSel.value === 'modelscope';
         releaseBusy();
+        // 魔搭 CDN 在部分网络环境下 QUIC 不稳定（实测 ERR_QUIC_PROTOCOL_ERROR），
+        // 失败时自动切回官方源重放本次动作，用户无感
+        if (isMirror && !mirrorFallbackUsed && lastAction) {
+          mirrorFallbackUsed = true;
+          hostSel.value = 'official';
+          setModelHost(HOST_KEY, 'https://huggingface.co');
+          resetWorker();
+          setStatus('魔搭下载失败，已自动改用官方源重试…', '');
+          setTimeout(() => {
+            if (lastAction.kind === 'translate') startTranslate(lastAction.text);
+            else if (lastAction.kind === 'preload') startPreload();
+          }, 300);
+          return;
+        }
+        setStatus('错误：' + m.message, 'error');
+        hintEl.textContent = isMirror
+          ? '魔搭源下载失败，请检查网络或切回官方源重试；已下载过的模型可离线使用。'
+          : '下载失败多为国际链路波动，可稍后重试，或在工具栏切换「魔搭（国内）」源。';
         // 预下载失败时恢复按钮，允许重试
         if (wasPreload) preloadBtn.disabled = false;
       }
@@ -215,15 +262,13 @@ export function initTranslate() {
     }
   });
 
-  runBtn.addEventListener('click', () => {
-    const text = input.value.trim();
-    if (!text) { flashHint(runBtn, '请先输入文本'); return; }
-    if (busy) { flashHint(runBtn, busyKind === 'preload' ? '正在预下载模型，请稍候' : '正在翻译中'); return; }
+  function startTranslate(text) {
     busy = true;
     busyKind = 'translate';
     runBtn.disabled = true;
     output.value = '';   // 立刻清掉旧译文，避免误读成新结果
     const seq = ++reqSeq;
+    lastAction = { kind: 'translate', text, seq };
     setStatus('正在初始化模型…');
     progressBox.hidden = false;
     progressFill.style.width = '0%';
@@ -242,17 +287,25 @@ export function initTranslate() {
       text,
       direction: directionSel.value,
       seq,
+      host: currentHost(),
     });
+  }
+
+  runBtn.addEventListener('click', () => {
+    const text = input.value.trim();
+    if (!text) { flashHint(runBtn, '请先输入文本'); return; }
+    if (busy) { flashHint(runBtn, busyKind === 'preload' ? '正在预下载模型，请稍候' : '正在翻译中'); return; }
+    startTranslate(text);
   });
 
-  preloadBtn.addEventListener('click', () => {
-    if (busy) return;
+  function startPreload() {
     busy = true;
     busyKind = 'preload';
     preloadBtn.disabled = true;
     // 计数器重置：上一次的进度不应混进本次统计
     dlFiles.clear();
     dlDoneCount = 0;
+    lastAction = { kind: 'preload' };
     setStatus('正在预下载两个方向的模型…');
     progressBox.hidden = false;
     progressFill.style.width = '0%';
@@ -264,7 +317,12 @@ export function initTranslate() {
         preloadBtn.disabled = false;
       }
     }, 300000);
-    getWorker().postMessage({ type: 'preload' });
+    getWorker().postMessage({ type: 'preload', host: currentHost() });
+  }
+
+  preloadBtn.addEventListener('click', () => {
+    if (busy) return;
+    startPreload();
   });
 
   $('btn-clear').addEventListener('click', () => {

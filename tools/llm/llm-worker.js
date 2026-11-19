@@ -85,6 +85,10 @@ function post(type, data = {}) {
 function setupEnv() {
   env.allowLocalModels = false;
   env.remoteHost = host;
+  // 魔搭路径模板（见 translate-worker.js 同处注释）
+  env.remotePathTemplate = host === 'https://modelscope.cn'
+    ? 'models/{model}/resolve/master/'
+    : '{model}/resolve/{revision}/';
   env.useBrowserCache = localFiles.size === 0;  // 本地文件模式不能读缓存里的旧模型
   env.useWasmCache = false; // WASM 由 SW 缓存，不重复存
   const base = (import.meta.env?.BASE_URL || '/').replace(/\/$/, '');

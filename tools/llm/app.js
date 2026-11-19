@@ -3,6 +3,7 @@
  * 模型加载与推理都在 Worker 内，这里只负责界面与消息。
  */
 import { copyText } from '/assets/js/clipboard.js';
+import { getModelHost, setModelHost, HOST_MODELSCOPE } from '/assets/js/model-host.js';
 
 export function initLlm() {
   const $ = (id) => document.getElementById(id);
@@ -100,8 +101,24 @@ export function initLlm() {
           setStatus('生成完成', 'ready');
           break;
         case 'error':
+          // 魔搭 CDN 在部分网络下 QUIC 不稳定，失败自动切回官方源重放加载
+          if (hostSel.value === 'modelscope' && !mirrorFallbackUsed && lastAction) {
+            mirrorFallbackUsed = true;
+            hostSel.value = 'official';
+            setModelHost(HOST_KEY, 'https://huggingface.co');
+            resetWorker();
+            // 必须先解锁 busy、清掉旧的超时定时器，否则下面的重放会被
+            // startLoad() 开头的 `if (busy) return` 直接拦掉
+            busy = false;
+            if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
+            setStatus('魔搭下载失败，已自动改用官方源重试…', '');
+            setTimeout(() => startLoad(), 300);
+            return;
+          }
           setStatus('错误：' + m.message, 'error');
-          hintEl.textContent = '首次下载可能失败，请检查网络后重试；已下载的模型可离线使用。';
+          hintEl.textContent = hostSel.value === 'modelscope'
+            ? '魔搭源下载失败，可切回官方源重试；已下载的模型可离线使用。'
+            : '首次下载可能失败（多为国际链路波动），可把下载源切换为「魔搭（国内）」后重试。';
           busy = false;
           sendBtn.disabled = !ready;
           loadBtn.disabled = false;
@@ -120,9 +137,37 @@ export function initLlm() {
     return worker;
   }
 
+  // 下载源：缓存键是完整 URL，切换源后同模型会按新 URL 重新下载
+  const HOST_KEY = 'llm-model-host';
+  const hostSel = $('llm-host');
+  hostSel.value = getModelHost(HOST_KEY) === HOST_MODELSCOPE ? 'modelscope' : 'official';
+  hostSel.addEventListener('change', () => {
+    if (busy) { setStatus('加载中，稍后再切换', 'error'); return; }
+    setModelHost(HOST_KEY, hostSel.value === 'modelscope' ? HOST_MODELSCOPE : 'https://huggingface.co');
+    // 用户主动重新选源，允许再次尝试回退
+    mirrorFallbackUsed = false;
+    setStatus('已切换到' + (hostSel.value === 'modelscope' ? '魔搭（国内）' : '官方源') + '，下次加载生效', 'ready');
+    resetWorker();
+    ready = false;
+    sendBtn.disabled = true;
+  });
+
+  function currentHost() {
+    return hostSel.value === 'modelscope' ? HOST_MODELSCOPE : 'https://huggingface.co';
+  }
+
+  function resetWorker() {
+    if (worker) { worker.terminate(); worker = null; }
+  }
+
+  // 魔搭失败自动回退官方源的状态
+  let lastAction = null;
+  let mirrorFallbackUsed = false;
+
   function startLoad() {
     if (busy) return;
     busy = true;
+    lastAction = { kind: 'load', model: modelSel.value };
     loadBtn.disabled = true;
     sendBtn.disabled = true;
     progressBox.hidden = false;
@@ -134,7 +179,7 @@ export function initLlm() {
         loadBtn.disabled = false;
       }
     }, 180000);
-    getWorker().postMessage({ type: 'load', model: modelSel.value });
+    getWorker().postMessage({ type: 'load', model: modelSel.value, host: currentHost() });
   }
 
   loadBtn.addEventListener('click', startLoad);
@@ -198,6 +243,7 @@ export function initLlm() {
       model: modelSel.value,
       prompt: text,
       maxTokens: 256,
+      host: currentHost(),
     });
   });
 

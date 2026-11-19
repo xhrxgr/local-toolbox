@@ -32,6 +32,11 @@ function post(type, data = {}) {
 function setupEnv() {
   env.allowLocalModels = false;
   env.remoteHost = host;
+  // 魔搭的仓库路径是 /models/{org}/{model}/resolve/master/{file}，
+  // 与官方模板（{model}/resolve/{revision}/）不同；revision 固定 master
+  env.remotePathTemplate = host === 'https://modelscope.cn'
+    ? 'models/{model}/resolve/master/'
+    : '{model}/resolve/{revision}/';
   env.useBrowserCache = true;
   env.useWasmCache = false; // WASM 走 SW 的缓存策略，不重复存一份
   const base = (import.meta.env?.BASE_URL || '/').replace(/\/$/, '');
@@ -124,8 +129,8 @@ function maxTokensFor(text) {
   return Math.min(512, Math.max(64, Math.ceil(text.length * 1.6) + 32));
 }
 
-async function translate(text, direction, seq) {
-  const pipe = await ensurePipe(direction);
+async function translate(text, direction, seq, requestedHost) {
+  const pipe = await ensurePipe(direction, requestedHost);
 
   // 按段落保持原文结构；段内按句子切块，逐块翻译并流式送出
   const paragraphs = text.split('\n');
@@ -185,11 +190,11 @@ self.onmessage = async (e) => {
         ? msg.direction
         : detectDirection(text);
       post('log', { message: `正在翻译（${direction === 'en-zh' ? '英→中' : '中→英'}）…` });
-      const out = await translate(text, direction, msg.seq);
+      const out = await translate(text, direction, msg.seq, msg.host);
       post('result', { text: out, direction, seq: msg.seq });
       return;
     }
   } catch (err) {
-    post('error', { message: String((err && err.message) || err) });
+    post('error', { message: String((err && err.message) || err), stack: String(err && err.stack || '').slice(0, 500) });
   }
 };
