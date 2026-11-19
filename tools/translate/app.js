@@ -24,6 +24,12 @@ export function initTranslate() {
   let busy = false;
   let reqSeq = 0;
   let busyTimer = null;
+  let busyKind = '';       // 'translate' | 'preload'
+  let cachedDirs = new Set(); // 已缓存的模型方向
+
+  const DIR_LABEL = { 'zh-en': '中→英', 'en-zh': '英→中' };
+  // 两个方向各自的关键文件：decoder 是最大的模型文件，缓存里有它即算完整
+  const KEY_FILE = { 'zh-en': 'opus-mt-zh-en', 'en-zh': 'opus-mt-en-zh' };
 
   function setStatus(text, kind = '') {
     statusEl.textContent = text;
@@ -32,9 +38,57 @@ export function initTranslate() {
 
   function releaseBusy() {
     busy = false;
+    busyKind = '';
     runBtn.disabled = false;
-    preloadBtn.disabled = false;
     if (busyTimer) { clearTimeout(busyTimer); busyTimer = null; }
+  }
+
+  // ---------- 预下载进度聚合 ----------
+  // 两个方向共约 8 个文件，单个文件的 0~100% 会来回横跳；
+  // 以文件为单位聚合成总体进度：进度条 = 各文件均值的均值，文本显示已完成数。
+  const dlFiles = new Map();   // 'direction|file' -> { progress, done }
+  let dlDoneCount = 0;
+
+  function renderDlProgress(currentFile, currentDir) {
+    progressBox.hidden = false;
+    let sum = 0;
+    for (const f of dlFiles.values()) sum += f.progress;
+    const total = Math.round(sum / dlFiles.size);
+    progressFill.style.width = total + '%';
+    progressText.textContent = `${dlDoneCount}/${dlFiles.size} 个文件`;
+    const dir = DIR_LABEL[currentDir] || '';
+    const name = (currentFile || '').split('/').pop();
+    setStatus(`正在下载${dir ? ` ${dir}` : ''}模型：${name || '…'}`);
+  }
+
+  function applyCachedUi() {
+    const both = cachedDirs.has('zh-en') && cachedDirs.has('en-zh');
+    if (both) {
+      setStatus('两个方向的模型均已缓存，可离线翻译', 'ready');
+      preloadBtn.textContent = '模型已缓存';
+      preloadBtn.disabled = true;
+    } else if (cachedDirs.size > 0) {
+      const have = [...cachedDirs].map((d) => DIR_LABEL[d]).join('、');
+      const missing = ['zh-en', 'en-zh'].filter((d) => !cachedDirs.has(d)).map((d) => DIR_LABEL[d]).join('、');
+      setStatus(`${have}模型已缓存；${missing}模型首次使用时自动下载`, 'ready');
+      preloadBtn.textContent = '补齐预下载';
+    }
+    // 全无缓存时保持初始文案「模型未加载…」，按钮文案不变
+  }
+
+  /** 页面加载时查 Cache Storage，让用户一进来就知道模型是否已就绪 */
+  async function detectCachedModels() {
+    try {
+      if (!('caches' in window)) return;
+      const cache = await caches.open('transformers-cache');
+      const urls = (await cache.keys()).map((k) => k.url);
+      for (const dir of ['zh-en', 'en-zh']) {
+        if (urls.some((u) => u.includes('/' + KEY_FILE[dir] + '/') && u.includes('.onnx'))) {
+          cachedDirs.add(dir);
+        }
+      }
+      applyCachedUi();
+    } catch { /* Cache API 不可用时静默跳过 */ }
   }
 
   function getWorker() {
@@ -45,15 +99,29 @@ export function initTranslate() {
       if (m.type === 'log') {
         setStatus(m.message);
       } else if (m.type === 'progress') {
-        progressBox.hidden = false;
-        const p = Math.round(m.progress || 0);
-        progressFill.style.width = p + '%';
-        // 显示当前下载的文件，避免长下载期间用户以为卡死
-        const name = (m.file || '').split('/').pop();
-        progressText.textContent = m.done ? '完成' : name ? `${p}% · ${name.slice(0, 14)}` : `${p}%`;
-        setStatus(`正在下载模型文件：${name || '…'}`);
+        const key = (m.direction || '') + '|' + (m.file || '');
+        if (busyKind === 'preload' && m.file && m.direction) {
+          const rec = dlFiles.get(key) || { progress: 0 };
+          rec.progress = m.done ? 100 : Math.round(m.progress || 0);
+          dlFiles.set(key, rec);
+          if (m.done && rec.progress === 100 && !rec.counted) { rec.counted = true; dlDoneCount++; }
+          renderDlProgress(m.file, m.direction);
+        } else {
+          // 翻译时的单模型加载：保持原有单文件进度显示
+          progressBox.hidden = false;
+          const p = Math.round(m.progress || 0);
+          progressFill.style.width = p + '%';
+          const name = (m.file || '').split('/').pop();
+          progressText.textContent = m.done ? '完成' : name ? `${p}% · ${name.slice(0, 14)}` : `${p}%`;
+          setStatus(`正在下载模型文件：${name || '…'}`);
+        }
       } else if (m.type === 'model-ready') {
-        setStatus('模型就绪（可离线使用）', 'ready');
+        // 某个方向刚下载完成，记入缓存集合（preload 进行中不覆盖下载文案）
+        if (m.direction) cachedDirs.add(m.direction);
+        if (busyKind !== 'preload') {
+          setStatus('模型就绪，正在翻译…', 'ready');
+          applyCachedUi();
+        }
       } else if (m.type === 'token') {
         // 流式译文：只接受当前请求的片段
         if (m.seq === reqSeq) {
@@ -73,13 +141,20 @@ export function initTranslate() {
         }
         releaseBusy();
       } else if (m.type === 'ready') {
-        setStatus('模型已预下载，可离线使用', 'ready');
+        // preload 完成：两个方向都已进缓存
+        cachedDirs.add('zh-en');
+        cachedDirs.add('en-zh');
+        setStatus('模型已全部缓存，之后可离线翻译', 'ready');
         progressBox.hidden = true;
+        applyCachedUi();
         releaseBusy();
       } else if (m.type === 'error') {
+        const wasPreload = busyKind === 'preload';
         setStatus('错误：' + m.message, 'error');
         hintEl.textContent = '若首次下载失败，请检查网络；已下载过的模型可离线使用。';
         releaseBusy();
+        // 预下载失败时恢复按钮，允许重试
+        if (wasPreload) preloadBtn.disabled = false;
       }
     };
     worker.onerror = (e) => {
@@ -143,8 +218,9 @@ export function initTranslate() {
   runBtn.addEventListener('click', () => {
     const text = input.value.trim();
     if (!text) { flashHint(runBtn, '请先输入文本'); return; }
-    if (busy) { flashHint(runBtn, '正在翻译中'); return; }
+    if (busy) { flashHint(runBtn, busyKind === 'preload' ? '正在预下载模型，请稍候' : '正在翻译中'); return; }
     busy = true;
+    busyKind = 'translate';
     runBtn.disabled = true;
     output.value = '';   // 立刻清掉旧译文，避免误读成新结果
     const seq = ++reqSeq;
@@ -172,13 +248,20 @@ export function initTranslate() {
   preloadBtn.addEventListener('click', () => {
     if (busy) return;
     busy = true;
+    busyKind = 'preload';
     preloadBtn.disabled = true;
+    // 计数器重置：上一次的进度不应混进本次统计
+    dlFiles.clear();
+    dlDoneCount = 0;
     setStatus('正在预下载两个方向的模型…');
     progressBox.hidden = false;
+    progressFill.style.width = '0%';
+    progressText.textContent = '';
     busyTimer = setTimeout(() => {
       if (busy) {
         setStatus('模型下载较慢，请稍候或重试', '');
         releaseBusy();
+        preloadBtn.disabled = false;
       }
     }, 300000);
     getWorker().postMessage({ type: 'preload' });
@@ -193,9 +276,10 @@ export function initTranslate() {
   $('btn-copy').addEventListener('click', async (e) => {
     if (!output.value) { flashHint(e.currentTarget, '暂无译文'); return; }
     const ok = await copyText(output.value);
-    flashHint(e.currentTarget, ok ? '已复制x' : '复制失败');
+    flashHint(e.currentTarget, ok ? '已复制' : '复制失败');
   });
 
   updateLangLabels(directionSel.value);
   updateCount();
+  detectCachedModels();
 }
