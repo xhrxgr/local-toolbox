@@ -1,0 +1,1 @@
+var e=`https://huggingface.co`,t=`https://modelscope.cn`;function n(n){try{return localStorage.getItem(n)===`https://modelscope.cn`?t:e}catch{return e}}function r(n,r){try{localStorage.setItem(n,r===`https://modelscope.cn`?t:e)}catch{}}export{n,r,t};

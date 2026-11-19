@@ -6,8 +6,9 @@
   <meta name="description" content="本地大模型 —— 在浏览器里运行大语言模型，对话内容不上传服务器" />
   <title>本地大模型 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/llm-BPX5isdB.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/llm-C1Uc5rn6.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Ir7JNMuE.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/model-host-DHruOqA7.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/llm-DzojA0kM.css">
 </head>
@@ -21,6 +22,10 @@
         <select class="codec-select" id="llm-model" aria-label="选择模型">
           <option value="qwen">Qwen2.5-0.5B（中英较好，约 460MB）</option>
           <option value="smollm">SmolLM2-135M（下载快，偏英文，约 112MB）</option>
+        </select>
+        <select class="codec-select" id="llm-host" aria-label="模型下载源" title="模型下载源：国内网络建议魔搭">
+          <option value="official">源：官方</option>
+          <option value="modelscope">源：魔搭（国内）</option>
         </select>
         <span class="llm-status" id="llm-status" role="status">模型未加载</span>
         <button class="btn btn-secondary" id="btn-load" type="button">加载模型</button>

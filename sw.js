@@ -67,10 +67,11 @@ const CROSS_ORIGIN_ASSET_RE = /\.(?:js|mjs|wasm|data|onnx|traineddata|traineddat
 /* Transformers.js 自己用 Cache API 缓存模型（键就是文件 URL），
    SW 若再缓存一份会重复占几百 MB，容易撑爆配额。
    这些请求交给库自己管理，SW 不拦截。
-   注意：不要只列 onnx-community/Xenova —— HuggingFaceTB 等组织同样
-   会被用作模型源，漏掉就会让 .json/.onnx 走进 cacheFirst，
+   注意：不要只列 onnx-community/Xenova —— HuggingFaceTB 等组织、
+   modelscope.cn（魔搭，路径 /models/{org}/{repo}/resolve/master/...）
+   同样会被用作模型源，漏掉就会让 .json/.onnx 走进 cacheFirst，
    拿到 opaque 响应后库解析失败（表现为 net::ERR_FAILED）。 */
-const TRANSFORMERS_MODEL_RE = /(?:huggingface\.co|hf-mirror\.(?:com|net))\/(?:[^/]+\/)?[^/]+\/resolve\//i;
+const TRANSFORMERS_MODEL_RE = /(?:huggingface\.co|hf-mirror\.(?:com|net)|modelscope\.cn)\/.*\/resolve\//i;
 
 /* 离线且无对应缓存时的兜底页 */
 const OFFLINE_HTML = `<!DOCTYPE html>

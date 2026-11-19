@@ -6,9 +6,10 @@
   <meta name="description" content="离线中英互译 —— 模型在浏览器本地运行，文本不上传，首次加载后可离线使用" />
   <title>离线翻译 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/translate-BkIklaWs.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/translate-cS5CleW8.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Ir7JNMuE.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/clipboard-C24IsV_E.js">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/model-host-DHruOqA7.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/translate-Bddm-vAd.css">
 </head>
@@ -37,6 +38,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-3-3 M17 17H4l3 3"/></svg>
           </button>
         </div>
+        <select class="codec-select" id="tr-host" aria-label="模型下载源" title="模型下载源：国内网络建议魔搭">
+          <option value="official">源：官方</option>
+          <option value="modelscope">源：魔搭（国内）</option>
+        </select>
         <span class="translate-status" id="tr-status" role="status">模型未下载 · 首次使用约需 60MB</span>
         <button class="btn btn-secondary btn-sm" id="btn-preload" type="button">预下载模型</button>
       </div>
