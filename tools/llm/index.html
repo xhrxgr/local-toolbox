@@ -6,11 +6,12 @@
   <meta name="description" content="本地大模型 —— 在浏览器里运行大语言模型，对话内容不上传服务器" />
   <title>本地大模型 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/llm-C1Uc5rn6.js"></script>
-  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-Ir7JNMuE.js">
+  <script type="module" crossorigin src="/local-toolbox/assets/llm-C9WGJHyU.js"></script>
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-3ktveFWh.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/model-host-DHruOqA7.js">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-BhPJDATC.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/llm-DzojA0kM.css">
+  <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-progress-BwTeY6bQ.js">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-exNiSijH.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/llm-Bl0qN3qf.css">
 </head>
 <body>
   <main class="tool-container">
@@ -34,9 +35,14 @@
       </div>
       <input type="file" id="llm-files" webkitdirectory directory multiple hidden />
 
-      <div class="llm-progress" id="llm-progress" hidden>
-        <div class="llm-progress__bar"><span id="llm-progress-fill"></span></div>
-        <span class="llm-progress__text" id="llm-progress-text"></span>
+      <div class="dl-progress" id="llm-progress" hidden>
+        <div class="dl-progress__head">
+          <span class="dl-progress__title" id="llm-progress-title">正在加载模型</span>
+          <span class="dl-progress__pct" id="llm-progress-pct">0%</span>
+        </div>
+        <div class="dl-progress__track"><div class="dl-progress__fill" id="llm-progress-fill"></div></div>
+        <div class="dl-progress__status" id="llm-progress-status">等待开始</div>
+        <div class="dl-progress__files" id="llm-progress-files"></div>
       </div>
 
       <div class="llm-chat" id="llm-chat" aria-live="polite">
