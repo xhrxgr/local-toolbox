@@ -6,35 +6,58 @@
   <meta name="description" content="本地大模型 —— 在浏览器里运行大语言模型，对话内容不上传服务器" />
   <title>本地大模型 - 网页工具箱</title>
   <link rel="icon" type="image/svg+xml" href="/local-toolbox/favicon.svg" />
-  <script type="module" crossorigin src="/local-toolbox/assets/llm-DV5BoW7z.js"></script>
+  <script type="module" crossorigin src="/local-toolbox/assets/llm-DHBzbYEK.js"></script>
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/common-CA3EqM3N.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/model-host-DHruOqA7.js">
   <link rel="modulepreload" crossorigin href="/local-toolbox/assets/download-progress-gxdKvRr9.js">
   <link rel="stylesheet" crossorigin href="/local-toolbox/assets/common-JEQ5WO6Y.css">
-  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/llm-Bl0qN3qf.css">
+  <link rel="stylesheet" crossorigin href="/local-toolbox/assets/llm-DzWWphBs.css">
 </head>
 <body>
-  <main class="tool-container">
+  <main class="tool-container llm-page">
     <section class="mode-panel glass mode-panel--active llm-panel">
-      <div class="panel-desc">在浏览器里直接运行大语言模型，对话内容不会上传。首次使用需下载模型，之后可离线使用。</div>
-
-      <div class="llm-bar">
-        <label class="codec-label" for="llm-model">模型</label>
-        <select class="codec-select" id="llm-model" aria-label="选择模型">
-          <option value="qwen">Qwen2.5-0.5B（中英较好，约 460MB）</option>
-          <option value="smollm">SmolLM2-135M（下载快，偏英文，约 112MB）</option>
-        </select>
-        <select class="codec-select" id="llm-host" aria-label="模型下载源" title="模型下载源：国内网络建议魔搭">
-          <option value="official">源：官方</option>
-          <option value="modelscope">源：魔搭（国内）</option>
-        </select>
+      <!-- 标题区：建立视觉锚点 -->
+      <header class="llm-panel__head">
+        <div class="llm-panel__title">
+          <span class="llm-panel__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="3" />
+              <path d="M9 9h6M9 13h6M9 17h3" />
+            </svg>
+          </span>
+          <div>
+            <h1>本地大模型</h1>
+            <p>对话只在浏览器内处理，不上传服务器</p>
+          </div>
+        </div>
         <span class="llm-status" id="llm-status" role="status">模型未加载</span>
-        <button class="btn btn-secondary" id="btn-load" type="button">加载模型</button>
-        <button class="btn btn-secondary" id="btn-import" type="button">导入本地模型文件</button>
-        <button class="btn btn-secondary" id="btn-reset" type="button">新建对话</button>
+      </header>
+
+      <!-- 配置区：模型、下载源、操作 -->
+      <div class="llm-config">
+        <label class="llm-field">
+          <span class="llm-field__label">模型</span>
+          <select class="codec-select" id="llm-model" aria-label="选择模型">
+            <option value="qwen">Qwen2.5-0.5B（中英较好，约 460MB）</option>
+            <option value="smollm">SmolLM2-135M（下载快，偏英文，约 112MB）</option>
+          </select>
+        </label>
+        <label class="llm-field">
+          <span class="llm-field__label">下载源</span>
+          <select class="codec-select" id="llm-host" aria-label="模型下载源" title="模型下载源：国内网络建议魔搭">
+            <option value="official">官方</option>
+            <option value="modelscope">魔搭（国内）</option>
+          </select>
+        </label>
+        <div class="llm-config__actions">
+          <button class="btn btn-primary" id="btn-load" type="button">加载模型</button>
+          <button class="btn btn-secondary" id="btn-import" type="button">导入本地模型</button>
+          <button class="btn btn-secondary" id="btn-reset" type="button">新建对话</button>
+        </div>
       </div>
       <input type="file" id="llm-files" webkitdirectory directory multiple hidden />
 
+      <!-- 下载进度 -->
       <div class="dl-progress" id="llm-progress" hidden>
         <div class="dl-progress__head">
           <span class="dl-progress__title" id="llm-progress-title">正在加载模型</span>
@@ -46,18 +69,27 @@
         <div class="dl-progress__files" id="llm-progress-files"></div>
       </div>
 
+      <!-- 对话区 -->
       <div class="llm-chat" id="llm-chat" aria-live="polite">
-        <div class="llm-empty" id="llm-empty">加载模型后开始对话。小模型能力有限，适合简单问答与文本改写。</div>
+        <div class="llm-empty" id="llm-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8A8.5 8.5 0 0 1 12 20a8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z" />
+            <path d="M8 11h8M8 14h5" />
+          </svg>
+          <strong>加载模型后开始对话</strong>
+          <span>小模型能力有限，适合简单问答与文本改写</span>
+        </div>
       </div>
 
+      <!-- 输入区 -->
       <div class="llm-compose">
-        <textarea class="codec-input" id="llm-input" placeholder="输入问题，Ctrl+Enter 发送…" rows="3" spellcheck="false"></textarea>
+        <textarea class="codec-input" id="llm-input" placeholder="输入问题，Ctrl + Enter 发送…" rows="3" spellcheck="false"></textarea>
         <div class="llm-compose__foot">
           <span class="llm-count" id="llm-count">0 字符</span>
           <button class="btn btn-primary" id="btn-send" type="button" disabled>发送</button>
         </div>
       </div>
-      <p class="llm-hint" id="llm-hint">提示：模型越大回答越好但越慢。首次下载受网络影响可能需要几分钟，下载完成后会自动缓存。也可以「导入本地模型文件」直接用一个已下载好的模型文件夹，无需联网。</p>
+      <p class="llm-hint" id="llm-hint">首次下载受网络影响可能需要几分钟，完成后自动缓存，之后可离线使用。也可以「导入本地模型」直接用已下载好的模型文件夹，无需联网。</p>
     </section>
   </main>
 </body>
