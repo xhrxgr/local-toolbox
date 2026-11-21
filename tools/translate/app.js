@@ -5,6 +5,7 @@
 import { copyText, flashHint } from '/assets/js/clipboard.js';
 import { getModelHost, setModelHost, HOST_MODELSCOPE } from '/assets/js/model-host.js';
 import { DownloadProgress, renderProgress as renderProgressUi, hideProgress } from '/assets/js/download-progress.js';
+import { mountResourcePanel } from '/assets/js/resource-hub.js';
 
 export function initTranslate() {
   const $ = (id) => document.getElementById(id);
@@ -348,4 +349,5 @@ export function initTranslate() {
   updateLangLabels(directionSel.value);
   updateCount();
   detectCachedModels();
+  mountResourcePanel('#resource-panel', 'translate');
 }

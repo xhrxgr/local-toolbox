@@ -243,6 +243,88 @@ async function fetchWithProgress(url, onProgress) {
   return buf.buffer;
 }
 
+/**
+ * 判断 transformers.js 缓存里是否存在匹配某个模型的文件。
+ * 缓存键是完整 URL，而模型可从官方/魔搭两个源下载 —— 用 URL 片段匹配
+ * 而不是精确 URL，任一源命中即算已缓存。
+ */
+async function modelCached(cacheName, repo, ext = '.onnx') {
+  if (!('caches' in window)) return false;
+  try {
+    const cache = await caches.open(cacheName);
+    return (await cache.keys()).some((k) => {
+      const u = k.url;
+      return u.includes('/' + repo + '/') && u.includes(ext) && u.includes('/resolve/');
+    });
+  } catch {
+    return false;
+  }
+}
+
+/** 删除缓存中某个模型的所有文件（任意源） */
+async function removeModelEverywhere(repo) {
+  if (!('caches' in window)) return;
+  for (const name of await caches.keys()) {
+    const cache = await caches.open(name);
+    try {
+      for (const req of await cache.keys()) {
+        if (req.url.includes('/' + repo + '/')) await cache.delete(req);
+      }
+    } catch { /* 忽略 */ }
+  }
+}
+
+/**
+ * 生成一个 transformers.js 模型资源条目。
+ * 与 ASR 那条不同：这里按 repo 名匹配缓存，官方/魔搭两个源都算。
+ * 预下载统一走官方源（默认源），URL 结构固定，写入 transformers-cache。
+ */
+function makeTransformersModelResource({ id, name, desc, size, repo, files }) {
+  const CACHE = 'transformers-cache';
+  const OFFICIAL = 'https://huggingface.co';
+  return {
+    id,
+    name,
+    desc,
+    size,
+    files: [],
+    async isCached() {
+      return modelCached(CACHE, repo);
+    },
+    async download(onProgress) {
+      const cache = ('caches' in window) ? await caches.open(CACHE).catch(() => null) : null;
+      let loaded = 0;
+      for (const f of files) {
+        const url = `${OFFICIAL}/${repo}/resolve/main/${f.name}`;
+        // 已缓存的来源文件直接跳过，避免重复下载
+        if (cache && await cache.match(url)) {
+          loaded += f.size || 0;
+          onProgress?.(loaded, size);
+          continue;
+        }
+        try {
+          const buf = await fetchWithProgress(url, (l) => onProgress?.(loaded + l, size));
+          if (cache) {
+            try {
+              await cache.put(url, new Response(buf, {
+                headers: { 'Content-Type': f.name.endsWith('.onnx') ? 'application/octet-stream' : 'application/json' },
+              }));
+            } catch { /* 配额不足时本次仍可用 */ }
+          }
+          loaded += buf.byteLength || f.size || 0;
+        } catch {
+          // 不同模型版本文件清单略有差异，单个文件 404 不影响整体缓存
+          loaded += f.size || 0;
+        }
+      }
+      onProgress?.(size, size);
+    },
+    async remove() {
+      await removeModelEverywhere(repo);
+    },
+  };
+}
+
 /* ========== 资源定义 ========== */
 
 /**
@@ -324,12 +406,8 @@ export const RESOURCE_GROUPS = [
         files: [],
         async isCached() {
           const mod = await import('/tools/asr/model-registry.js');
-          // 只认官方源：那是默认下载源，也是预下载写入的键。
-          // 镜像源是用户手动切换后的临时选择，不作为「已缓存」判定。
-          for (const f of mod.ASR_MODEL_FILES) {
-            if (!(await urlCachedAnywhere(mod.asrModelUrl(mod.ASR_HOST_OFFICIAL, f.name)))) return false;
-          }
-          return true;
+          // 官方/魔搭任一来源有缓存都算就绪（切换过下载源的用户也能识别）
+          return modelCached('transformers-cache', 'onnx-community/whisper-tiny');
         },
         async download(onProgress) {
           const mod = await import('/tools/asr/model-registry.js');
@@ -360,6 +438,78 @@ export const RESOURCE_GROUPS = [
           }
         },
       },
+    ],
+  },
+  {
+    id: 'translate',
+    title: '离线翻译',
+    toolPath: '/tools/translate/',
+    resources: [
+      makeTransformersModelResource({
+        id: 'translate-zh-en',
+        name: '中 → 英翻译模型',
+        desc: 'opus-mt 中英翻译模型（量化版约 28MB），预下载后离线也能翻译。翻译工具里可切换下载源，任一来源的缓存都会被识别。',
+        size: 28_000_000,
+        repo: 'Xenova/opus-mt-zh-en',
+        files: [
+          { name: 'config.json', size: 1200 },
+          { name: 'generation_config.json', size: 400 },
+          { name: 'tokenizer_config.json', size: 900 },
+          { name: 'tokenizer.json', size: 6_400_000 },
+          { name: 'onnx/encoder_model_quantized.onnx', size: 10_000_000 },
+          { name: 'onnx/decoder_model_merged_quantized.onnx', size: 11_000_000 },
+        ],
+      }),
+      makeTransformersModelResource({
+        id: 'translate-en-zh',
+        name: '英 → 中翻译模型',
+        desc: 'opus-mt 英中翻译模型（量化版约 28MB），与中英方向独立缓存，两个方向可分别预下载。',
+        size: 28_000_000,
+        repo: 'Xenova/opus-mt-en-zh',
+        files: [
+          { name: 'config.json', size: 1200 },
+          { name: 'generation_config.json', size: 400 },
+          { name: 'tokenizer_config.json', size: 900 },
+          { name: 'tokenizer.json', size: 6_400_000 },
+          { name: 'onnx/encoder_model_quantized.onnx', size: 10_000_000 },
+          { name: 'onnx/decoder_model_merged_quantized.onnx', size: 11_000_000 },
+        ],
+      }),
+    ],
+  },
+  {
+    id: 'llm',
+    title: '本地大模型',
+    toolPath: '/tools/llm/',
+    resources: [
+      makeTransformersModelResource({
+        id: 'llm-smollm',
+        name: 'SmolLM2-135M 模型',
+        desc: '下载快、偏英文的小模型（约 112MB），适合简单问答与改写。预下载后在本地大模型工具里可离线对话。',
+        size: 112_000_000,
+        repo: 'HuggingFaceTB/SmolLM2-135M-Instruct',
+        files: [
+          { name: 'config.json', size: 1200 },
+          { name: 'generation_config.json', size: 400 },
+          { name: 'tokenizer_config.json', size: 2500 },
+          { name: 'tokenizer.json', size: 17_000_000 },
+          { name: 'onnx/model_q4f16.onnx', size: 95_000_000 },
+        ],
+      }),
+      makeTransformersModelResource({
+        id: 'llm-qwen',
+        name: 'Qwen2.5-0.5B 模型',
+        desc: '中英表现较好的小模型（约 460MB）。体积较大，建议网络稳定时预下载。',
+        size: 460_000_000,
+        repo: 'onnx-community/Qwen2.5-0.5B-Instruct',
+        files: [
+          { name: 'config.json', size: 1200 },
+          { name: 'generation_config.json', size: 400 },
+          { name: 'tokenizer_config.json', size: 8000 },
+          { name: 'tokenizer.json', size: 11_000_000 },
+          { name: 'onnx/model_q4f16.onnx', size: 440_000_000 },
+        ],
+      }),
     ],
   },
   {

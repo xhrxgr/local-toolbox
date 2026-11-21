@@ -28,6 +28,7 @@ export class DownloadProgress {
     this.known = new Map(this.files.map((f) => [f.name, f]));
     this.activeName = '';
     this.finished = false;
+    this.lastRatio = 0;
     // 速度计算：每个文件的字节数 + 最近 3 秒的采样点
     this.bytes = new Map();   // name -> { loaded, total }
     this.samples = [];        // [{ t, loaded }]
@@ -84,28 +85,36 @@ export class DownloadProgress {
       const totalSize = this.files.reduce((s, f) => s + (f.size || 0), 0);
       for (const [n, p] of sized) weighted += (this.known.get(n).size / totalSize) * p;
     }
-    // 未在预知清单里的文件（库实际下载列表可能比清单多）也计入
+    // 优先按字节数加权：多文件并行下载时，新文件以 0% 加入会把
+    // 「各文件进度的平均值」直接拉低（实测 95%→77%→66% 倒退，
+    // 用户以为点了没反应）。字节数加权则天然单调。
+    let byteRatio = null;
+    const withBytes = [...this.bytes.values()].filter((b) => b.total > 0);
+    if (withBytes.length) {
+      const loaded = withBytes.reduce((s, b) => s + b.loaded, 0);
+      const total = withBytes.reduce((s, b) => s + b.total, 0);
+      if (total > 0) byteRatio = loaded / total;
+    }
+
     let ratio;
-    if (sized.length && unknown.length) {
+    if (byteRatio !== null) {
+      ratio = byteRatio;
+    } else if (sized.length && unknown.length) {
       const part = unknown.reduce((s, [, p]) => s + p, 0) / unknown.length;
       ratio = (weighted + part) / 2;
     } else if (sized.length) {
       ratio = weighted;
     } else if (unknown.length) {
       ratio = unknown.reduce((s, [, p]) => s + p, 0) / unknown.length;
-      // 无预知体积时，先完成的小配置文件会让「平均值」瞬间接近 100%，
-      // 随后大文件开始又倒退（实测缓存命中的 json 先 100% 再掉到 81%）。
-      // 只要没收到调用方的 finish()，一律压在 95% 以内（像 FFmpeg 留尾部
-      // 余量）。100% 只在 model-ready / ready 后由 finish() 给出。
-      if (!this.finished) ratio = Math.min(ratio, 0.95);
     } else {
       ratio = 0;
     }
-
-    // 注意：不要因为「当前已知文件都 done」就显示 100% ——
-    // 缓存命中的小 json 会先单独 done 一下，随后大文件才开始下载，
-    // 此时给 100% 会造成「100 → 80」的倒退。100% 由调用方在收到
-    // model-ready / ready 消息后自行设置。
+    // 未 finish 前留 95% 余量；100% 只在 model-ready / ready 后由 finish() 给出
+    if (!this.finished) ratio = Math.min(ratio, 0.95);
+    else ratio = 1;
+    // 单调锁：实际下载中字节数不会倒退，异常回包也不该让进度条往回走
+    ratio = Math.max(ratio, this.lastRatio || 0);
+    this.lastRatio = ratio;
 
     // 活跃文件：优先取最近更新的未完成文件，其次取进度最低的
     let active = null;

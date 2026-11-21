@@ -156,8 +156,11 @@
 }
 
 .res-row__main {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 0;
+  /* 必须配 min-width:0，否则固有宽度会把这一列撑开，
+     窄屏下状态文字被挤成竖排（和 script-card__main 同款坑） */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .res-row__name {
@@ -245,6 +248,11 @@
     text-align: left;
     min-width: 0;
   }
+
+  /* 窄屏：主信息独占一行，状态/体积/按钮各占其位，互不挤压 */
+  .res-row__main { flex: 1 1 100%; }
+  .res-row__check { flex: 0 0 auto; }
+  .res-row__status { flex: 1 1 auto; }
 
   .res-row__actions {
     width: 100%;
