@@ -1,4 +1,4 @@
-import{t as e}from"./toast-C63kdhUO.js";import{a as t}from"./resource-registry-BcE5lktY.js";var n=`resource-panel`,r=!1;function i(){if(r)return;r=!0;let e=document.createElement(`style`);e.textContent=`
+import{t as e}from"./toast-C63kdhUO.js";import{a as t}from"./resource-registry-B2jNV4yn.js";var n=`resource-panel`,r=!1;function i(){if(r)return;r=!0;let e=document.createElement(`style`);e.textContent=`
     .${n} {
       display: flex;
       flex-direction: column;
